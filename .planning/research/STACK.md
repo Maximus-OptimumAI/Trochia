@@ -1,0 +1,299 @@
+# Stack Research
+
+**Domain:** TypeScript-first, AI-heavy, RAG-backed B2C SaaS (agentic founder-fundraising operating system — Next.js monolith, solo build with Claude Code)
+**Researched:** 2026-05-11
+**Confidence:** HIGH on the core stack (matches the 2026 mainstream and the team's `Build_Stack_v2.md`); MEDIUM on a few version-pinning details and on the AI-eval/doc-gen gap picks (verified against current docs but the ecosystem moves fast).
+
+> **Verdict in one line:** The team's tentative stack is *correct for 2026* — keep almost all of it. The only real call to make is **Next.js 16 vs 15** (recommendation: start on 16.x, see below). Everything else is either "ship it" or a small gap to fill. This doc validates each pick, then fills the gaps the question called out: testing, LLM eval/observability, deterministic `.docx`/`.pdf`/`.xlsx` generation, in-browser audio capture, Google Drive `drive.file` OAuth, and the Vercel-on-Fluid-Compute deployment model.
+
+---
+
+## Recommended Stack
+
+### Core Technologies
+
+| Technology | Version (May 2026) | Purpose | Why Recommended |
+|------------|--------------------|---------|-----------------|
+| **Next.js (App Router)** | **16.1.x** (15.x still LTS-ish but in maintenance) | React framework, monolith, marketing + app in one repo | Next.js 16 (Oct 2025) made Turbopack the default bundler for `dev` *and* `build`, made React Compiler support stable, and removed the synchronous-request-API shim that 15.x kept. As of May 2026, 16.1.x is the current stable line. **Recommendation: start on 16.x** — greenfield projects shouldn't start on the previous major, and `tRPC v11`, `@supabase/ssr`, `shadcn/ui`, and Tailwind v4 all support it. The `middleware.ts` → `proxy.ts` rename is the one migration wrinkle to know about. If the team already has Next 15 scaffolding working, 15.x is fine to ship MVP on and upgrade later — but don't add new 15-only patterns. *(If the team's locked decision is genuinely "15", note it as the one place this research disagrees — pin `next@15` exactly and plan a 16 upgrade before V2.)* HIGH confidence. |
+| **TypeScript** | 5.7+ (whatever ships with Next 16) | End-to-end type safety | Non-negotiable; with tRPC + Zod this is the "solved" full-stack TS setup in 2026. HIGH. |
+| **React** | 19.x | UI runtime | Ships with Next 16; React Compiler 1.0 is stable and on by default in Next 16 — free memoization, no manual `useMemo` churn. HIGH. |
+| **Tailwind CSS** | **v4.x** | Styling | v4 is the 2026 default: CSS-first config (no `tailwind.config.js`), OKLCH colors, ~10x faster builds, native CSS variables. shadcn/ui fully supports v4 and the CLI initializes v4 projects. HIGH. |
+| **shadcn/ui** | latest (CLI-distributed, not versioned) | Component layer (copy-in, you own the code) | The dominant 2026 React UI pattern. Every primitive has `data-slot` attributes for styling under Tailwind v4. Use the `shadcn` skill + `magic`/`stitch` MCPs to generate components — no v0/Lovable subscription needed. HIGH. |
+| **Radix UI** | latest (primitives pulled in by shadcn) | Headless accessible primitives | Comes with shadcn; nothing to decide. HIGH. |
+| **Lucide React** | latest | Icon set | Standard pairing with shadcn. HIGH. |
+| **tRPC** | **v11.x** | Type-safe API layer over Next API routes | v11 (stable since mid-2025) rewrote the Next.js adapter for App Router + RSC + server actions + streaming + React Query hydration. This is the right way to do end-to-end type safety in a Next monolith in 2026. Use the `@trpc/next` App Router integration + `@trpc/tanstack-react-query` adapter. HIGH. |
+| **Zod** | **v4.x** | Runtime validation, shared input/output schemas | Zod 4 is current; faster, smaller, better tree-shaking. Use it for tRPC procedure inputs, form schemas (react-hook-form resolver), env validation, and **the SAFE variable-substitution input contract** (the security-critical one). HIGH. |
+| **TanStack Query** | **v5.x** | Server-state cache on the client | Standard; integrates with tRPC v11's prefetch/hydration helpers. HIGH. |
+| **react-hook-form** | v7.x | Form state | Standard; pair with `@hookform/resolvers` + Zod. HIGH. |
+| **Framer Motion** (now **`motion`**) | `motion` v12.x | Animations — use sparingly | Framer Motion rebranded to the `motion` package; same API, install `motion` not `framer-motion`. Brand voice is "operator, not assistant" — keep animation minimal. HIGH. |
+| **Supabase** | platform (current) | Postgres 15+, Auth, Storage, Realtime | The DB. Vercel Postgres/KV are discontinued — Supabase is correct. Use the new **publishable/secret API keys** (the old `anon`/`service_role` keys work through end of 2026 but are deprecated — start on the new keys). Provision **US + EU regions** per the geography decision (EU residency at V2). HIGH. |
+| **pgvector** | **0.8.x** (0.8.2 current) | Vector search inside Postgres | Correct call — do NOT add Pinecone/Weaviate. pgvector 0.8.x has HNSW indexing (added in 0.7.0), comfortably handles 5–10M vectors on a well-sized instance; you won't approach that for years. Use **HNSW** (not IVFFlat) indexes. Keep the index in RAM (size the Supabase compute add-on accordingly when corpus grows). HIGH. |
+| **Drizzle ORM** | **0.44.x** (1.0 in beta) | Type-safe SQL, migrations | Lighter than Prisma, great Supabase story, RLS-aware. **Pin 0.44.x** (conservative) rather than the 1.0 beta until 1.0 ships stable — API churn isn't worth it on a solo build. Use `drizzle-kit` for migrations; keep RLS policies in SQL migrations alongside schema. HIGH. |
+| **Inngest** | TypeScript SDK **v4.x** | Background jobs, queues, durable multi-step workflows, crons | Keep it. SDK v4 has rewritten middleware, parallel-step optimization, checkpointing on by default. Event-driven model fits Trochia well (one "transcript ingested" event fans out to summarize → update pipeline → maybe trigger follow-up draft). Runs *your* code on Vercel — see the Fluid Compute section below for how. The `inngest` skill is wired up. HIGH. (Alternative considered: Trigger.dev v4 — see Alternatives table. Inngest is the right pick here because the workload is genuinely event-shaped and the team already has the skill.) |
+| **Upstash Redis** | platform (current) | Rate limiting, ephemeral caching, idempotency keys | Pay-per-request HTTP Redis — ideal for serverless. Use `@upstash/ratelimit` for per-user/per-IP/per-route limits (sliding window) on AI endpoints (cost protection), auth endpoints (abuse), and outreach-draft endpoints. Also use it as the **idempotency store** for Stripe webhooks and Inngest dedup. HIGH. |
+| **Supabase Auth** | platform (current) | Auth: Google SSO at MVP; magic link + TOTP MFA at V2 | Correct vs Clerk — free, RLS-native, one fewer vendor. Use **`@supabase/ssr`** for Next App Router cookie handling (PKCE by default). MFA = TOTP (`supabase.auth.mfa.*`), phone OTP optional. Magic link = `signInWithOtp`. Do NOT add Auth0. (If solo-build DX pain on auth becomes a tax later, Clerk is the escape hatch — but don't pre-pay for it.) HIGH. |
+| **Stripe** + **Stripe Tax** | API `2025-xx` (latest), `stripe` Node SDK current | Subscriptions (4 tiers + add-on), Customer Portal, 7-day trial, card-on-file at signup, VAT/GST/sales tax | Standard and correct. Use Stripe Billing (Products/Prices for the 4 tiers + the $499 one-time Founder Audit), Customer Portal for self-serve, `trial_period_days: 7` with `payment_method_collection: 'always'`. Stripe Tax covers US sales tax + UK VAT + EU OSS + India GST registration logic. **Caveat:** Stripe Tax *calculates* but you still file — for a solo founder, that's fine at MVP; revisit a filing layer (Quaderno for B2C VAT/OSS, or just an accountant) when EU volume grows. The `stripe-integration` skill handles wiring. HIGH. |
+| **Resend** | API current, **`react-email`** v4.x for templates | Transactional email (auth, billing receipts, in-app notifications) | Standard for Next/TS shops. Pair with `react-email` (or `@react-email/components`) for typed, previewable templates. Free to 3K/mo → $20/mo. Note: founder-approved investor emails go out via the founder's *own Gmail* (Gmail connector / Google OAuth `gmail.send`), NOT Resend — Resend is for Trochia→founder system mail only. HIGH. |
+| **Sentry** | `@sentry/nextjs` v9+ | Error monitoring, performance, session replay | Standard. `@sentry/nextjs` auto-instruments App Router, server actions, and route handlers. Free tier fine until ~1K customers. Do NOT add Datadog. HIGH. |
+| **Amplitude** | `@amplitude/analytics-browser` v2.x (+ `@amplitude/analytics-node` for server events) | Product analytics, funnels, retention, session replay | Correct vs Mixpanel/PostHog. Browser SDK v2 + Session Replay plugin. Track the funnel events the PRD names (deck review completed, brief generated, follow-up drafted, SAFE generated, weekly-loop completion). Server-side SDK for revenue/lifecycle events you don't want client-spoofable. The Amplitude claude.ai connector is for *your* analysis, not instrumentation. HIGH. |
+| **Vercel** (Fluid Compute) | platform (current) | Hosting: Next.js app, API routes, Inngest function endpoint | Correct. Fluid Compute is the default execution model now (one container handles concurrent requests; pay Active CPU not wall-clock; `waitUntil` for post-response work). Default function duration is **300s** on all plans; **up to 800s on Pro** via `export const maxDuration = N` per route or `vercel.json`. See the dedicated section below for the Inngest deployment pattern. HIGH. |
+| **Cloudflare** | platform (current) | DNS, WAF, DDoS in front of Vercel | Standard. Keep DNS on Cloudflare (proxied), point to Vercel. `NEXT_PUBLIC_SITE_URL` migration (`trochia.asranest.com` → `trochia.ai`) is a DNS + Vercel domain change, zero code. HIGH. |
+| **Anthropic API** | **Claude Opus 4.7 / Sonnet 4.6 / Haiku 4.5**, `@anthropic-ai/sdk` current | All production AI: deck review, brief synthesis, follow-up drafting, Q&A, voice-coach structure scoring, application/DDQ drafting | Correct lineup and current (Opus 4.7 shipped 2026-04-16; Sonnet 4.6 is the default workhorse; Haiku 4.5 is the cheap tier). Opus 4.7 and Sonnet 4.6 both support 1M context at flat rates (no surcharge). **Prompt caching: yes, this is the right cost lever — see the dedicated section.** Model routing per the PRD: **Haiku** for classification/polling/cheap Q&A, **Sonnet 4.6** for high-volume drafting, **Opus 4.7** for deep reasoning (deck review, brief synthesis, scorecard). Use the `claude-api` skill. HIGH. |
+| **OpenAI API** | `gpt-5.x` via `openai` SDK | **Fallback only** — Codex bridge for stuck build tasks; optional runtime fallback if Anthropic is down | Keep as fallback. Build a thin `LLMProvider` interface so a provider swap is config, not a rewrite — but don't route production traffic to it by default. Do NOT make this a primary dependency. HIGH on "keep as fallback", MEDIUM on whether you ever need it at runtime. |
+| **Voyage AI** (embeddings) | `voyage-3.5` / `voyage-4` family via `voyageai` SDK | Embeddings for Business Memory, Pipeline Memory, curated corpus | Correct primary pick. Voyage leads retrieval benchmarks (RTEB), supports 32K-token context (good for chunking long corpus docs / decks), and the voyage-4 family shares a vector space across sizes (embed with `large`, query with `lite`, no re-index). ~$0.12/M tokens. **Important: pick one model and never silently change it** — re-embedding the whole corpus + all tenant memory on a model change is painful; version the embedding model in the schema. HIGH. |
+| **Cohere** (embeddings, alternative) | `embed-v4` | Drop-in alternative if you also want Cohere's reranker in the same vendor | Fine as an alternative; pick Voyage unless you specifically want Cohere Rerank co-located. See "Reranking" below. MEDIUM. |
+| **LlamaParse** (LlamaIndex) | API current (`llama-parse` / `llama-cloud-services` SDK) | PDF/PPTX/DOCX → structured slide/section JSON for deck review + DDQ parsing | Correct. 10K free credits/mo, then $1.25/1K credits. Produces the cleanest markdown from visually complex docs (pitch decks are exactly that). **Have a fallback:** if a deck fails LlamaParse (corrupt, weird embeds), fall back to `pdf-parse` / a basic text extractor and flag low-confidence to the founder. Reducto is the enterprise-grade alternative if accuracy ever becomes a complaint — not needed at MVP. HIGH. |
+| **Deepgram Nova-3** (V2) | API current, `@deepgram/sdk` v3+ | Audio transcription: voice pitch coach + Live Raise transcript ingestion fallback | Correct. ~$0.0043/min pre-recorded, ~$0.0077/min streaming, billed per-second, $200 free credit. For the 30–90s voice coach clips, **pre-recorded (batch) is the right mode** — record full clip in browser, upload, transcribe once. Streaming only if you ever do live captioning. HIGH. |
+| **Hume AI — Expression Measurement / Prosody** (V2) | ⚠️ **API sunsetting** | Voice prosody: pace, energy, pause distribution for the voice coach | ⚠️ **VERIFY BEFORE V2.** Hume's *Expression Measurement API* (the prosody model) is being sunset: per Hume's docs, **June 14, 2026 is the last day to use the API and download results** (Playground job creation ends May 14, 2026). Hume is consolidating on EVI (speech-to-speech) and Octave (TTS) — neither of which gives you a "score this recording's prosody" batch endpoint. **Action: by Phase 5 (V2 voice coach, ~Week 11), re-confirm Hume's offering OR have a Plan B ready.** Plan B options: (a) compute the metrics the PRD actually requires yourself from the audio + word timings — Deepgram Nova-3 returns per-word timestamps and confidence, from which **pace (WPM), pause discipline (gap distribution), and filler-word count** are deterministic to compute; "energy" can be approximated from RMS amplitude via the Web Audio API or a tiny server-side DSP step; (b) `praat-parselmouth` (Python) for pitch/intensity if you want real prosody analysis; (c) a successor vendor if one emerges. Honestly, Plan B (a) is probably *better* than Hume for this use case — the PRD's 4 voice metrics are mechanical, not emotional. **Confidence: HIGH that Hume EM is sunsetting; MEDIUM on the exact replacement (decide at V2).** Do not build the voice coach assuming Hume is permanent. |
+| **Dropbox Sign API** (V3) | API current, `@dropbox/sign` Node SDK | E-signature for generated SAFEs; DocuSign fallback | Correct and cost-preferred. Official Node SDK. ESIGN-Act + eIDAS + GDPR + SOC 2 Type II compliant; supports eID/QES via QTSPs (`is_eid: true`) for EU founders. Embedded signing flows so the investor signs from a Trochia-branded page on desktop/mobile. Webhook → cap-table update within 30s (route through Inngest for retry/idempotency). One note: Dropbox Sign discontinued its native SharePoint integration in March 2026 — irrelevant to Trochia. HIGH. |
+
+### Supporting Libraries (the gaps the question called out)
+
+| Library | Version (May 2026) | Purpose | When to Use |
+|---------|--------------------|---------|-------------|
+| **Vitest** | v3.x (Jest-30-era) | Unit + integration tests (business logic, cap-table math, SAFE variable substitution, RAG retrieval shaping, tRPC procedures via `createCaller`) | The 2026 default — 3–6x faster than Jest, native ESM/TS/JSX, zero test-specific config with Vite. **This is where the cap-table math test suite lives** (the PRD demands a 30-scenario spreadsheet match — that's a Vitest table-test). HIGH. |
+| **@testing-library/react** + **jsdom** (or `happy-dom`) | latest | Component unit tests | Use sparingly — in 2026 most teams push UI testing to Playwright. Use RTL for pure-logic components (forms, the SAFE gate checkbox behavior, score displays). MEDIUM. |
+| **Playwright** | v1.5x | E2E + critical-path integration ("paths where failure costs money") | The 2026 standard for browser tests. Cover: signup → trial → card-on-file; Knowledge Pack Import → confirmed memory; deck upload → review; SAFE generate → gate → download; SAFE → e-sign → cap-table update. ~20–30 specs, not hundreds. Also already in your MCP set (`playwright`). HIGH. |
+| **MSW (Mock Service Worker)** | v2.x | Mock Anthropic/Voyage/LlamaParse/Stripe/Deepgram in tests | Deterministic AI-feature tests without burning tokens; also useful for Playwright. HIGH. |
+| **Langfuse** | OSS, `langfuse` JS SDK v3.x (or `langfuse-vercel` for AI SDK tracing) | **LLM observability + eval harness** — traces every Anthropic call (prompt, model, tokens, cost, cache hit, latency), datasets + LLM-as-judge scorers, prompt management/versioning | Fill this gap with Langfuse. It's MIT-licensed, prompt-first, has a real eval harness, and the `langfuse` skill is wired up. **This is the home for the PRD-mandated eval harnesses** (deck reviewer: false-positive rate <25%, no fabricated slide refs, median <90s; voice coach: filler detection >90%; pre-call brief: sources cited; DDQ: ≥80% answers cited). Run evals in CI (GitHub Actions) on a frozen dataset of anonymized real cases. Self-host on a tiny Postgres or use Langfuse Cloud free tier (5K traces/mo) to start. **Alternative: Braintrust** — more polished managed eval + CI deployment-blocking, generous free tier (1M spans/mo), but proprietary; pick it if you'd rather not run Langfuse infra. **Recommendation: Langfuse** (OSS, skill exists, no vendor lock). HIGH on "you need one"; MEDIUM Langfuse-vs-Braintrust (both are fine). Do NOT skip this — "eval harness from day 1" is in the PRD. |
+| **`docx` library** (`docxtemplater` for templated docs) | `docxtemplater` v3.x (+ open-source core; the free modules cover what you need) | **SAFE `.docx` generation** — deterministic variable substitution into vetted YC/Cooley GO templates | Use **docxtemplater**: you upload the lawyer-vetted YC SAFE `.docx` as a template with `{company_name}`, `{investor_name}`, `{amount}`, `{valuation_cap}`, `{discount_pct}`, `{mfn}` placeholders; the engine does pure string substitution — *exactly* the "deterministic variable substitution only, no model-generated legal language" requirement. Templates can be edited by non-lawyers (your law-firm partner updates the `.docx` quarterly without touching code). **Critical: validate all inputs through a Zod schema before substitution** (prevents the catastrophic string-injection bug the Security Engineer must audit — e.g., a `{company_name}` containing template syntax). Do NOT use the `docx` (build-from-scratch) library for SAFEs — you want the lawyer's exact formatting preserved, not reconstructed. HIGH. |
+| **PDF rendering for SAFEs** | **LibreOffice headless** (`libreoffice-convert` npm wrapper) OR Gotenberg (Docker) | Convert the generated `.docx` → `.pdf` so the output is both formats per PRD | The SAFE PRD requires "SAFE PDF + the underlying .docx". Cleanest path: generate `.docx` with docxtemplater, then convert to PDF with **LibreOffice in headless mode** for pixel-faithful fidelity to the legal template. On Vercel that means a separate small service (LibreOffice doesn't run in the Vercel function sandbox) — run it as a **Render/Railway/Fly container** or use **Gotenberg** (a Docker API around LibreOffice + Chromium) and call it from an Inngest function. Alternative: render the SAFE as HTML and use Playwright/Chromium-on-Lambda → PDF, but then you're re-typesetting the legal doc and risking layout drift, which a lawyer will hate. **Recommendation: docx → LibreOffice-headless → PDF, via an Inngest job hitting a small converter service.** MEDIUM (this is a real bit of infra; budget for it in Phase 8). |
+| **PDF generation for non-legal docs** | **`@react-pdf/renderer`** v4.x (a.k.a. "react-pdf") | Deck-review annotated PDF, pre-call brief PDF, voice scorecard PDF, DDQ output | For Trochia-authored documents (briefs, scorecards, reviewed-deck annotations) where *you* control the layout, `@react-pdf/renderer` is ideal: declarative React components → PDF, ultralight, runs in a Node serverless function, no headless browser. Use this for everything except the legally-faithful SAFE. (`pdf-lib` is the tool if you ever need to *stamp/annotate an existing PDF* — e.g., overlay review comments on the founder's original deck PDF rather than regenerating it.) HIGH. |
+| **ExcelJS** | `exceljs` v4.x | **Cap-table `.xlsx` export** — Holder / Type / Date / Amount / Shares / Pre-% / Post-% / Notes, matching Carta/lawyer format | Use **ExcelJS**, not SheetJS, for *generating* workbooks: ExcelJS has the better write API for formatting (column widths, number formats, bold headers, frozen header row, cell borders) which matters for "matches the format lawyers use". SheetJS (`xlsx`) is for *reading/parsing* many formats and for browser-side — overkill and worse for styled writes. The cap-table math is computed by deterministic TS (unit-tested), then ExcelJS just serializes the result. HIGH. |
+| **In-browser audio capture** | **`MediaRecorder` API** (native) — no library; optionally `extendable-media-recorder` for cross-browser WAV | Voice pitch coach: 30–90s capture, auto-stop at 90s | Native `navigator.mediaDevices.getUserMedia()` + `MediaRecorder` is the right answer — it's "WebRTC audio capture" in practice. Record to `audio/webm;codecs=opus` (universally supported), upload the blob to Supabase Storage (tenant-isolated bucket, encryption at rest), then hand the storage URL to a Deepgram batch job via Inngest. Use the **Web Audio API** (`AnalyserNode` / offline RMS pass) to compute the "energy 1–5" metric and to draw a live waveform during recording. If you need a uniform format across Safari/Firefox/Chrome, `extendable-media-recorder` + `-wav-encoder` normalizes to WAV — but webm/opus is fine for transcription. The `voice-ai-development` skill applies here. **Accessibility fallback: text-pitch input path** (same rubric, no voice metrics) per the PRD — that's just a textarea + the same Opus structure-scoring prompt. HIGH. |
+| **Google Drive `drive.file` OAuth** | **`googleapis`** Node client (`google.drive('v3')`) + `google-auth-library` | V2 Data Room: create "<Company> Data Room" folder tree, set "Restricted" permissions, per-investor share links, access analytics | Use the official **`googleapis`** package. Request **only** the `https://www.googleapis.com/auth/drive.file` scope (app sees/manages only files it creates — the PRD's hard requirement; this also keeps you out of Google's restricted-scope security assessment that full `drive` would trigger). Store the refresh token encrypted per-tenant. Flow: founder OAuth → `files.create` (folder, then sub-folders + README files) → `permissions.create` with `role: 'reader'`/`writer` per investor (never `type: 'anyone'`) → generate `webViewLink` per investor → poll `changes`/`files.list` (or Drive Activity API on the created folder) for view/download events → store *only metadata* (file IDs, names, events) per the PRD. On "revoke access" → delete the per-investor permissions, invalidate links. NOTE: `drive.file` does NOT let you read files the founder uploaded *outside* Trochia — that's the intended limitation; the DDQ filler instead takes a direct upload from the founder. The `supabase-automation` and Google connectors help, but the runtime integration is your code. HIGH. |
+| **`@upstash/ratelimit`** | v2.x | Rate limiting on AI/auth/outreach routes; abuse + cost protection | Sliding-window limiter backed by Upstash Redis; wrap it in a tRPC middleware keyed by `userId` (and IP for unauthenticated routes). Especially important on Opus-backed endpoints (deck review, brief gen) to cap a runaway cost from a single tenant. HIGH. |
+| **Cohere Rerank** *or* **Voyage Rerank** | `rerank-4` / `rerank-2.5` | Reranking RAG hits before they go into the prompt | The PRD's RAG quality bar ("median response under 8s, says I-don't-know rather than fabricating, citation in every answer") benefits a lot from a rerank pass: pgvector recall → top-50, rerank → top-5–8 into the Opus synthesis prompt. **Voyage Rerank 2.5** = best quality/latency balance (~600ms); **Cohere Rerank 4** = strong multilingual, also fast. Pick whichever matches your embedding vendor (Voyage embeddings → Voyage rerank; Cohere embeddings → Cohere rerank). MEDIUM — nice-to-have, not MVP-blocking, but cheap to add and materially improves grounding. |
+| **`@anthropic-ai/sdk`** | current | The Anthropic client; prompt caching via `cache_control` breakpoints | See the prompt-caching section. Wrap in your own `LLMProvider` interface for the OpenAI fallback. HIGH. |
+| **`tsx`** | latest | Run TS scripts (migrations, seed scripts, eval runners, corpus-embedding jobs) | Standard dev tool. HIGH. |
+| **`drizzle-kit`** | matches Drizzle | Schema diffing + migrations | Standard. HIGH. |
+| **`zod-to-json-schema`** or Anthropic's tool-use schema | latest | Structured output from Claude (deck reviewer JSON, scorecard JSON, DDQ answers) | The deck reviewer returns `{slide_number, original_text, issue_type, severity, suggested_rewrite, reasoning}` — define it as a Zod schema, convert to a JSON Schema, pass as an Anthropic *tool* (forced tool use) for reliable structured output, then re-parse with Zod for safety. The `llm-structured-output` skill covers this. HIGH. |
+| **`@react-email/components`** + **`react-email`** | v4.x | Typed transactional email templates rendered for Resend | Standard pairing with Resend. MEDIUM (could also just send simple HTML strings). |
+
+### Development Tools
+
+| Tool | Purpose | Notes |
+|------|---------|-------|
+| **Claude Code (Max plan)** | Primary build agent | Per `Build_Stack_v2.md`; the GSD + Superpowers workflow spine. Use `context7` MCP for live, version-correct docs — never code Next 16 / tRPC v11 / Tailwind v4 / pgvector from training memory. |
+| **Cursor** | Secondary IDE for manual fine-tuning | Optional, per the team's doc. |
+| **GitHub Actions** | CI: typecheck, lint, Vitest, Playwright (against a preview deploy), **Langfuse eval suite on the frozen dataset** | Wire the eval harness into CI so a prompt regression blocks merge — this is the operational form of "eval harness from day 1." |
+| **Vercel preview deployments** | Per-PR environments | Standard; Playwright E2E runs against the preview URL. |
+| **Drizzle Studio** / Supabase Studio | DB inspection | Standard. |
+| **1Password** | Secret management | Per the team's doc; keep Anthropic/Voyage/Stripe/Deepgram/Dropbox-Sign/Google-OAuth secrets here, inject into Vercel env. |
+| **ESLint + Prettier** (or Biome) | Lint/format | Standard; Biome if you want one fast tool instead of two. |
+
+---
+
+## Vercel on Fluid Compute — the deployment model (concrete answer)
+
+**Yes, the Vercel + Inngest model works on Fluid Compute. Here's exactly how:**
+
+1. **Next.js app + API routes + tRPC** deploy as normal Vercel Functions. Under Fluid Compute (the default now) a single container instance serves *concurrent* requests, you're billed Active CPU (paused during I/O — so waiting on Anthropic/Voyage/Deepgram costs nothing), and you get `waitUntil()` for fire-and-forget post-response work. Default per-invocation duration is **300s** on all plans; bump to **up to 800s on Pro** with `export const maxDuration = N` in a route file or a `vercel.json` glob.
+
+2. **Long/expensive AI work does NOT run inline in a request.** Deck review (Opus over a 12-slide deck + memory + taxonomy, target <90s), corpus embedding, transcript summarization, SAFE generation+PDF conversion, brief synthesis — these go to **Inngest**. Pattern: the route handler validates input, emits an Inngest event (`deck/uploaded`, `transcript/ingested`, `safe/requested`), returns immediately with a job ID; the client subscribes (poll a status endpoint or use Supabase Realtime on a `jobs` row); Inngest invokes your function.
+
+3. **Inngest "runs your code on Vercel."** You expose **one HTTP endpoint** — `app/api/inngest/route.ts` (the `serve()` handler from `inngest/next`) — and register it in the Inngest dashboard (or via the Vercel ↔ Inngest integration, which wires the env vars and the endpoint automatically on deploy). Inngest's cloud orchestrator calls *your* endpoint, step by step; each step is its own short Vercel Function invocation (so each step must finish under `maxDuration` — set the Inngest route's `maxDuration` to 300–800s and design steps to be small + retryable). This is why the event-driven, step-based model matters: a 5-minute pipeline is N × short invocations, not one 5-minute function.
+
+4. **Crons** (the PRD's "auto-reminder after 3 weeks of no response", "14-day F&F follow-up reminders", "12-month access-log retention purge", weekly digest jobs) = Inngest scheduled functions, same endpoint. Don't use Vercel Cron for stateful multi-step reminders — Inngest gives you retries, concurrency control, and step memoization.
+
+5. **Webhooks** (Stripe, Dropbox Sign, Google Drive push notifications) → route handler verifies signature, emits an Inngest event, returns 200 fast. Idempotency: dedup on the provider event ID via Upstash Redis or an Inngest event key. Cap-table-update-on-signature lives in an Inngest function so a transient DB error retries cleanly within the 30s SLA.
+
+6. **Rate limiting** sits in tRPC middleware (`@upstash/ratelimit`), evaluated before the expensive call — and Inngest functions also support per-key `concurrency` limits, so you can cap, e.g., "at most 3 concurrent Opus deck reviews per tenant" at the orchestration layer too.
+
+7. **One caveat for the SAFE→PDF step:** LibreOffice/Chromium-headless can't run in the Vercel function sandbox. Run a tiny **Gotenberg** (or custom LibreOffice) container on Render/Railway/Fly; the Inngest "generate SAFE" function calls it over HTTP for the `.docx`→`.pdf` step. This is the only piece of infra that lives off Vercel. (`@react-pdf/renderer` for briefs/scorecards runs fine *inside* Vercel functions — no browser needed.)
+
+**Net:** the team's "Next.js monolith on Vercel + Inngest + Upstash" choice is exactly the 2026-correct pattern for this workload. Nothing to change. HIGH confidence.
+
+---
+
+## Prompt caching with the Anthropic SDK — yes, it's the right cost lever
+
+**Validated. The team's mandate is correct.** Why it's the single biggest lever for Trochia specifically:
+
+- Trochia's prompts are **front-loaded with large, stable context**: the curated fundraising corpus (YC Manual, Sam Altman, Lenny's, Pari Passu, term-sheet libraries, NfX, Charles Hudson), the founder's confirmed Business Memory, the deck JSON, the defect taxonomy, the system prompt, the tool schemas. These get re-sent on *every* Q&A turn, every deck-review pass, every brief. That's the textbook prompt-caching shape.
+- Cached input reads at **10% of base input price** (90% discount); cache writes cost ~25% more than base input on first write, with a 5-minute TTL (refreshed on each hit; a 1-hour TTL tier exists for an extra cost). For a sidebar Q&A session where the founder asks 5 questions in a few minutes against the same corpus + memory, you pay full price once and 10% four times — and the corpus chunk alone can be tens of thousands of tokens.
+- Implementation: place `cache_control: { type: 'ephemeral' }` breakpoints on the *stable* prefix blocks (system prompt → tool definitions → corpus → business memory), in that order, *before* the volatile turn content. The `claude-api` / `prompt-caching` skills enforce this; bake it into the `LLMProvider` wrapper so no production call can bypass it.
+- Combine with **model routing** (Haiku for classification/polling/cheap Q&A, Sonnet 4.6 for high-volume drafting, Opus 4.7 for deck review/brief/scorecard) and **batch the corpus-embedding job once** (not per request). Together these are how the PRD hits its >75% gross-margin target at ~$8–$15 AI cost per active user.
+- One thing to *measure*, not assume: cache hit rate. Log `cache_creation_input_tokens` vs `cache_read_input_tokens` per call into Langfuse; if hit rate is low (e.g., requests arrive >5 min apart and the corpus block keeps expiring), either consolidate request bursts, or use the 1-hour cache tier for the corpus block, or accept it. Don't cargo-cult it — instrument it.
+
+HIGH confidence: prompt caching is correct, mandated rightly, and the biggest cost lever. Combine with model routing and one-time embedding for the full margin story.
+
+---
+
+## Installation
+
+```bash
+# --- Core framework (greenfield, recommended) ---
+npx create-next-app@latest trochia --typescript --tailwind --app --eslint
+# -> this scaffolds Next 16.x + Tailwind v4 + TS
+
+# shadcn/ui (Tailwind v4 mode)
+npx shadcn@latest init
+
+# --- API + validation + data ---
+npm install @trpc/server @trpc/client @trpc/next @trpc/tanstack-react-query @tanstack/react-query zod
+npm install drizzle-orm postgres            # postgres = the pg driver for Supabase
+npm install -D drizzle-kit tsx
+npm install @supabase/supabase-js @supabase/ssr
+
+# --- Forms / motion ---
+npm install react-hook-form @hookform/resolvers motion
+
+# --- Background jobs / rate limiting ---
+npm install inngest
+npm install @upstash/ratelimit @upstash/redis
+
+# --- Payments / email ---
+npm install stripe
+npm install resend react-email @react-email/components
+
+# --- Observability / analytics ---
+npm install @sentry/nextjs
+npm install @amplitude/analytics-browser @amplitude/analytics-node
+
+# --- AI ---
+npm install @anthropic-ai/sdk            # Claude (production)
+npm install openai                       # fallback only, behind an LLMProvider iface
+npm install voyageai                      # embeddings (primary)
+# (cohere-ai only if you pick Cohere for embeddings/rerank)
+npm install langfuse                      # LLM observability + eval harness
+npm install zod-to-json-schema            # structured-output schemas for Claude tool use
+
+# --- Document parsing / generation ---
+npm install llama-cloud-services          # LlamaParse (deck + DDQ parsing)
+npm install docxtemplater pizzip          # SAFE .docx generation (template substitution)
+npm install @react-pdf/renderer           # briefs / scorecards / annotated reviews -> PDF
+npm install pdf-lib                        # stamping/annotating EXISTING PDFs (optional)
+npm install exceljs                        # cap-table .xlsx export
+npm install libreoffice-convert            # .docx -> .pdf (runs in a SEPARATE container, not Vercel)
+
+# --- V2/V3 integrations ---
+npm install @deepgram/sdk                  # V2: voice-coach + transcript transcription
+npm install googleapis google-auth-library # V2: Drive (drive.file scope only)
+npm install @dropbox/sign                  # V3: e-signature
+# (Hume EM API is sunsetting June 2026 — DO NOT install a permanent dependency on it; compute voice metrics from Deepgram word timings + Web Audio RMS instead)
+
+# --- Testing ---
+npm install -D vitest @vitest/ui jsdom @testing-library/react @testing-library/jest-dom
+npm install -D @playwright/test
+npm install -D msw
+```
+
+---
+
+## Alternatives Considered
+
+| Recommended | Alternative | When to Use Alternative |
+|-------------|-------------|-------------------------|
+| **Next.js 16.x** | Next.js 15.x | If the team's Next-15 scaffolding is already working and MVP timeline is tight — fine to ship MVP on 15, pin `next@15`, upgrade to 16 before V2. Don't start *new* on 15 in 2026. |
+| **Drizzle ORM** | Prisma | Prisma if you want the most mature migration tooling + Studio and don't mind a heavier client / generated layer. Drizzle is lighter and the RLS story is cleaner for Supabase — keep Drizzle. |
+| **Supabase Auth** | Clerk | Clerk if solo-build auth DX (orgs, MFA UI, user management dashboard) becomes a real time sink. Costs ~$25/mo + per-MAU. Don't pre-pay; Supabase Auth + `@supabase/ssr` is fine for the stated requirements (Google SSO → magic link → TOTP MFA). |
+| **Inngest** | Trigger.dev v4 | Trigger.dev if you'd rather have an Apache-2.0 self-hostable engine and a direct-invocation (`task.trigger()`) mental model over event-driven. For Trochia the workload *is* event-shaped (one ingest event fans out) and the `inngest` skill exists — keep Inngest. |
+| **Langfuse** | Braintrust | Braintrust for a fully-managed eval platform with CI deployment-blocking and a 1M-span/mo free tier, if you don't want to run Langfuse infra. Both are good; pick Langfuse for OSS + existing skill. |
+| **Voyage AI embeddings** | Cohere `embed-v4` / OpenAI `text-embedding-3-large` | Cohere if you want embeddings + reranker from one vendor; OpenAI only if you're already deep in OpenAI infra (you're not). Voyage leads retrieval quality — keep it. |
+| **`@react-pdf/renderer`** (Trochia-authored PDFs) | Puppeteer/Playwright → PDF, or pdfmake | Headless-browser-to-PDF if a brief/scorecard layout needs full CSS/web rendering fidelity — but that needs Chromium-on-Lambda or a container. `@react-pdf/renderer` runs in a plain Node function — keep it for briefs/scorecards. Use **LibreOffice-headless** specifically for the SAFE (legal-template fidelity). |
+| **docxtemplater** (SAFE .docx) | `docx` (build-from-scratch) library, or Carbone | The `docx` library if you ever need to *construct* a Word doc programmatically with no template — wrong for SAFEs (you must preserve the lawyer's exact template). Carbone has a simpler filter syntax but fewer hooks; docxtemplater's open-source core is enough and battle-tested 8+ years. |
+| **ExcelJS** (cap-table export) | SheetJS (`xlsx`) | SheetJS if you need to *parse* uploaded spreadsheets or support 20+ formats / browser-side. For *generating* a styled cap-table workbook, ExcelJS's write API is better. |
+| **Deepgram Nova-3** (transcription) | AssemblyAI, Gladia, OpenAI `gpt-4o-transcribe`/Whisper | AssemblyAI/Gladia are credible if Deepgram pricing or accuracy disappoints; Whisper if you want OpenAI consolidation. Deepgram is fast, cheap, per-second billed, returns word timings (which you need for the voice metrics) — keep it. |
+| **Hume AI prosody** (voice metrics) | **Compute metrics yourself** from Deepgram word timestamps + Web Audio RMS; or `praat-parselmouth` | ⚠️ Hume's Expression Measurement API is sunsetting June 2026 — the self-compute path is the recommended default for V2, not the alternative. The PRD's 4 voice metrics (pace WPM, filler count, energy 1–5, pause discipline 1–5) are mechanical and don't need an emotion model. |
+| **LlamaParse** | Reducto, Unstructured, Docling (IBM, OSS) | Reducto if deck/DDQ parse accuracy becomes a customer complaint (enterprise-grade, vision-first). Docling if you want a free self-hosted parser. LlamaParse's markdown quality on visually-complex docs (decks!) is best-in-class and the free tier is generous — keep it, with a `pdf-parse` fallback. |
+| **Dropbox Sign** (e-sign) | DocuSign | DocuSign is the explicit fallback per the PRD; pricier, more enterprise. Dropbox Sign has the Node SDK, eIDAS/eID support, embedded signing, cheaper — keep it as primary. |
+| **Amplitude** | PostHog | PostHog if you want feature flags + session replay + analytics in one OSS tool and self-host. The team already standardized on Amplitude (+ connector) — keep it; add PostHog only if you need feature flags badly (or use a tiny flags lib / Vercel Edge Config instead). |
+
+---
+
+## What NOT to Use
+
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| **Vercel Postgres / Vercel KV** | **Discontinued.** Vercel deprecated its first-party Postgres and KV (now points users to marketplace partners like Neon/Upstash). | Supabase (Postgres + pgvector + Storage + Auth) for the DB; Upstash Redis for KV/rate-limiting. *(Confirmed: stays excluded.)* |
+| **Pinecone / Weaviate / any separate vector DB** | pgvector 0.8.x with HNSW handles 5–10M vectors comfortably — orders of magnitude beyond Trochia's needs for years. A separate vector DB adds a vendor, a sync problem, and cost for zero benefit at this scale. | pgvector inside Supabase. *(Confirmed: stays excluded. Re-evaluate only past ~50M vectors — not happening soon.)* |
+| **Mem0 / Letta** | Trochia's "Business Memory + Pipeline Memory" is the *moat* — it must be owned, schema'd, RLS-isolated, auditable, exportable. An off-the-shelf memory framework hides the data model you most need to control. | Custom Postgres schema (`businesses`, `business_memory`, `pipeline`, `pipeline_memory`, ...) + pgvector embeddings + Drizzle. `episodic-memory` MCP is build-time only. *(Confirmed: stays excluded.)* |
+| **Algolia** | pgvector + Postgres full-text search (and a rerank pass) covers Trochia's search needs (curated corpus, investor list). Algolia is another vendor + index sync for marginal gain. | Postgres FTS + pgvector hybrid search; the `hybrid-search-implementation` skill. *(Confirmed: stays excluded.)* |
+| **v0 by Vercel / Lovable** | UI generation is already covered by the `magic` (21st.dev) + `stitch` (Google) MCPs + `shadcn`/`frontend-design` skills inside Claude Code — paying $20/mo each is redundant. | `magic` + `stitch` MCPs + shadcn CLI. *(Confirmed: stays excluded.)* |
+| **Composio** | Native MCP servers (Gmail, Calendar, Drive, GitHub, Linear, Sentry, Amplitude, Airtable connectors; `apify`, `firecrawl`, `playwright`) cover the integration surface. | Native MCP servers + the `googleapis` SDK for runtime Drive ops. *(Confirmed: stays excluded.)* |
+| **Auth0** | Supabase Auth is free, RLS-native, and meets the requirements (Google SSO → magic link → TOTP MFA). Auth0 = a vendor + cost for no incremental value here. | Supabase Auth + `@supabase/ssr`; Clerk is the escape hatch if DX pain appears (not Auth0). *(Confirmed: stays excluded.)* |
+| **Datadog** | Sentry (errors/perf/replay) + Amplitude (product) + Langfuse (LLM) cover observability until ~1K+ customers. Datadog is heavy and expensive for a solo build. | Sentry + Amplitude + Langfuse. *(Confirmed: stays excluded.)* |
+| **Salesforce / HubSpot** | Trochia has no sales-CRM need at this stage; Airtable connector + Linear handle CRM-lite. (And note: Trochia's *own* product is a CRM-for-fundraising — but that's the product, not internal tooling.) | Airtable + Linear. *(Confirmed: stays excluded.)* |
+| **Twilio** | No SMS at MVP (auth MFA = TOTP, not SMS — which is also more secure). | Supabase Auth TOTP; Resend for email; revisit SMS only if a feature demands it. *(Confirmed: stays excluded.)* |
+| **Mixpanel** | Amplitude (+ claude.ai connector) is the chosen product-analytics tool; running both is pointless. | Amplitude. *(Confirmed: stays excluded.)* |
+| **Hume AI as a *permanent* dependency** | Its Expression Measurement / prosody API is sunsetting (last usable day ~June 14, 2026). Building the V2 voice coach around it would be building on sand. | Compute the 4 voice metrics from Deepgram word timestamps + Web Audio RMS; revisit a prosody vendor at V2 only if needed. **NEW exclusion-class warning** — not on the original list but should be. |
+| **An LLM anywhere in cap-table math or SAFE legal language** | Per the PRD's hard constraints: dilution/conversion/MFN-cascade math is deterministic unit-tested TS; SAFE text is deterministic variable substitution into vetted templates. A model "computing the cap table" or "drafting a clause" is a catastrophic compliance + correctness failure. | Plain TypeScript + Vitest (30-scenario test suite) for cap-table math; docxtemplater string substitution (Zod-validated inputs, Security-Engineer-audited) for SAFEs. |
+| **Headless Chromium (Puppeteer/Playwright) for the SAFE PDF** | Re-typesetting a lawyer-vetted legal document via HTML→PDF risks layout drift a lawyer will reject; also needs Chromium-on-Lambda infra. | `docx` template (docxtemplater) → LibreOffice-headless → PDF, in a small off-Vercel container called from Inngest. (Headless browser → PDF is fine for *non-legal* docs, but `@react-pdf/renderer` is lighter for those.) |
+| **Streaming Deepgram for the voice coach** | The clips are 30–90s and recorded fully before analysis; streaming adds complexity and costs ~80% more per minute for no benefit. | Deepgram **pre-recorded/batch** mode on the uploaded blob, via an Inngest job. (Streaming only if you ever add live captioning.) |
+
+---
+
+## Stack Patterns by Variant
+
+**If shipping MVP fast on existing Next 15 scaffolding:**
+- Stay on `next@15` (pinned), keep everything else as recommended; schedule the Next 16 upgrade for the V2 boundary. The `middleware.ts`→`proxy.ts` rename and the async-request-API removal are the migration items.
+- Skip rerank (Cohere/Voyage Rerank) and the 1-hour prompt-cache tier at MVP; add them when grounding quality or cost data says so.
+
+**If/when the EU founder push lands (V2):**
+- Provision a Supabase EU-region project; route EU tenants there (or use Supabase's multi-region/read-replica patterns). This is the "data residency" requirement — plan for it as a tenancy-routing concern, not a code rewrite.
+- Confirm Dropbox Sign eIDAS/QES (`is_eid: true`) flow for EU SAFE signing.
+- Add a VAT/OSS filing layer (Quaderno) or hand it to an accountant — Stripe Tax calculates but doesn't file.
+
+**If the voice coach (V2) is reached and Hume EM is confirmed dead:**
+- Default to: Deepgram batch transcription → derive pace/filler/pause from word timings → derive "energy 1–5" from a Web Audio offline RMS pass (or a tiny server-side DSP step) → Opus 4.7 for the 5 structure dimensions. No prosody vendor needed. Re-check the market for a successor only if customer feedback demands richer voice analysis.
+
+**If a single tenant generates runaway AI cost:**
+- `@upstash/ratelimit` tRPC middleware (per-user sliding window) on Opus-backed routes + Inngest per-key `concurrency` caps + per-tenant monthly token budgets surfaced in the billing tier logic. Instrument cache hit rate in Langfuse; raise the cache TTL tier for the corpus block if hit rate is poor.
+
+**If the deck-parse pipeline gets a malformed file:**
+- LlamaParse fails → fall back to `pdf-parse`/basic text extraction → flag low-confidence → tell the founder "we couldn't fully parse this; here's a partial review" rather than fabricating. (Mirrors the PRD's "low-quality transcript → flag for verification" pattern.)
+
+---
+
+## Version Compatibility
+
+| Package A | Compatible With | Notes |
+|-----------|-----------------|-------|
+| `next@16.x` | `react@19.x`, `tailwindcss@4.x`, `@trpc/*@11.x`, `@supabase/ssr` (current), `shadcn` (current), `@sentry/nextjs@9+` | All verified to support Next 16 / App Router in 2026. React Compiler is stable & on by default in Next 16. |
+| `tailwindcss@4.x` | `shadcn/ui` (current) | shadcn fully migrated to Tailwind v4 (`@theme` directive, `data-slot` attributes, OKLCH). CSS-first config — no `tailwind.config.js`. |
+| `@trpc/server@11.x` | `@tanstack/react-query@5.x`, `zod@4.x`, `next@16.x` | Use `@trpc/tanstack-react-query` (the v11 React Query adapter) + the App Router server-component prefetch helpers. |
+| `drizzle-orm@0.44.x` | `postgres@3.x` (pg driver), Supabase Postgres 15+, `drizzle-kit` (matching) | Pin 0.44.x; hold on the 1.0 beta until stable. RLS policies live in SQL migrations. |
+| `@supabase/ssr` (current) | `next@16.x` App Router, `@supabase/supabase-js@2.x` | PKCE flow by default; handle cookies in middleware/`proxy.ts` + server components. Use new publishable/secret keys. |
+| `inngest@4.x` (TS SDK) | `next@16.x` (the `inngest/next` `serve` handler), Vercel Fluid Compute | One route handler `app/api/inngest/route.ts`; set its `maxDuration` to 300–800s; keep steps small. Vercel↔Inngest integration auto-wires env + endpoint. |
+| `pgvector@0.8.x` | Supabase Postgres (extension pre-available), `drizzle-orm` (via `vector` column type) | Use HNSW indexes; ensure the index fits in RAM as the corpus grows (size Supabase compute accordingly). |
+| `@anthropic-ai/sdk` (current) | Claude Opus 4.7 / Sonnet 4.6 / Haiku 4.5; 1M context (Opus/Sonnet) | `cache_control: {type:'ephemeral'}` breakpoints on stable prefix blocks; `langfuse` for tracing token/cost/cache-hit. |
+| `docxtemplater@3.x` | `pizzip@3.x` | Open-source core covers loops/conditions/substitution; the paid modules aren't needed for SAFE variable substitution. Zod-validate all inputs before render. |
+| `@react-pdf/renderer@4.x` | `react@19.x`, Node serverless (no browser) | Runs inside Vercel functions. For *editing existing* PDFs use `pdf-lib` instead. |
+| `exceljs@4.x` | Node serverless | Generate styled cap-table workbooks; loads workbook into memory (fine for 50–500 rows). |
+| `googleapis` (current) + `google-auth-library` | Node serverless | Request `drive.file` scope ONLY; store refresh tokens encrypted per-tenant. |
+| `@deepgram/sdk@3+` | Node serverless | Batch (pre-recorded) mode for voice-coach clips; returns word-level timestamps + confidence (needed for the voice metrics). |
+| `@dropbox/sign` (current) | Node serverless | Embedded signing flows; webhook → Inngest → cap-table update; `is_eid:true` for EU QES. |
+| `vitest@3.x` + `@playwright/test@1.5x` + `msw@2.x` | `next@16.x` | Vitest for logic/unit (incl. cap-table math 30-scenario suite), Playwright for ~20–30 money-path E2E, MSW to mock AI/payment APIs. |
+
+---
+
+## Sources
+
+- `/vercel/next.js` (Context7) — Next.js 16.x is current; versions list confirms 16.1.x line — HIGH
+- nextjs.org/blog/next-16, nextjs.org/docs/app/guides/upgrading/version-16 — Turbopack default, React Compiler stable, sync-request-API removed, `middleware`→`proxy` rename — HIGH
+- platform.claude.com/docs/en/about-claude/models/overview & /pricing; multiple 2026 pricing trackers — Opus 4.7 (released 2026-04-16), Sonnet 4.6, Haiku 4.5; 1M context flat-rate; prompt caching = 90% discount on cached input — HIGH
+- trpc.io/blog/announcing-trpc-v11, trpc.io/docs/client/nextjs — v11 stable, App Router/RSC-native adapter — HIGH
+- orm.drizzle.team (latest releases) + supabase.com/docs/guides/database/drizzle — Drizzle 0.44.x conservative / 1.0 beta; first-class Supabase support — HIGH
+- supabase.com/docs/guides/ai, .../vector-indexes/hnsw-indexes; pgvector 0.8.2 current — HNSW, 5–10M vector scale, keep index in RAM — HIGH
+- vercel.com/docs/fluid-compute, .../functions/configuring-functions/duration, .../functions/limitations — Fluid Compute default, 300s default / 800s Pro `maxDuration`, `waitUntil`, Active-CPU billing — HIGH
+- inngest.com/blog/vercel-integration, inngest.com/docs/reference/typescript/intro, vercel.com/marketplace/inngest — runs your code on Vercel via one `serve()` endpoint; SDK v4; Vercel integration auto-wires — HIGH
+- ui.shadcn.com/docs/tailwind-v4, ui.shadcn.com/docs/installation/next — Tailwind v4 + shadcn, `@theme`, `data-slot`, OKLCH, CSS-first config — HIGH
+- supabase.com/docs/guides/auth/auth-mfa/totp, .../auth/server-side, .../auth/quickstarts/nextjs — `@supabase/ssr` PKCE cookies; TOTP MFA; magic link via `signInWithOtp`; new publishable/secret keys (anon/service_role deprecated end-2026) — HIGH
+- vitest.dev, nextjs.org/docs/app/guides/testing, multiple 2026 comparisons — Vitest default for new projects; Playwright for browser/E2E; ~20–30 money-path E2E pattern — HIGH
+- braintrust.dev / langfuse comparisons, firecrawl.dev best-LLM-observability-2026 — Langfuse (MIT, prompt-first, eval harness) vs Braintrust (managed, CI-blocking, 1M-span free tier) — MEDIUM (both valid; recommended Langfuse for OSS + existing skill)
+- docxtemplater.com / github.com/open-xml-templating/docxtemplater — template-based .docx/.pptx/.xlsx generation, OSS core, 8+ yrs maintained — HIGH
+- dev.to handdot "6 JS libraries for generating PDFs", nutrient.io top-JS-PDF-libraries-2026 — `@react-pdf/renderer` lightweight/serverless-friendly; Puppeteer needs Chromium; `pdf-lib` for editing existing PDFs — HIGH
+- pkgpulse.com SheetJS-vs-ExcelJS-2026, npm-compare — ExcelJS better write/format API; SheetJS better for parsing/many-formats — HIGH
+- deepgram.com/pricing, brasstranscripts.com Deepgram-pricing-2026 — Nova-3 $0.0043/min batch / $0.0077/min streaming, per-second billing, $200 credit; returns word timings — HIGH
+- dev.hume.ai/docs/expression-measurement/overview & /faq — **Expression Measurement API sunsetting: Playground job creation ends 2026-05-14, API + result download ends 2026-06-14**; Hume consolidating on EVI + Octave — HIGH (this is the load-bearing risk finding)
+- developers.google.com/workspace/drive/api/guides/api-specific-auth, .../quickstart/nodejs — `googleapis` Node client; `drive.file` scope = only app-created files (avoids restricted-scope assessment) — HIGH
+- sign.dropbox.com/products/dropbox-sign-api, developers.hellosign.com, help.dropbox.com/plans/dropbox-sign-and-eid — official Node SDK; ESIGN/eIDAS/GDPR/SOC2; `is_eid:true` for QES; SharePoint integration discontinued 2026-03-16 (irrelevant) — HIGH
+- llamaindex.ai/llamaparse & /pricing; reducto.ai/compare/reducto-vs-llamaparse — LlamaParse 10K free credits/mo, $1.25/1K credits, best markdown on complex docs; Reducto = enterprise alternative — HIGH
+- buildmvpfast.com best-embedding-model-comparison-2026, agentset.ai/rerankers — Voyage leads RTEB, 32K context, shared vector space across sizes; Voyage Rerank 2.5 = best quality/latency, Cohere Rerank 4 strong multilingual — MEDIUM (vendor-published benchmarks; directionally consistent across sources)
+- stripe.com/tax, numeral/quaderno/kintsugi comparisons — Stripe Tax calculates 100+ countries (US sales tax, UK VAT, EU OSS, India GST) but doesn't file; Quaderno = B2C VAT/OSS filing alternative — MEDIUM
+- `.planning/intel/Trochia_AI_Build_Stack_v2.md`, `.planning/intel/Trochia_AI_PRD_v2.docx`, `.planning/PROJECT.md` — the team's locked decisions, per-feature data models, and constraints (validated against, not re-derived) — HIGH
+
+---
+*Stack research for: TypeScript-first, AI-heavy, RAG-backed B2C SaaS (agentic founder-fundraising OS, Next.js monolith)*
+*Researched: 2026-05-11*
