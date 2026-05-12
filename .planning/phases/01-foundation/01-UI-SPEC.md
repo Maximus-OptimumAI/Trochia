@@ -65,10 +65,22 @@ Type classes Phase 1 must define (Tailwind `fontSize` keys per DESIGN-REFERENCE 
 | Body | `text-body` | Inter | 16–17px (1.0625rem) | 400 | 1.65 | 0 | Body copy default. Default text color `text-ink`. |
 | Body small | `text-body-sm` | Inter | 14–15px (0.9375rem) | 400 | 1.55 | 0 | Secondary copy, captions, helper text, footer |
 | Label | `text-label` | Inter | 13–14px (0.8125rem) | 500 | 1.4 | +4% (0.04em), uppercase OK | Eyebrows, form labels |
-| Mono | `text-mono` | Geist Mono | 14–16px | 400 | normal | 0 | Numbers, metrics, pricing figures, command palette, IDs |
-| Mono small | `text-mono-sm` | Geist Mono | 12–13px | 400 | normal | 0 | Inline code, badges, section-divider labels, phase tags |
+| Mono | `text-mono` | Geist Mono | Tailwind-native `text-base` (16px) + `font-mono` — **not a custom `fontSize` key** | 400 | normal | 0 | Numbers, metrics, pricing figures, command palette, IDs |
+| Mono small | `text-mono-sm` | Geist Mono | Tailwind-native `text-sm` (14px) + `font-mono` — **not a custom `fontSize` key** | 400 | normal | 0 | Inline code, badges, section-divider labels, phase tags |
 
 Secondary text → `text-graphite`. Accent text → `text-signal`, **one moment per surface only — never body, never large fills**.
+
+### Type-scale rationale / guardrail exception (per-typeface)
+
+**Design System Exception — documented and approved.** The standard UI quality guardrail of "≤4 font sizes, ≤2 font weights" is a *global* structural heuristic. Trochia's brand system is a deliberate **3-typeface architecture** mandated upstream by `docs/BRAND.md` and `docs/DESIGN-REFERENCE.md` (Geist for display/headings, Inter for body/UI, Geist Mono for numerics/code). For a multi-typeface system, the guardrail is correctly interpreted **per typeface, not globally** — each family must independently stay at or under 4 sizes and 2 weights. It does:
+
+| Typeface | Role | Sizes | Weights | Holds? |
+|----------|------|-------|---------|--------|
+| **Geist** | Display + headings | 4: `text-display` (~4rem), `text-h2` (~2.5rem), `text-h3` (~1.625rem), `text-h4` (~1.25rem) | 2: 600 (headings) / 700 (display emphasis, e.g. wordmark) | ✓ ≤4 sizes, ≤2 weights |
+| **Inter** | Body + UI | 3: `text-body` (~1.0625rem), `text-body-sm` (~0.9375rem), `text-label` (~0.8125rem) | 2: 400 (body) / 500 (emphasis, labels) | ✓ ≤4 sizes, ≤2 weights |
+| **Geist Mono** | Numerics + code | 2: `text-mono` (`text-base`), `text-mono-sm` (`text-sm`) — Tailwind-native size utilities, **not** custom `fontSize` keys | 1: 400 | ✓ ≤4 sizes, ≤2 weights |
+
+> **Note on the Tailwind config.** `tailwind.config.ts` defines **7 custom `fontSize` keys** — `display`, `h2`, `h3`, `h4`, `body`, `body-sm`, `label` — because those keys span the **two** typeface roles Geist (4) + Inter (3). That total is *expected and correct*; it is not 7 sizes "in one typeface." The mono roles deliberately do **not** add custom `fontSize` keys: `text-mono` / `text-mono-sm` are composed from Tailwind's native `text-base` / `text-sm` with `font-mono`. Per typeface the contract holds. No token values change as a result of this exception — this subsection is justification, not a re-spec.
 
 ---
 
@@ -130,7 +142,7 @@ Voice: **operator, not assistant.** Direct, founder-grade, short sentences, conc
 | Form validation error | Inline under field: `text-body-sm text-danger mt-1.5`, field gets `border-danger`. Message states the fix, not just the problem ("Enter a valid email address" not "Invalid input"). |
 | Toast — success | Plain statement of what happened: "Deck uploaded." / "Signed in." No emoji, no confetti. Auto-dismiss ~4s. |
 | Toast — error | "Couldn't {action}. {Reason if known}." with an optional "Retry" action. |
-| Founder-approval confirmation pattern (XC-02 — establish now) | Used for ALL external sends (email, intro requests, signature requests, payments) in later phases; established in Phase 1 as a reusable Dialog. Title: "Send this {thing}?" Body: shows the full thing to be sent (recipient + content preview), read-only. Buttons: Primary "Send" (or `bg-signal` if it's *the* accent on that surface) + Secondary "Cancel". Never a one-click send for anything that leaves Trochia. Phase 1 ships the component + a styleguide demo with placeholder content. |
+| Founder-approval confirmation pattern (XC-02 — establish now) | Used for ALL external sends (email, intro requests, signature requests, payments) in later phases; established in Phase 1 as a reusable Dialog. Title: "Send this {thing}?" Body: shows the full thing to be sent (recipient + content preview), read-only. Buttons: Primary "Send" (or `bg-signal` if it's *the* accent on that surface) + Secondary **"Keep editing"**. Never a one-click send for anything that leaves Trochia. Phase 1 ships the component + a styleguide demo with placeholder content. |
 | Legal-disclaimer banner/footer pattern (establish now for Legal Stack / SAFE surfaces later) | A thin `bg-stone/60 border border-stone rounded-lg p-4 text-body-sm text-graphite` strip. Phase 1 ships the component + styleguide demo with the canonical text: "Trochia is not a law firm and does not provide legal advice. Consult your lawyer." (and the affiliate-disclosure variant: "Trochia may earn a referral fee from vendors listed here."). Never the bare strings "legal advice" / "investment advice" without the "not" prefix. |
 | Destructive confirmation | See table below — all destructive actions use a Dialog with the action verb in the confirm button, danger-colored confirm button (`bg-danger text-paper`), and require an explicit click (no checkbox-less one-click). |
 | Footer tagline | "The agentic operator for your raise." |
@@ -176,7 +188,7 @@ shadcn/ui components to install and theme to brand tokens (not stock). From DESI
 - **Skeleton/loading states** — neutral `bg-stone/60 animate-pulse` blocks matching content layout. Used on onboarding auto-review, dashboard load, any async surface. No spinners as the primary loading affordance for full-page loads.
 - **Empty state component** — Mark icon 64px, H3 heading, `text-body` body, one Primary CTA, centered `max-w-md py-32`. (Spec'd in copywriting contract above.)
 - **Error state component** — same layout family; H3 heading, body, "Try again" + "Contact support". (Spec'd above.)
-- **Founder-approval confirmation Dialog** — reusable, content-agnostic. (Spec'd above; styleguide demo required.)
+- **Founder-approval confirmation Dialog** — reusable, content-agnostic. Title "Send this {thing}?", read-only preview of recipient + content, Primary "Send" + Secondary **"Keep editing"**. (Spec'd above; styleguide demo required.)
 - **Legal-disclaimer banner/footer** — reusable strip component, two variants (not-legal-advice, affiliate-disclosure). (Spec'd above; styleguide demo required.)
 - **Section divider** — `flex items-center gap-4 my-20`: `text-mono-sm text-graphite uppercase tracking-wider` label + `flex-1 h-px bg-stone`.
 - **App shell** — sidebar (`w-60 bg-paper border-r border-stone`, logo lockup top, nav items middle, user menu bottom) + main-area top bar (`h-14 bg-paper border-b border-stone px-8`, page title `text-h3` left, page actions right) + content slot. Nav items: `flex items-center gap-3 px-3 h-10 rounded-md text-body-sm font-medium text-graphite hover:bg-stone/50 hover:text-ink`; active `bg-stone text-ink`; disabled (future phase) `text-graphite/50 cursor-not-allowed` + right-aligned `text-mono-sm` "Phase N" badge. Sidebar nav order: Business Memory, Pitch Lab, Pipeline, Live Raise, Data Room*, Raise Ops* (`*` = disabled with phase badge), then bottom: Settings, user avatar. The ambient Q&A sidebar slot (right side, built out Phase 2) exists as an empty Sheet-mounted region now.
@@ -220,12 +232,12 @@ shadcn/ui components to install and theme to brand tokens (not stock). From DESI
 Auth-gated internal route. Single long page (with a sticky table-of-contents sidebar) that renders **every themed component, token, and motion example**. Sections, in order:
 
 1. **Color tokens** — swatches for `paper`, `ink`, `graphite`, `stone`, `signal`, `success`, `warning`, `danger` with hex + token name + role; plus a "Signal usage" callout listing what the accent is reserved for.
-2. **Typography specimens** — every type class (`text-display`, `text-h2`, `text-h3`, `text-h4`, `text-body`, `text-body-sm`, `text-label`, `text-mono`, `text-mono-sm`) shown with name, font, size, weight, tracking, line-height, and sample text. Show Geist, Inter, Geist Mono samples.
+2. **Typography specimens** — every type class (`text-display`, `text-h2`, `text-h3`, `text-h4`, `text-body`, `text-body-sm`, `text-label`, `text-mono`, `text-mono-sm`) shown with name, font, size, weight, tracking, line-height, and sample text. Show Geist, Inter, Geist Mono samples. Include a panel restating the per-typeface guardrail exception (Geist 4 sizes / Inter 3 / Geist Mono 2; mono uses native `text-base`/`text-sm`, not custom `fontSize` keys).
 3. **Spacing scale** — visual bars for each spacing token.
 4. **Buttons** — all 5 variants × all sizes (`h-9`/`h-11`/`h-12`) × states (default, hover, active/press, disabled, with-icon, icon-only). Including the `signal` variant flagged "use once per surface".
 5. **Inputs & Form** — Input (default, focus, error, disabled), Label, a sample react-hook-form + Zod form with a validation error shown, Textarea.
 6. **Cards** — default card, interactive card (hover state), featured card with Signal badge.
-7. **Dialog** — a demo modal; the **founder-approval confirmation Dialog** demo (with placeholder send content); a **destructive-confirmation Dialog** demo.
+7. **Dialog** — a demo modal; the **founder-approval confirmation Dialog** demo (with placeholder send content; Primary "Send" + Secondary "Keep editing"); a **destructive-confirmation Dialog** demo.
 8. **Sheet** — mobile-nav demo trigger; side-panel demo (the Q&A sidebar slot shape).
 9. **Tabs** — sample (mimicking the pricing monthly/annual toggle).
 10. **Toast** — buttons to fire success / error toasts (Sonner).
@@ -276,6 +288,7 @@ Phase 1 is **not done** until `/styleguide` renders all of the above with the th
 - ❌ "AI buddy" copy ("Hi! I'm Trochia 👋"), emoji in product copy, anthropomorphic verbs (Trochia "feels"/"loves"/"wants"/"helps")
 - ❌ "Trusted by" + logos with no real relationship — placeholder copy must be honest about being placeholder
 - ❌ Any Tailwind color or font outside the brand token system
+- ❌ A 5th custom `fontSize` key inside a *single* typeface role (the 7 total config keys span Geist + Inter — that is the documented per-typeface exception, not a license to expand any one family beyond 4)
 - ❌ The banned compliance strings: "rolling fund", "investment advice", "legal advice" (without "not"/"this is not"), "fund", "investment vehicle", "adviser"
 - ❌ Hardcoded site URL anywhere — always `process.env.NEXT_PUBLIC_SITE_URL` / `NEXT_PUBLIC_APP_URL`
 - ❌ Autonomous external sends — every email/intro/signature/payment goes through the founder-approval Dialog
