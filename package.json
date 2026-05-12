@@ -16,12 +16,12 @@
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "0.95.2",
     "@amplitude/analytics-browser": "^2.42.2",
     "@amplitude/analytics-node": "^1.5.57",
+    "@anthropic-ai/sdk": "0.95.2",
     "@hookform/resolvers": "^5.2.2",
-    "@react-pdf/renderer": "^4.5.1",
     "@react-email/components": "^1.0.12",
+    "@react-pdf/renderer": "^4.5.1",
     "@sentry/nextjs": "^10.53.1",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.105.4",
@@ -46,6 +46,7 @@
     "react-hook-form": "^7.75.0",
     "resend": "^6.12.3",
     "stripe": "^22.1.1",
+    "superjson": "^2.2.6",
     "zod": "^4.4.3",
     "zod-to-json-schema": "^3.25.2"
   },
