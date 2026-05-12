@@ -144,7 +144,7 @@ Voice: **operator, not assistant.** Direct, founder-grade, short sentences, conc
 | Toast — error | "Couldn't {action}. {Reason if known}." with an optional "Retry" action. |
 | Founder-approval confirmation pattern (XC-02 — establish now) | Used for ALL external sends (email, intro requests, signature requests, payments) in later phases; established in Phase 1 as a reusable Dialog. Title: "Send this {thing}?" Body: shows the full thing to be sent (recipient + content preview), read-only. Buttons: Primary "Send" (or `bg-signal` if it's *the* accent on that surface) + Secondary **"Keep editing"**. Never a one-click send for anything that leaves Trochia. Phase 1 ships the component + a styleguide demo with placeholder content. |
 | Legal-disclaimer banner/footer pattern (establish now for Legal Stack / SAFE surfaces later) | A thin `bg-stone/60 border border-stone rounded-lg p-4 text-body-sm text-graphite` strip. Phase 1 ships the component + styleguide demo with the canonical text: "Trochia is not a law firm and does not provide legal advice. Consult your lawyer." (and the affiliate-disclosure variant: "Trochia may earn a referral fee from vendors listed here."). Never the bare strings "legal advice" / "investment advice" without the "not" prefix. |
-| Destructive confirmation | See table below — all destructive actions use a Dialog with the action verb in the confirm button, danger-colored confirm button (`bg-danger text-paper`), and require an explicit click (no checkbox-less one-click). |
+| Destructive confirmation | See table below — all destructive actions use a Dialog with the action verb in the confirm button, danger-colored confirm button (`bg-danger text-paper`), and require an explicit click (no checkbox-less one-click). Dismiss buttons always use a specific verb+noun ("Keep editing" / "Keep my account" / "Keep subscription") — never a bare "Cancel". |
 | Footer tagline | "The agentic operator for your raise." |
 | Cookie/DPA clickwrap (XC-04) | "By signing up you agree to our Data Processing Addendum." (link to `/legal/dpa`) — shown on the sign-up screen near the legal line. |
 
@@ -152,11 +152,11 @@ Voice: **operator, not assistant.** Direct, founder-grade, short sentences, conc
 
 | Action | Confirmation approach |
 |--------|----------------------|
-| Delete account (XC-04) | Dialog: "Delete your account?" Body: "This soft-deletes your account now and permanently purges all your data after 30 days. You can export your data first." Confirm button: `bg-danger` "Delete account" — require typing the word `DELETE` to enable. Secondary: "Export my data first" + "Cancel". Lives in `/app/settings`. |
-| Cancel subscription | Dialog: "Cancel your subscription?" Body: "You'll keep access until the end of your billing period." Confirm: `bg-danger` "Cancel subscription". Secondary: "Keep subscription". (Or hand off to Stripe Customer Portal — if so, the in-app trigger still uses this Dialog before redirect.) |
+| Delete account (XC-04) | Dialog: "Delete your account?" Body: "This soft-deletes your account now and permanently purges all your data after 30 days. You can export your data first." Confirm button: `bg-danger` "Delete account" — require typing the word `DELETE` to enable. Secondary slot: "Export my data first" (action link) + "Keep my account" (dismiss button — never a bare "Cancel"). Lives in `/app/settings`. |
+| Cancel subscription | Dialog: "Cancel your subscription?" Body: "You'll keep access until the end of your billing period." Confirm: `bg-danger` "Cancel subscription". Secondary: "Keep subscription" (dismiss button). (Or hand off to Stripe Customer Portal — if so, the in-app trigger still uses this Dialog before redirect.) |
 | Sign out | No confirmation needed (non-destructive). Plain ghost menu item in the sidebar user menu. |
 
-There are no other destructive actions in Phase 1 (Business Memory edit/reject, deck delete, pipeline delete etc. belong to later phases — but those phases MUST reuse this destructive-Dialog pattern).
+There are no other destructive actions in Phase 1 (Business Memory edit/reject, deck delete, pipeline delete etc. belong to later phases — but those phases MUST reuse this destructive-Dialog pattern, including the "specific verb+noun dismiss label, never bare Cancel" rule).
 
 ---
 
@@ -171,7 +171,7 @@ shadcn/ui components to install and theme to brand tokens (not stock). From DESI
 | 3 | Label | `text-label text-graphite mb-2 block`. | |
 | 4 | Form | react-hook-form + Zod integration; error helper text `text-body-sm text-danger mt-1.5`. | |
 | 5 | Card | `bg-paper border border-stone rounded-xl p-8`, `hover:border-ink/20` only if interactive, `transition-colors duration-150`. No shadow, no lift, no gradient. Featured variant: `border-2 border-signal relative` + absolute Signal badge top-right. | |
-| 6 | Dialog | Modal: fade + slight upward translate 250ms ease-out. May use the one allowed shadow. Used for: "Start your raise" capture, founder-approval pattern, destructive confirmations. | |
+| 6 | Dialog | Modal: fade + slight upward translate 250ms ease-out. May use the one allowed shadow. Used for: "Start your raise" capture, founder-approval pattern, destructive confirmations. Dismiss button uses a specific verb+noun label, never bare "Cancel". | |
 | 7 | Sheet | Mobile nav (full-screen), side panels. Reserves the Phase-2 ambient Q&A sidebar slot. | |
 | 8 | Tabs | Pricing monthly/annual toggle, manifesto sections. | |
 | 9 | Toast (Sonner) | App-shell notifications. Bottom-right, `text-body-sm`, auto-dismiss ~4s, no icons-as-decoration. | |
@@ -188,7 +188,8 @@ shadcn/ui components to install and theme to brand tokens (not stock). From DESI
 - **Skeleton/loading states** — neutral `bg-stone/60 animate-pulse` blocks matching content layout. Used on onboarding auto-review, dashboard load, any async surface. No spinners as the primary loading affordance for full-page loads.
 - **Empty state component** — Mark icon 64px, H3 heading, `text-body` body, one Primary CTA, centered `max-w-md py-32`. (Spec'd in copywriting contract above.)
 - **Error state component** — same layout family; H3 heading, body, "Try again" + "Contact support". (Spec'd above.)
-- **Founder-approval confirmation Dialog** — reusable, content-agnostic. Title "Send this {thing}?", read-only preview of recipient + content, Primary "Send" + Secondary **"Keep editing"**. (Spec'd above; styleguide demo required.)
+- **Founder-approval confirmation Dialog** — reusable, content-agnostic. Title "Send this {thing}?", read-only preview of recipient + content, Primary "Send" + Secondary **"Keep editing"** (never a bare "Cancel"). (Spec'd above; styleguide demo required.)
+- **Destructive-confirmation Dialog** — reusable. `bg-danger` confirm button carrying the action verb+noun ("Delete account", "Cancel subscription"), optional typed-confirmation gate, Secondary dismiss button with a specific verb+noun ("Keep my account", "Keep subscription") — **never a bare "Cancel" / "OK"**. (Spec'd in the destructive-actions table; styleguide demo required.)
 - **Legal-disclaimer banner/footer** — reusable strip component, two variants (not-legal-advice, affiliate-disclosure). (Spec'd above; styleguide demo required.)
 - **Section divider** — `flex items-center gap-4 my-20`: `text-mono-sm text-graphite uppercase tracking-wider` label + `flex-1 h-px bg-stone`.
 - **App shell** — sidebar (`w-60 bg-paper border-r border-stone`, logo lockup top, nav items middle, user menu bottom) + main-area top bar (`h-14 bg-paper border-b border-stone px-8`, page title `text-h3` left, page actions right) + content slot. Nav items: `flex items-center gap-3 px-3 h-10 rounded-md text-body-sm font-medium text-graphite hover:bg-stone/50 hover:text-ink`; active `bg-stone text-ink`; disabled (future phase) `text-graphite/50 cursor-not-allowed` + right-aligned `text-mono-sm` "Phase N" badge. Sidebar nav order: Business Memory, Pitch Lab, Pipeline, Live Raise, Data Room*, Raise Ops* (`*` = disabled with phase badge), then bottom: Settings, user avatar. The ambient Q&A sidebar slot (right side, built out Phase 2) exists as an empty Sheet-mounted region now.
@@ -223,8 +224,8 @@ shadcn/ui components to install and theme to brand tokens (not stock). From DESI
 | Route | Contract |
 |-------|----------|
 | `/app` (dashboard) | App shell (sidebar + top bar). Top bar title "Dashboard". Content: when no Business Memory exists → the empty-dashboard state ("Welcome to Trochia" + "Start Business Memory" CTA → `/app/memory`). Always-visible: the **three FND-12 CTAs** rendered as three secondary-variant action cards — "Generate VC fit list", "Prepare for an upcoming call", "Draft outreach" — each linking to its (Phase-2/4/5) destination, with a `text-mono-sm` "Coming Phase N" badge where the destination isn't built yet. The ambient Q&A sidebar slot (right side) is mounted but empty (Phase 2 fills it). |
-| `/app/settings` | Account screen: profile basics, the destructive **Delete account** Dialog (typed `DELETE` confirm), **Export my data** action (XC-04 plumbing). |
-| `/app/billing` | Billing screen: current tier, "Manage billing" → Stripe Customer Portal link (FND-05), the destructive **Cancel subscription** Dialog (or pre-redirect confirm). 7-day trial / card-on-file status shown. |
+| `/app/settings` | Account screen: profile basics, the destructive **Delete account** Dialog (typed `DELETE` confirm; dismiss button "Keep my account"), **Export my data** action (XC-04 plumbing). |
+| `/app/billing` | Billing screen: current tier, "Manage billing" → Stripe Customer Portal link (FND-05), the destructive **Cancel subscription** Dialog (dismiss button "Keep subscription"; or pre-redirect confirm). 7-day trial / card-on-file status shown. |
 | Module routes (`/app/memory`, `/app/pitch`, `/app/pipeline`, `/app/live-raise`) | Phase 1: thin placeholder pages inside the shell with an empty-state ("Coming in Phase N — here's what it'll do: …") so the sidebar nav resolves. Real UI lands in those phases' own UI-SPECs. Data Room and Raise Ops nav items are **disabled** with a "Phase N" badge. |
 
 ### `/styleguide` — MANDATORY Phase-1 exit gate
@@ -237,7 +238,7 @@ Auth-gated internal route. Single long page (with a sticky table-of-contents sid
 4. **Buttons** — all 5 variants × all sizes (`h-9`/`h-11`/`h-12`) × states (default, hover, active/press, disabled, with-icon, icon-only). Including the `signal` variant flagged "use once per surface".
 5. **Inputs & Form** — Input (default, focus, error, disabled), Label, a sample react-hook-form + Zod form with a validation error shown, Textarea.
 6. **Cards** — default card, interactive card (hover state), featured card with Signal badge.
-7. **Dialog** — a demo modal; the **founder-approval confirmation Dialog** demo (with placeholder send content; Primary "Send" + Secondary "Keep editing"); a **destructive-confirmation Dialog** demo.
+7. **Dialog** — a demo modal (dismiss button "Close" or a context-specific verb+noun, never bare "Cancel"); the **founder-approval confirmation Dialog** demo (with placeholder send content; Primary "Send" + Secondary "Keep editing"); a **destructive-confirmation Dialog** demo (`bg-danger` "Delete account" confirm + "Keep my account" dismiss — demonstrating the no-bare-Cancel rule).
 8. **Sheet** — mobile-nav demo trigger; side-panel demo (the Q&A sidebar slot shape).
 9. **Tabs** — sample (mimicking the pricing monthly/annual toggle).
 10. **Toast** — buttons to fire success / error toasts (Sonner).
@@ -289,6 +290,7 @@ Phase 1 is **not done** until `/styleguide` renders all of the above with the th
 - ❌ "Trusted by" + logos with no real relationship — placeholder copy must be honest about being placeholder
 - ❌ Any Tailwind color or font outside the brand token system
 - ❌ A 5th custom `fontSize` key inside a *single* typeface role (the 7 total config keys span Geist + Inter — that is the documented per-typeface exception, not a license to expand any one family beyond 4)
+- ❌ Bare generic CTA labels — "Cancel", "OK", "Submit", "Save", "Yes", "No" as a standalone button label. Every button carries a specific verb+noun ("Delete account", "Keep my account", "Start your raise", "Keep editing"). Dismiss buttons in destructive/confirmation Dialogs use the "Keep {noun}" convention.
 - ❌ The banned compliance strings: "rolling fund", "investment advice", "legal advice" (without "not"/"this is not"), "fund", "investment vehicle", "adviser"
 - ❌ Hardcoded site URL anywhere — always `process.env.NEXT_PUBLIC_SITE_URL` / `NEXT_PUBLIC_APP_URL`
 - ❌ Autonomous external sends — every email/intro/signature/payment goes through the founder-approval Dialog
