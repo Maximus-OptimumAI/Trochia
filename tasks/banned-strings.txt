@@ -1,0 +1,29 @@
+# Trochia AI — banned strings (XC-05).
+#
+# One banned term per line. Lines starting with `#` and blank lines are ignored.
+# The scanner (scripts/check-banned-strings.mjs) globs src/**/*.{ts,tsx,md,mdx}
+# and public/**/*.md and fails CI on any match — EXCEPT the two compliance
+# phrases below ("investment advice" / "legal advice"), which are allowed when
+# immediately preceded by a negation ("not ", "this is not ", "is not ",
+# "does not provide ") within ~30 chars on the same logical line.
+#
+# Matching is case-insensitive, substring-based.
+
+# ── Compliance / securities bans (global + Trochia) ──
+rolling fund
+investment vehicle
+adviser
+
+# ── Conditionally banned: allowed ONLY with a "not ..." negation immediately before ──
+# (the scanner's allowlist handles these two — see ALLOWLISTED_PHRASES in the script)
+investment advice
+legal advice
+
+# ── Product-truth bans ──
+# Trochia handles transcripts + post-call drafts only; it never speaks in calls.
+AI-as-call-speaker
+
+# NOTE: the bare word "fund" is intentionally NOT hard-banned repo-wide — too
+# common ("funding round", "VC fund" in copy about *other* funds). It gets a
+# Compliance-Auditor pass in Phase 10 (F&F) instead, where the F&F context makes
+# it dangerous. Same for "vehicle"/"advise" outside the phrases above.

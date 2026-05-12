@@ -67,14 +67,13 @@ function redactArgs(args: unknown[]): unknown[] {
   return args.map((a) => redact(a));
 }
 
-/* eslint-disable no-console */
+// (no-console is disabled for this file in eslint.config.mjs — this is the wrapper)
 export const logger = {
   debug: (...args: unknown[]): void => console.debug(...redactArgs(args)),
   info: (...args: unknown[]): void => console.info(...redactArgs(args)),
   warn: (...args: unknown[]): void => console.warn(...redactArgs(args)),
   error: (...args: unknown[]): void => console.error(...redactArgs(args)),
 };
-/* eslint-enable no-console */
 
 /** Exposed for reuse by Sentry's `beforeSend` (Plan 05) and tests. */
 export const redactSensitive = (value: unknown): unknown => redact(value);
