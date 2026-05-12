@@ -24,6 +24,24 @@ Trochia AI is an agentic Founder Operating System for raising capital — it run
 - **Timeline / capacity**: realistic 36 weeks assumes a dedicated operator co-founder on Trochia; solo-Martins is the Conservative timeline (+~6 months). Operator assignment is unresolved (see Open Questions).
 <!-- GSD:project-end -->
 
+<!-- This section lives OUTSIDE the GSD-managed blocks so it survives `generate-claude-md` / `/gsd-update` regeneration. -->
+
+## Workflow rules (non-negotiable)
+
+1. Every /gsd-plan-phase run MUST begin by reading tasks/constraints.md and incorporating its rules into PLAN.md.
+
+2. Any UI-track work (Frontend Developer subagent, component design, marketing surfaces, app screens, styling decisions) MUST begin by reading BOTH docs/BRAND.md AND docs/DESIGN-REFERENCE.md. These two files together define the design system — no UI subagent may plan or implement without reading them.
+
+3. Plan-checker MUST verify all constraints in tasks/constraints.md are honored before plan approval.
+
+4. Verifier MUST confirm constraints held in shipped code, and MUST confirm UI deliverables match docs/DESIGN-REFERENCE.md (anti-patterns avoided, exit-gate criteria met).
+
+5. Code Reviewer MUST reject any PR that:
+   - Hardcodes a site URL
+   - Uses banned compliance strings (rolling fund, investment advice without "not", etc.)
+   - Introduces UI patterns listed as anti-patterns in DESIGN-REFERENCE.md
+   - Adds a Tailwind color or font outside the brand token system
+
 <!-- GSD:stack-start source:research/STACK.md -->
 ## Technology Stack
 
