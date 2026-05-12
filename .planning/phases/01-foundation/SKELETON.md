@@ -11,6 +11,8 @@ The thinnest real end-to-end slice (D-08, founder's words): `signup → tier pic
 
 Built and deployed by **Plan 07** (`01-07-PLAN.md`); proven by `e2e/skeleton.spec.ts` + the manual post-deploy checks recorded in `01-VALIDATION.md`.
 
+> **Why the skeleton lands at wave 5, not wave 1:** intentional, per D-08. The Walking Skeleton (signup → tier picker → Stripe Checkout → webhook → /app shows the tier) genuinely needs the scaffold + lint/CI (Plan 01), the design system + `providers.tsx` (Plan 02), the Supabase schema + RLS + tRPC context (Plan 03), the `ai/client.ts` chokepoint + Inngest (Plan 04), the observability wiring (Plan 05), and the compliance plumbing — DPA + data-rights (Plan 06) — in place first. Building it earlier would mean stubbing all of those and re-doing the wiring. The late skeleton is by design, not by accident; every later phase builds vertical slices on top of it without renegotiating these decisions.
+
 ## Architectural Decisions
 
 | Decision | Choice | Rationale |

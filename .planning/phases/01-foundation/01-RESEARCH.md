@@ -750,26 +750,32 @@ export async function runAgent<T>(opts: {
 
 **These `[ASSUMED]` claims need a quick verification by the planner (Context7 / official docs) before becoming locked plan decisions — none of them block planning, and the project-level STACK.md (2026-05-11) already verified the heavier version claims.**
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> All four resolved during planning (plan set 01-01-PLAN.md … 01-09-PLAN.md, 2026-05-12). Each carries an inline RESOLVED marker pointing at the plan that locks it.
 
 1. **How exactly does the request-scoped Drizzle client carry `tenant_id` for RLS?**
    - What we know: RLS policies must read the tenant id from the request; the standard Supabase pattern is `auth.jwt() ->> 'tenant_id'` (or `auth.uid()` + a `memberships` lookup). The query must run as the `authenticated` role.
    - What's unclear: whether to (a) inject `tenant_id` as a custom JWT claim via a Supabase Auth Hook and use a Supabase client, (b) use `postgres.js` and `set local request.jwt.claims = '...'` per request, or (c) key the policy on `auth.uid()` and join to `memberships`. All three work; (a) is cleanest if a one-business-per-account model holds (it does in Phase 1 per D-03). 
    - Recommendation: planner picks the approach with current Supabase docs (Context7: `supabase` → "RLS with Drizzle" / "custom claims" / "Auth Hooks"); document it in PLAN.md as a locked sub-decision. Lean toward (a) — a custom `tenant_id` claim via an Auth Hook — because it makes the RLS policy a one-liner and the two-user test trivial.
+   - **RESOLVED: Plan 03 (`01-03-PLAN.md`) — Task 1 resolves this against current Supabase docs (Context7), leaning toward option (a) (custom `tenant_id` JWT claim via a Supabase Auth Hook, one-business-per-account in Phase 1 per D-03), records the exact wiring in `01-03-SUMMARY.md`, and adds `NON_TENANT_TABLES` to `src/db/rls.ts`.**
 
 2. **Does Supabase Auth expose three distinct session timers (JWT expiry / inactivity timeout / absolute lifetime)?**
    - What we know: D-10 wants 1h / 30d / 90d; D-10's own fallback says JWT expiry + inactivity timeout are must-haves and the 90d absolute cap is best-effort.
    - What's unclear: whether the current Supabase dashboard/config has a separate "time-box user sessions" knob.
    - Recommendation: planner verifies against supabase.com/docs/guides/auth (Context7); if only two timers exist, ship those and note the 90d cap as best-effort per D-10. Don't block.
+   - **RESOLVED: Plan 07 (`01-07-PLAN.md`) — Task 1 confirms which of the three timers the current Supabase dashboard exposes, sets JWT expiry = 1h + inactivity = 30d (+ 90d absolute if exposed), and records the result in `01-07-SUMMARY.md` (also a Manual-Only check in `01-VALIDATION.md`).**
 
 3. **Where does the vendor data-flow inventory live, and what's its exact format?**
    - What we know: XC-01 requires it; it must cover Anthropic (no-training, 7-day retention), the OpenAI/Codex fallback, Claude-Code build tooling, and every other data-touching vendor (Resend, Sentry, Amplitude, Langfuse, Inngest, Stripe, Supabase).
    - What's unclear: whether it's a markdown table in `docs/`, a section of the DPA, or both.
    - Recommendation: a living markdown artifact (`docs/vendor-data-flow.md`) with columns {vendor, what data touches it, trains on inputs?, retention, DPA signed?, notes}, referenced from the DPA. Planner decides the exact path; the artifact existing is the Phase 1 deliverable.
+   - **RESOLVED: Plan 06 (`01-06-PLAN.md`) — Task 1 ships `docs/vendor-data-flow.md` as the living markdown artifact (columns: Vendor · What data touches it · Trains on inputs? · Retention · DPA/contract status · Notes), referenced from `/legal/dpa`.**
 
 4. **`/styleguide` auth-gating — is it inside `(app)` (so `entitlements()` gates it) or just session-gated?**
    - What we know: UI-SPEC says "auth-gated internal route." It's a Phase 1 exit gate that it renders all themed components.
    - Recommendation: session-gated (any logged-in user) is enough — it shouldn't require an active subscription, since it's an internal dev tool. Planner confirms; minor.
+   - **RESOLVED: session-gated (logged-in user, no active subscription required). Plan 02 ships `/styleguide` open under `(app)` with a TODO; Plan 07's `proxy.ts` session-gates it (logged-in only, NOT behind `entitlements()`); Plan 09's e2e asserts authed → renders / unauthed → `/sign-in`.**
 
 ## Sources
 
