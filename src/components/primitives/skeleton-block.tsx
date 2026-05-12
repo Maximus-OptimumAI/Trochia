@@ -1,0 +1,15 @@
+import { cn } from '@/lib/utils';
+
+/**
+ * SkeletonBlock — neutral loading placeholder (`bg-stone/60 animate-pulse`).
+ * Size it via className to match the content it stands in for. No spinner —
+ * spinners are not the primary loading affordance for full-page loads.
+ */
+export function SkeletonBlock({ className }: { className?: string }) {
+  return (
+    <div
+      aria-hidden
+      className={cn('animate-pulse rounded-lg bg-stone/60', className ?? 'h-4 w-full')}
+    />
+  );
+}
