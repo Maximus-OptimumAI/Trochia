@@ -177,18 +177,94 @@ Explicitly excluded. Documented to prevent scope creep. (See PROJECT.md "Out of 
 
 ## Traceability
 
-Which phases cover which requirements. **Populated during roadmap creation** (by `/gsd-new-project`'s roadmapper step) — empty until then.
+Which phases cover which requirements. Roadmap: `.planning/ROADMAP.md` (11 phases, created 2026-05-11).
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (to be filled by the roadmapper) | — | Pending |
+| FND-01 | Phase 1 — Foundation | Pending |
+| FND-02 | Phase 1 — Foundation | Pending |
+| FND-03 | Phase 1 — Foundation | Pending |
+| FND-04 | Phase 1 — Foundation | Pending |
+| FND-05 | Phase 1 — Foundation | Pending |
+| FND-06 | Phase 1 — Foundation | Pending |
+| FND-07 | Phase 1 — Foundation | Pending |
+| FND-08 | Phase 1 — Foundation | Pending |
+| FND-09 | Phase 1 — Foundation | Pending |
+| FND-10 | Phase 1 — Foundation | Pending |
+| FND-11 | Phase 1 — Foundation | Pending |
+| FND-12 | Phase 1 — Foundation | Pending |
+| XC-01 | Phase 1 — Foundation (enforced all phases) | Pending |
+| XC-02 | Phase 1 — Foundation (enforced all phases) | Pending |
+| XC-03 | Phase 1 — Foundation (enforced all phases) | Pending |
+| XC-04 | Phase 1 — Foundation (enforced all phases) | Pending |
+| XC-05 | Phase 1 — Foundation (enforced all phases) | Pending |
+| XC-06 | Phase 1 — Foundation (enforced all phases) | Pending |
+| XC-07 | Phase 1 — Foundation (enforced all phases) | Pending |
+| KNW-01 | Phase 2 — Knowledge Layer + Memory | Pending |
+| KNW-02 | Phase 2 — Knowledge Layer + Memory | Pending |
+| KNW-03 | Phase 2 — Knowledge Layer + Memory | Pending |
+| KNW-04 | Phase 2 — Knowledge Layer + Memory | Pending |
+| KNW-05 | Phase 2 — Knowledge Layer + Memory | Pending |
+| KNW-08 | Phase 2 — Knowledge Layer + Memory | Pending |
+| XC-08 | Phase 2 — Knowledge Layer + Memory | Pending |
+| PITCH-01 | Phase 3 — Pitch Lab Deck Reviewer | Pending |
+| PITCH-02 | Phase 3 — Pitch Lab Deck Reviewer | Pending |
+| PITCH-03 | Phase 3 — Pitch Lab Deck Reviewer | Pending |
+| PITCH-04 | Phase 3 — Pitch Lab Deck Reviewer | Pending |
+| PITCH-09 | Phase 3 — Pitch Lab Deck Reviewer | Pending |
+| PIPE-01 | Phase 4 — Investor Pipeline | Pending |
+| PIPE-02 | Phase 4 — Investor Pipeline | Pending |
+| PIPE-03 | Phase 4 — Investor Pipeline | Pending |
+| PIPE-04 | Phase 4 — Investor Pipeline | Pending |
+| PIPE-05 | Phase 4 — Investor Pipeline | Pending |
+| PIPE-06 | Phase 4 — Investor Pipeline | Pending |
+| PIPE-07 | Phase 4 — Investor Pipeline | Pending |
+| LIVE-01 | Phase 5 — Live Raise (soft-launch checkpoint) | Pending |
+| LIVE-02 | Phase 5 — Live Raise (soft-launch checkpoint) | Pending |
+| LIVE-03 | Phase 5 — Live Raise (soft-launch checkpoint) | Pending |
+| LIVE-04 | Phase 5 — Live Raise (soft-launch checkpoint) | Pending |
+| LIVE-05 | Phase 5 — Live Raise (soft-launch checkpoint) | Pending |
+| PITCH-05 | Phase 6 — Voice Pitch Coach + Q&A Drill + Browser Ext | Pending |
+| PITCH-06 | Phase 6 — Voice Pitch Coach + Q&A Drill + Browser Ext | Pending |
+| PITCH-07 | Phase 6 — Voice Pitch Coach + Q&A Drill + Browser Ext | Pending |
+| PITCH-08 | Phase 6 — Voice Pitch Coach + Q&A Drill + Browser Ext | Pending |
+| KNW-06 | Phase 6 — Voice Pitch Coach + Q&A Drill + Browser Ext | Pending |
+| DATA-01 | Phase 7 — Data Room Orchestration | Pending |
+| DATA-02 | Phase 7 — Data Room Orchestration | Pending |
+| DATA-03 | Phase 7 — Data Room Orchestration | Pending |
+| DATA-04 | Phase 7 — Data Room Orchestration | Pending |
+| DATA-05 | Phase 7 — Data Room Orchestration | Pending |
+| PIPE-08 | Phase 7 — Data Room Orchestration | Pending |
+| PIPE-09 | Phase 7 — Data Room Orchestration | Pending |
+| XC-09 | Phase 7 — Data Room Orchestration | Pending |
+| LEGAL-01 | Phase 8 — Legal Stack + EU Residency | Pending |
+| LEGAL-02 | Phase 8 — Legal Stack + EU Residency | Pending |
+| LEGAL-03 | Phase 8 — Legal Stack + EU Residency | Pending |
+| LEGAL-04 | Phase 8 — Legal Stack + EU Residency | Pending |
+| LEGAL-05 | Phase 8 — Legal Stack + EU Residency | Pending |
+| OPS-01 | Phase 9 — Raise Ops Core (SAFE + Cap Table) | Pending |
+| OPS-02 | Phase 9 — Raise Ops Core (SAFE + Cap Table) | Pending |
+| OPS-03 | Phase 9 — Raise Ops Core (SAFE + Cap Table) | Pending |
+| OPS-04 | Phase 9 — Raise Ops Core (SAFE + Cap Table) | Pending |
+| OPS-05 | Phase 9 — Raise Ops Core (SAFE + Cap Table) | Pending |
+| OPS-06 | Phase 9 — Raise Ops Core (SAFE + Cap Table) | Pending |
+| OPS-07 | Phase 10 — F&F Round Manager + E-Sign | Pending |
+| OPS-08 | Phase 10 — F&F Round Manager + E-Sign | Pending |
+| OPS-09 | Phase 10 — F&F Round Manager + E-Sign | Pending |
+| OPS-10 | Phase 10 — F&F Round Manager + E-Sign | Pending |
+| KNW-07 | Phase 11 — Polish + Close Mode + Alumni + Launch | Pending |
+| LAUNCH-01 | Phase 11 — Polish + Close Mode + Alumni + Launch | Pending |
+| LAUNCH-02 | Phase 11 — Polish + Close Mode + Alumni + Launch | Pending |
+| LAUNCH-03 | Phase 11 — Polish + Close Mode + Alumni + Launch | Pending |
 
 **Coverage:**
 - v1 requirements: 75 total (FND ×12, KNW ×8, PITCH ×9, PIPE ×9, LIVE ×5, DATA ×5, LEGAL ×5, OPS ×10, LAUNCH ×3, XC ×9) — all RES additions integrated
 - Phase split: `[MVP]` ×36, `[V2]` ×18, `[V3]` ×14 (incl. 3 LAUNCH), `[XC]` cross-cutting ×7
-- Mapped to phases: 0 ⚠️ (roadmap not yet created)
-- Unmapped: 75 ⚠️
+- Mapped to phases: 75 / 75 ✓
+- Unmapped: 0 ✓
+- Per-phase counts: P1 ×19 · P2 ×7 · P3 ×5 · P4 ×7 · P5 ×5 · P6 ×5 · P7 ×8 · P8 ×5 · P9 ×6 · P10 ×4 · P11 ×4 (sum = 75)
+- `[XC]` requirements (XC-01..07) are assigned to Phase 1 as the place they are *established*; they are enforced across all subsequent phases (see ROADMAP.md "Cross-Cutting Enforcement").
 
 ---
 *Requirements defined: 2026-05-11*
-*Last updated: 2026-05-11 after initial definition*
+*Last updated: 2026-05-11 — traceability populated by the roadmapper (ROADMAP.md created, 11 phases, 75/75 mapped)*
