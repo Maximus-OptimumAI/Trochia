@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 460 140" role="img" aria-label="Trochia logo">
+  <title>Trochia</title>
+  <desc>Trochia horizontal lockup — T-Orbit mark with Trochia wordmark in Geist 600.</desc>
+  <g transform="translate(8, 8) scale(0.469)">
+    <path d="M 50 88 A 78 42 0 0 0 206 88" stroke="#0A0E1A" stroke-width="24" stroke-linecap="round" fill="none"/>
+    <line x1="128" y1="88" x2="128" y2="200" stroke="#0A0E1A" stroke-width="24" stroke-linecap="round"/>
+    <circle cx="128" cy="46" r="18" fill="#F25C2A"/>
+  </g>
+  <text x="148" y="92" font-family="'Geist', 'Inter', system-ui, -apple-system, sans-serif" font-size="64" font-weight="600" letter-spacing="-1.6" fill="#0A0E1A">Trochia</text>
+</svg>

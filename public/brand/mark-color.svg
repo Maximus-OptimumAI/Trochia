@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Trochia">
+  <title>Trochia</title>
+  <desc>Trochia T-Orbit mark — geometric T with arc crossbar and signal node at the apex.</desc>
+  <path d="M 50 88 A 78 42 0 0 0 206 88" stroke="#0A0E1A" stroke-width="24" stroke-linecap="round" fill="none"/>
+  <line x1="128" y1="88" x2="128" y2="200" stroke="#0A0E1A" stroke-width="24" stroke-linecap="round"/>
+  <circle cx="128" cy="46" r="18" fill="#F25C2A"/>
+</svg>

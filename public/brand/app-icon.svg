@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Trochia app icon">
+  <title>Trochia</title>
+  <desc>Trochia app icon — 1024 by 1024 rounded square, T-Orbit mark on paper.</desc>
+  <rect width="1024" height="1024" rx="230" ry="230" fill="#FAFAF7"/>
+  <g transform="translate(192, 204) scale(2.5)">
+    <path d="M 50 88 A 78 42 0 0 0 206 88" stroke="#0A0E1A" stroke-width="24" stroke-linecap="round" fill="none"/>
+    <line x1="128" y1="88" x2="128" y2="200" stroke="#0A0E1A" stroke-width="24" stroke-linecap="round"/>
+    <circle cx="128" cy="46" r="18" fill="#F25C2A"/>
+  </g>
+</svg>
