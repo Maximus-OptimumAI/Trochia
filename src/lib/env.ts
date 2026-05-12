@@ -21,21 +21,38 @@ const booleanish = z
   .transform((v) => v === 'true' || v === '1')
   .optional();
 
+/**
+ * "Required in production, optional elsewhere." A var wrapped in `prodRequired(...)`
+ * is `.optional()` in dev/test (so the scaffold and the unit tests run without it)
+ * but, when `NODE_ENV === 'production'`, must be present and non-empty — a missing
+ * one fails fast at module load on Vercel. Plan 03 flips the Supabase/DB vars to
+ * this; later plans flip their own vars the same way (disjoint edits).
+ */
+const IS_PROD = process.env.NODE_ENV === 'production';
+function prodRequired<T extends z.ZodTypeAny>(schema: T) {
+  return IS_PROD
+    ? schema.refine((v) => v !== undefined && v !== null && String(v).length > 0, {
+        message: 'required in production',
+      })
+    : schema.optional();
+}
+
 const envSchema = z.object({
   // ── Site URLs ── REQUIRED (present in .env.local; the app reads all URLs here)
   NEXT_PUBLIC_SITE_URL: z.string().url(), // required — do not make optional
   NEXT_PUBLIC_APP_URL: z.string().url(), // required — do not make optional
 
-  // ── Database ──
-  DATABASE_URL: z.string().optional(), // Plan 02 flips this to required-in-prod
-  DIRECT_URL: z.string().optional(), // Plan 02 flips this to required-in-prod
+  // ── Database ── (Plan 03 / 01-03-PLAN.md flipped these to required-in-prod)
+  DATABASE_URL: prodRequired(z.string()), // pooled (Supavisor) connection string — runtime
+  DIRECT_URL: prodRequired(z.string()), // direct connection string — drizzle-kit migrations
 
-  // ── Supabase ──
-  SUPABASE_URL: z.string().url().optional(), // Plan 02 flips this to required-in-prod
-  SUPABASE_PUBLISHABLE_KEY: z.string().optional(), // Plan 02 flips this to required-in-prod
-  SUPABASE_SECRET_KEY: z.string().optional(), // Plan 02 flips this to required-in-prod
-  NEXT_PUBLIC_SUPABASE_URL: z.string().url().optional(), // Plan 02 flips this to required-in-prod
-  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().optional(), // Plan 02 flips this to required-in-prod
+  // ── Supabase ── (Plan 03 / 01-03-PLAN.md flipped these to required-in-prod)
+  // Use the publishable + secret keys, NEVER anon/service_role.
+  SUPABASE_URL: prodRequired(z.string().url()),
+  SUPABASE_PUBLISHABLE_KEY: prodRequired(z.string()),
+  SUPABASE_SECRET_KEY: prodRequired(z.string()), // server-only — never in NEXT_PUBLIC_*
+  NEXT_PUBLIC_SUPABASE_URL: prodRequired(z.string().url()),
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: prodRequired(z.string()),
 
   // ── Stripe ──
   STRIPE_SECRET_KEY: z.string().optional(), // Plan 03 flips this to required-in-prod
