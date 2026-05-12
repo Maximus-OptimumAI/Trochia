@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-// @ts-expect-error — plain ESM module, no .d.ts
 import { scanText } from '../../scripts/check-banned-strings.mjs';
 
 describe('banned-strings scanner', () => {
