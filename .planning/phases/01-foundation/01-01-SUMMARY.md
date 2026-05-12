@@ -128,3 +128,7 @@ Greenfield Next.js 16.2.6 App Router monolith with the env/logger/crypto/errors 
 ## TDD Gate Compliance
 
 N/A — this plan is `type: execute` (not `type: tdd`); no tasks carry `tdd="true"`. Unit tests for `env.ts`, `logger.ts`, and the banned-string scanner were written alongside their implementations and pass.
+
+## Self-Check: PASSED
+
+All created files exist on disk; all four commits (c836e43, 30038a5, aca467d, be76042) are present in the branch history.
