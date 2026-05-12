@@ -6,12 +6,17 @@ on:
     branches: [main]
 
 # Expected GitHub repo secrets (added in repo settings, never committed):
-#   DATABASE_URL          — test Postgres connection (RLS integration tests skip if absent)
-#   DIRECT_URL            — test Postgres direct connection (for migrations in CI, if used)
+#   DATABASE_URL          — runtime (pooled) Postgres connection
+#   DIRECT_URL            — direct Postgres connection (drizzle-kit migrations)
+#   TEST_DATABASE_URL     — a throwaway/test Postgres; the RLS integration tests
+#                           (tests/rls/**) RUN when this is set and skip when it isn't.
+#   SUPABASE_URL / SUPABASE_PUBLISHABLE_KEY / SUPABASE_SECRET_KEY
+#   NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+#                           — required-in-prod by src/lib/env.ts (build runs NODE_ENV=production)
 #   NEXT_PUBLIC_SITE_URL  — required by src/lib/env.ts at build time
 #   NEXT_PUBLIC_APP_URL   — required by src/lib/env.ts at build time
 #   PLAYWRIGHT_BASE_URL   — Vercel preview URL for e2e (else the local webServer is used)
-# Later plans add: STRIPE_*, ANTHROPIC_API_KEY, SUPABASE_*, etc. as test secrets.
+# Later plans add: STRIPE_*, ANTHROPIC_API_KEY, etc. as test secrets.
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -24,8 +29,17 @@ jobs:
     env:
       NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000' }}
       NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL || 'http://localhost:3000' }}
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      DIRECT_URL: ${{ secrets.DIRECT_URL }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql://localhost:5432/ci' }}
+      DIRECT_URL: ${{ secrets.DIRECT_URL || 'postgresql://localhost:5432/ci' }}
+      # RLS integration tests (tests/rls/**) run only when this is set:
+      TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+      # Required-in-prod by src/lib/env.ts; `npm run build` sets NODE_ENV=production.
+      # Fallbacks keep the build green before the real Supabase secrets are added.
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'http://localhost:54321' }}
+      SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY || 'ci-publishable' }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY || 'ci-secret' }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'http://localhost:54321' }}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 'ci-publishable' }}
       PLAYWRIGHT_BASE_URL: ${{ secrets.PLAYWRIGHT_BASE_URL }}
     steps:
       - uses: actions/checkout@v4

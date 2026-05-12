@@ -114,10 +114,14 @@ export function getRequestClient(accessToken: string): RequestDb & { db: Drizzle
  * the two-user isolation test doesn't need the Supabase JWT secret. Same `rls(fn)`
  * contract as {@link getRequestClient}.
  */
-export function getRequestClientFromClaims(claims: Record<string, unknown>): RequestDb & {
+export function getRequestClientFromClaims(
+  claims: Record<string, unknown>,
+  /** Override the connection string (the test harness points this at `TEST_DATABASE_URL`). */
+  connectionString?: string,
+): RequestDb & {
   db: DrizzleDb;
 } {
-  const client = postgres(requireDatabaseUrl(), { prepare: false });
+  const client = postgres(connectionString ?? requireDatabaseUrl(), { prepare: false });
   const db = drizzle(client, { schema });
   const claimsJson = JSON.stringify(claims);
   return {

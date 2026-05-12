@@ -14,6 +14,10 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      // `server-only` is a Next build-time guard; under vitest (no `react-server`
+      // export condition) its default entry throws — alias it to the no-op shim so
+      // server modules under test (db/, server/) import cleanly.
+      'server-only': path.resolve(__dirname, './node_modules/server-only/empty.js'),
     },
   },
   test: {
