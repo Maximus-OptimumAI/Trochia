@@ -1,10 +1,11 @@
 ---
 phase: 1
 slug: foundation
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-05-12
+reviewed_at: 2026-05-12
 ---
 
 # Phase 1 — UI Design Contract
@@ -142,9 +143,9 @@ Voice: **operator, not assistant.** Direct, founder-grade, short sentences, conc
 | Form validation error | Inline under field: `text-body-sm text-danger mt-1.5`, field gets `border-danger`. Message states the fix, not just the problem ("Enter a valid email address" not "Invalid input"). |
 | Toast — success | Plain statement of what happened: "Deck uploaded." / "Signed in." No emoji, no confetti. Auto-dismiss ~4s. |
 | Toast — error | "Couldn't {action}. {Reason if known}." with an optional "Retry" action. |
-| Founder-approval confirmation pattern (XC-02 — establish now) | Used for ALL external sends (email, intro requests, signature requests, payments) in later phases; established in Phase 1 as a reusable Dialog. Title: "Send this {thing}?" Body: shows the full thing to be sent (recipient + content preview), read-only. Buttons: Primary "Send" (or `bg-signal` if it's *the* accent on that surface) + Secondary **"Keep editing"**. Never a one-click send for anything that leaves Trochia. Phase 1 ships the component + a styleguide demo with placeholder content. |
+| Founder-approval confirmation pattern (XC-02 — establish now) | Used for ALL external sends (email, intro requests, signature requests, payments) in later phases; established in Phase 1 as a reusable Dialog. Title: "Send this {thing}?" (e.g., "Send this outreach?"). Body: shows the full thing to be sent (recipient + content preview), read-only. Buttons: **Primary `Send {thing}`** — always the noun-bearing form resolved from `{thing}`, e.g. "Send outreach" / "Send request" / "Send follow-up" (never a bare "Send"; `bg-signal` only if it's *the* accent on that surface, otherwise `primary`) + Secondary **"Keep editing"**. Never a one-click send for anything that leaves Trochia. Phase 1 ships the component + a styleguide demo with placeholder content. |
 | Legal-disclaimer banner/footer pattern (establish now for Legal Stack / SAFE surfaces later) | A thin `bg-stone/60 border border-stone rounded-lg p-4 text-body-sm text-graphite` strip. Phase 1 ships the component + styleguide demo with the canonical text: "Trochia is not a law firm and does not provide legal advice. Consult your lawyer." (and the affiliate-disclosure variant: "Trochia may earn a referral fee from vendors listed here."). Never the bare strings "legal advice" / "investment advice" without the "not" prefix. |
-| Destructive confirmation | See table below — all destructive actions use a Dialog with the action verb in the confirm button, danger-colored confirm button (`bg-danger text-paper`), and require an explicit click (no checkbox-less one-click). Dismiss buttons always use a specific verb+noun ("Keep editing" / "Keep my account" / "Keep subscription") — never a bare "Cancel". |
+| Destructive confirmation | See table below — all destructive actions use a Dialog with the action verb in the confirm button, danger-colored confirm button (`bg-danger text-paper`), and require an explicit click (no checkbox-less one-click). Dismiss buttons always use a specific verb+noun ("Keep editing" / "Keep my account" / "Keep subscription" / "Keep draft") — never a bare "Cancel". |
 | Footer tagline | "The agentic operator for your raise." |
 | Cookie/DPA clickwrap (XC-04) | "By signing up you agree to our Data Processing Addendum." (link to `/legal/dpa`) — shown on the sign-up screen near the legal line. |
 
@@ -171,7 +172,7 @@ shadcn/ui components to install and theme to brand tokens (not stock). From DESI
 | 3 | Label | `text-label text-graphite mb-2 block`. | |
 | 4 | Form | react-hook-form + Zod integration; error helper text `text-body-sm text-danger mt-1.5`. | |
 | 5 | Card | `bg-paper border border-stone rounded-xl p-8`, `hover:border-ink/20` only if interactive, `transition-colors duration-150`. No shadow, no lift, no gradient. Featured variant: `border-2 border-signal relative` + absolute Signal badge top-right. | |
-| 6 | Dialog | Modal: fade + slight upward translate 250ms ease-out. May use the one allowed shadow. Used for: "Start your raise" capture, founder-approval pattern, destructive confirmations. Dismiss button uses a specific verb+noun label, never bare "Cancel". | |
+| 6 | Dialog | Modal: fade + slight upward translate 250ms ease-out. May use the one allowed shadow. Used for: "Start your raise" capture, founder-approval pattern, destructive confirmations. Dismiss button uses a specific verb+noun label, never bare "Cancel"/"OK"/"Close". | |
 | 7 | Sheet | Mobile nav (full-screen), side panels. Reserves the Phase-2 ambient Q&A sidebar slot. | |
 | 8 | Tabs | Pricing monthly/annual toggle, manifesto sections. | |
 | 9 | Toast (Sonner) | App-shell notifications. Bottom-right, `text-body-sm`, auto-dismiss ~4s, no icons-as-decoration. | |
@@ -188,7 +189,7 @@ shadcn/ui components to install and theme to brand tokens (not stock). From DESI
 - **Skeleton/loading states** — neutral `bg-stone/60 animate-pulse` blocks matching content layout. Used on onboarding auto-review, dashboard load, any async surface. No spinners as the primary loading affordance for full-page loads.
 - **Empty state component** — Mark icon 64px, H3 heading, `text-body` body, one Primary CTA, centered `max-w-md py-32`. (Spec'd in copywriting contract above.)
 - **Error state component** — same layout family; H3 heading, body, "Try again" + "Contact support". (Spec'd above.)
-- **Founder-approval confirmation Dialog** — reusable, content-agnostic. Title "Send this {thing}?", read-only preview of recipient + content, Primary "Send" + Secondary **"Keep editing"** (never a bare "Cancel"). (Spec'd above; styleguide demo required.)
+- **Founder-approval confirmation Dialog** — reusable, content-agnostic. Title "Send this {thing}?", read-only preview of recipient + content, Primary **`Send {thing}`** (noun-bearing, resolved from `{thing}` — e.g. "Send outreach"; never a bare "Send") + Secondary **"Keep editing"** (never a bare "Cancel"). (Spec'd above; styleguide demo required.)
 - **Destructive-confirmation Dialog** — reusable. `bg-danger` confirm button carrying the action verb+noun ("Delete account", "Cancel subscription"), optional typed-confirmation gate, Secondary dismiss button with a specific verb+noun ("Keep my account", "Keep subscription") — **never a bare "Cancel" / "OK"**. (Spec'd in the destructive-actions table; styleguide demo required.)
 - **Legal-disclaimer banner/footer** — reusable strip component, two variants (not-legal-advice, affiliate-disclosure). (Spec'd above; styleguide demo required.)
 - **Section divider** — `flex items-center gap-4 my-20`: `text-mono-sm text-graphite uppercase tracking-wider` label + `flex-1 h-px bg-stone`.
@@ -238,7 +239,7 @@ Auth-gated internal route. Single long page (with a sticky table-of-contents sid
 4. **Buttons** — all 5 variants × all sizes (`h-9`/`h-11`/`h-12`) × states (default, hover, active/press, disabled, with-icon, icon-only). Including the `signal` variant flagged "use once per surface".
 5. **Inputs & Form** — Input (default, focus, error, disabled), Label, a sample react-hook-form + Zod form with a validation error shown, Textarea.
 6. **Cards** — default card, interactive card (hover state), featured card with Signal badge.
-7. **Dialog** — a demo modal (dismiss button "Close" or a context-specific verb+noun, never bare "Cancel"); the **founder-approval confirmation Dialog** demo (with placeholder send content; Primary "Send" + Secondary "Keep editing"); a **destructive-confirmation Dialog** demo (`bg-danger` "Delete account" confirm + "Keep my account" dismiss — demonstrating the no-bare-Cancel rule).
+7. **Dialog** — a demo modal whose dismiss button is a context-specific verb+noun (e.g., **"Keep draft"**) — **never a bare "Cancel" / "OK" / "Close"** (the styleguide must teach the "Keep {noun}" dismiss convention by example, not offer a bare generic alternative); the **founder-approval confirmation Dialog** demo (with placeholder send content; title "Send this outreach?", Primary **"Send outreach"** — the noun-bearing form, never bare "Send" — + Secondary "Keep editing"); a **destructive-confirmation Dialog** demo (`bg-danger` "Delete account" confirm + "Keep my account" dismiss — demonstrating the no-bare-Cancel rule).
 8. **Sheet** — mobile-nav demo trigger; side-panel demo (the Q&A sidebar slot shape).
 9. **Tabs** — sample (mimicking the pricing monthly/annual toggle).
 10. **Toast** — buttons to fire success / error toasts (Sonner).
@@ -290,7 +291,7 @@ Phase 1 is **not done** until `/styleguide` renders all of the above with the th
 - ❌ "Trusted by" + logos with no real relationship — placeholder copy must be honest about being placeholder
 - ❌ Any Tailwind color or font outside the brand token system
 - ❌ A 5th custom `fontSize` key inside a *single* typeface role (the 7 total config keys span Geist + Inter — that is the documented per-typeface exception, not a license to expand any one family beyond 4)
-- ❌ Bare generic CTA labels — "Cancel", "OK", "Submit", "Save", "Yes", "No" as a standalone button label. Every button carries a specific verb+noun ("Delete account", "Keep my account", "Start your raise", "Keep editing"). Dismiss buttons in destructive/confirmation Dialogs use the "Keep {noun}" convention.
+- ❌ Bare generic CTA labels — "Cancel", "OK", "Submit", "Save", "Yes", "No", "Send", "Close" as a standalone button label. Every button carries a specific verb+noun ("Delete account", "Keep my account", "Start your raise", "Keep editing", "Send outreach", "Keep draft"). The founder-approval Dialog's primary action is always the noun-bearing `Send {thing}` form — never bare "Send". Dismiss buttons in destructive/confirmation/modal Dialogs use the "Keep {noun}" convention — never bare "Cancel"/"Close".
 - ❌ The banned compliance strings: "rolling fund", "investment advice", "legal advice" (without "not"/"this is not"), "fund", "investment vehicle", "adviser"
 - ❌ Hardcoded site URL anywhere — always `process.env.NEXT_PUBLIC_SITE_URL` / `NEXT_PUBLIC_APP_URL`
 - ❌ Autonomous external sends — every email/intro/signature/payment goes through the founder-approval Dialog
@@ -322,11 +323,11 @@ The `magic` / `stitch` MCPs may be used to *generate* UI scaffolding, but the br
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS (1 non-blocking FLAG resolved 2026-05-12 — founder-approval Dialog primary is now `Send {thing}`; `/styleguide` dismiss example is "Keep draft", not "Close")
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved — 2026-05-12 (6/6 dimensions; Dimension 1 FLAG was non-blocking and has been addressed)
