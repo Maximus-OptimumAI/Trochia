@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Expected GitHub repo secrets (added in repo settings, never committed):
+#   DATABASE_URL          — test Postgres connection (RLS integration tests skip if absent)
+#   DIRECT_URL            — test Postgres direct connection (for migrations in CI, if used)
+#   NEXT_PUBLIC_SITE_URL  — required by src/lib/env.ts at build time
+#   NEXT_PUBLIC_APP_URL   — required by src/lib/env.ts at build time
+#   PLAYWRIGHT_BASE_URL   — Vercel preview URL for e2e (else the local webServer is used)
+# Later plans add: STRIPE_*, ANTHROPIC_API_KEY, SUPABASE_*, etc. as test secrets.
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: lint · typecheck · banned-strings · vitest · playwright · lighthouse
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000' }}
+      NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL || 'http://localhost:3000' }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DIRECT_URL: ${{ secrets.DIRECT_URL }}
+      PLAYWRIGHT_BASE_URL: ${{ secrets.PLAYWRIGHT_BASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Banned-string check
+        run: npm run check:banned
+
+      - name: Unit + integration tests (Vitest)
+        # RLS integration tests skip themselves when DATABASE_URL is absent —
+        # later plans add the test-db secret.
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E tests (Playwright)
+        run: npm run test:e2e
+
+      - name: Lighthouse CI
+        # Soft-fail for now (the marketing `/` route ships in Plan 08; flip to a
+        # hard gate then). Asserts perf/a11y/best-practices/SEO >= 0.9 on `/`.
+        continue-on-error: true
+        run: npx lhci autorun
