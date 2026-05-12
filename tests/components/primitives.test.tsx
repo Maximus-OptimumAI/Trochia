@@ -9,17 +9,13 @@
  *   - LegalDisclaimerBanner: renders the canonical "not a law firm … does not
  *     provide legal advice" copy.
  */
-import { describe, it, expect, afterEach, beforeAll, vi } from 'vitest';
+import '@testing-library/jest-dom/vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
-import * as matchers from '@testing-library/jest-dom/matchers';
 
 import { FounderApprovalDialog } from '@/components/primitives/founder-approval-dialog';
 import { DestructiveConfirmDialog } from '@/components/primitives/destructive-confirm-dialog';
 import { LegalDisclaimerBanner } from '@/components/primitives/legal-disclaimer-banner';
-
-beforeAll(() => {
-  expect.extend(matchers);
-});
 
 afterEach(cleanup);
 
