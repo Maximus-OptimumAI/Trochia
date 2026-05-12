@@ -37,7 +37,16 @@ Trochia AI is an agentic Founder Operating System for raising capital — one Ne
   3. A founder can sign in with Google SSO (30-day sessions), Stripe billing is live (Pre-Raise $49 / Active Raise $199, Customer Portal, 7-day trial, card-on-file, idempotent webhooks), `entitlements()` gates features by tier, and the <5-min onboarding shell runs end-to-end instrumented in Amplitude
   4. All Anthropic calls go through `ai/client.ts` with prompt caching verified in Langfuse, model routing, Zod-typed outputs, and the OpenAI fallback flag; no production code calls Anthropic outside it
   5. The banned-string CI check runs (compliance-language guardrails), the GDPR/UK-GDPR/DPDP-grade clickwrap DPA + data-subject-rights/export/delete plumbing works, the vendor data-flow inventory + logging-scrub lint exist, the `tenant.region` seam + `getDbForRegion()` factory exist (US/UK/India), and Inngest background jobs run via a single `serve()` endpoint
-**Plans**: TBD
+**Plans**: 9 plans (+ SKELETON.md — Walking Skeleton)
+  - [ ] 01-01-PLAN.md — Scaffold Next.js 16.x + env contract + lib helpers + ESLint ruleset (import boundaries / no-hardcoded-URL / no-raw-console) + banned-string CI check + test infra (Vitest/Playwright/MSW) + GitHub Actions CI [FND-01, FND-08, XC-03, XC-05]
+  - [ ] 01-02-PLAN.md — Design system: shadcn init + Tailwind v4 brand tokens + fonts + 14 themed components + cross-cutting primitives (founder-approval Dialog, destructive-confirm Dialog, legal banner, empty/error/skeleton, app shell, marketing top bar, footer) + `/styleguide` (19 sections — exit gate) [FND-01, XC-02]
+  - [ ] 01-03-PLAN.md — Supabase provision + Phase-1 Drizzle schema (users/accounts/sessions/subscriptions/jobs/legal_acceptances) + RLS default-deny + tenant-scoped tRPC context + `getDbForRegion()` seam + RLS schema-scan & two-user isolation tests + `db:push` [FND-02, FND-03, FND-10] *(autonomous: false — Supabase provisioning + drizzle-kit push)*
+  - [ ] 01-04-PLAN.md — `ai/client.ts` chokepoint (prompt caching / model routing / Zod outputs / OpenAI fallback flag / untrusted-input pattern / Haiku health-check) + Inngest single `serve()` endpoint + jobs functions (health-check, reconcile-stripe stub, purge-soft-deleted, stubs) [FND-09, FND-11, XC-06, XC-07, XC-01]
+  - [ ] 01-05-PLAN.md — Observability: Sentry (PII scrub) + Amplitude (browser+node, onboarding-funnel taxonomy) + Langfuse (consumed by ai/client.ts) + Resend (typed react-email templates, system-mail-only) [FND-07, XC-06] *(autonomous: false — account provisioning)*
+  - [ ] 01-06-PLAN.md — Compliance plumbing: vendor data-flow inventory (docs/vendor-data-flow.md) + clickwrap DPA + downloadable PDF + data-subject-rights (export → Storage → signed URL → email; account soft-delete; restore-within-30d) + tRPC procedures [XC-01, XC-04]
+  - [ ] 01-07-PLAN.md — **Walking Skeleton:** Supabase Auth Google SSO + proxy.ts /app gate + Stripe billing (2 tiers, Customer Portal, 7-day trial, card-on-file, idempotent webhook + reconcile cron) + `entitlements()` (replaces the Plan-03 stub) + sign-up/sign-in/welcome/tier-picker/Checkout + /app shows tier + /reactivate + Vercel deploy + SKELETON.md [FND-04, FND-05, FND-06, FND-12] *(autonomous: false — Google OAuth config, Stripe dashboard setup, session-timer config, deploy confirmation)*
+  - [ ] 01-08-PLAN.md — Marketing site: homepage (8 sections, left-aligned hero + animated raise timeline, Lighthouse>90 gate) + /pricing (all 4 tiers, Active Raise featured, Close Mode/Alumni V3 badge no-CTA, monthly/annual Tabs, feature matrix, 8-Q FAQ) + /manifesto (1500–2000 words) + /legal/{privacy,terms,security,dpa} [FND-01, FND-08, XC-05]
+  - [ ] 01-09-PLAN.md — Onboarding stepper (Import/Deck/Review shells + funnel instrumentation + accounts.onboarding_* schema [BLOCKING: db:push]) + /app dashboard (empty state + 3 FND-12 CTA cards) + module placeholders + /app/settings (delete account + export data) + /app/billing (Customer Portal + cancel) + /styleguide session-gate [FND-12, XC-02, XC-04] *(autonomous: false — drizzle-kit push)*
 
 ### Phase 2: Knowledge Layer + Memory
 **Goal**: The Business Memory + Pipeline Memory spine works — founders convert their existing ChatGPT/Claude context into a confirmed Business Memory in minutes, a grounded+cited ambient Q&A answers from the curated corpus + memory, and a unified raise timeline anchors the "one operator" feel. This phase carries the explicit "is the moat real?" gate on design partners' own data.
@@ -175,7 +184,6 @@ Trochia AI is an agentic Founder Operating System for raising capital — one Ne
   3. All four tiers (Pre-Raise / Active Raise / Close Mode / Alumni) are live at public launch; the launch surfaces (landing page, pricing page, marketing copy) are shipped and pass the banned-string CI check
   4. SOC 2 Type I prep with Vanta is begun; the $50K MRR target (~300 paid users at ~$170 blended ARPU) and 3 accelerator partnerships are tracked as launch-readiness goals; **public launch is gated on ≥3 founders having closed real rounds while using Trochia**
 **Plans**: TBD
-**UI hint**: yes
 
 ## Progress
 
@@ -184,7 +192,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/TBD | Not started | - |
+| 1. Foundation | 0/9 | Planned | - |
 | 2. Knowledge Layer + Memory | 0/TBD | Not started | - |
 | 3. Pitch Lab — Deck Reviewer | 0/TBD | Not started | - |
 | 4. Investor Pipeline | 0/TBD | Not started | - |
