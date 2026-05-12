@@ -32,6 +32,12 @@
 - Customer data NEVER enters a training pipeline.
 - No customer data in the OpenAI fallback or any build tooling that could log it.
 
+## UI / design system
+- All UI work MUST read docs/BRAND.md and docs/DESIGN-REFERENCE.md before planning or implementing.
+- The aesthetic targets harmonic.ai + firecrawl.dev — operator-grade, near-monochromatic, single Signal accent.
+- Anti-patterns listed in DESIGN-REFERENCE.md are banned (no gradients on sections, no shadows on cards, no carousels, no AI-buddy copy, etc.).
+- Phase 1 must ship a /styleguide internal route exposing every themed component.
+
 ## Trochia AI cannot be a substitute for legal counsel
 - Every legal-adjacent surface (SAFE generation, F&F, Legal Stack, cap table) carries explicit disclaimers.
 - Compliance Auditor pass is non-skippable at Phase 8, 9, and 10.
