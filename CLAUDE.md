@@ -7,6 +7,8 @@ Trochia AI is an agentic Founder Operating System for raising capital — it run
 
 **Core Value:** A founder can run their entire raise from inside one tool whose shared memory knows their business and their pipeline better than any general AI — and that memory + workflow ownership across the whole raise journey is the moat. If everything else fails, the unified Business Memory + Pipeline Memory spine that every module reads from and writes to must work.
 
+> ⚠️ **READ FIRST — `tasks/constraints.md`** holds the non-negotiable build constraints (URL-always-from-env; banned compliance language + Phase-0 CI check; the `ai/client.ts` chokepoint + mandatory prompt caching; the `safe-engine`/`cap-table-engine` → no-import-path-to-`ai/` rule; deterministic cap-table math + the TDD-first 30-scenario oracle + the SAFE-engine Security audit; no autonomous external sends; `drive.file`-only Drive scope + opt-in-per-thread Gmail; never train on customer data; lawyer-disclaimer surfaces + non-skippable Compliance Auditor passes at Phases 8–10). **Every subagent — Backend Architect, Frontend Developer, AI Engineer, Code Reviewer, Compliance Auditor, Security Engineer — MUST read `tasks/constraints.md` before planning or executing any phase.**
+
 ### Constraints
 
 - **Scope**: Full product — MVP (Weeks 0–10) + V2 (Weeks 11–22) + V3 (Weeks 23–36) — built end-to-end before the public launch, per PRD v2. The MVP slice soft-launches to 25 design partners at ~Week 10. PRD v1 (MVP-only staged ship) is the fallback if scope must be cut.
