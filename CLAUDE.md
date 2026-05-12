@@ -225,6 +225,8 @@ No project skills found. Add skills to any of: `.claude/skills/`, `.agents/skill
 <!-- GSD:workflow-start source:GSD defaults -->
 ## GSD Workflow Enforcement
 
+**Non-negotiable: every `/gsd-plan-phase` run MUST begin by reading `tasks/constraints.md` and incorporating its rules into PLAN.md. Plan-checker MUST verify all constraints are honored before plan approval. Verifier MUST confirm constraints held in shipped code.**
+
 Before using Edit, Write, or other file-changing tools, start work through a GSD command so planning artifacts and execution context stay in sync.
 
 Use these entry points:
