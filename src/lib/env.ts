@@ -83,9 +83,9 @@ const envSchema = z.object({
   AMPLITUDE_API_KEY: prodRequired(z.string()),
   NEXT_PUBLIC_AMPLITUDE_API_KEY: prodRequired(z.string()),
 
-  // ── Resend ──
-  RESEND_API_KEY: z.string().optional(), // Plan 05 flips this to required-in-prod
-  EMAIL_FROM: z.string().optional(), // Plan 05 owns this
+  // ── Resend ── (Plan 05 / 01-05-PLAN.md flipped RESEND_API_KEY to required-in-prod)
+  RESEND_API_KEY: prodRequired(z.string()),
+  EMAIL_FROM: z.string().optional(), // optional — `src/lib/email/client.ts` derives the from-address from SITE_URL's host when unset (no hardcoded domain)
 
   // ── Inngest ──
   INNGEST_SIGNING_KEY: z.string().optional(), // Plan 07 flips this to required-in-prod
