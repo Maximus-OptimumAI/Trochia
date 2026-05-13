@@ -20,7 +20,7 @@ Requirements for the full product (this milestone). Each maps to a roadmap phase
 - [ ] **FND-04** `[MVP]`: A founder can sign in with Google SSO (Supabase Auth); sessions persist 30 days and refresh on activity; magic-link sign-in and TOTP MFA are added at V2
 - [ ] **FND-05** `[MVP]`: Stripe billing is live with Pre-Raise ($49/mo, $39/mo annual) and Active Raise ($199/mo, $159/mo annual) tiers, a self-serve Stripe Customer Portal, a 7-day free trial, card-on-file required at signup, and no permanent free tier; webhooks are idempotent with a reconciliation path
 - [ ] **FND-06** `[MVP]`: An `entitlements()` function gates module/feature access by the founder's current Stripe tier (extensible to the Close Mode and Alumni tiers added at V3)
-- [ ] **FND-07** `[MVP]`: Resend sends transactional email; Sentry captures errors; Amplitude tracks product events; Langfuse traces every production Anthropic call (cache hit rate, tokens, latency, cost per user) — all wired from Phase 0
+- [x] **FND-07** `[MVP]`: Resend sends transactional email; Sentry captures errors; Amplitude tracks product events; Langfuse traces every production Anthropic call (cache hit rate, tokens, latency, cost per user) — all wired from Phase 0
 - [ ] **FND-08** `[MVP]`: The site URL is read everywhere from `process.env.NEXT_PUBLIC_SITE_URL` (and `NEXT_PUBLIC_APP_URL`); it is never hardcoded, so the planned `trochia.asranest.com` → `trochia.ai` migration requires zero code changes
 - [x] **FND-09** `[MVP]`: A single `ai/client.ts` chokepoint wraps all Anthropic calls — prompt caching on the stable prefix (corpus + Business Memory + taxonomy + tool schemas), model routing by task class (Opus deep reasoning / Sonnet drafting / Haiku classification), Zod-typed structured outputs, and the OpenAI/Codex fallback behind a config flag; no production code calls Anthropic outside it
 - [x] **FND-10** `[MVP]`: A `tenant.region` column + `getDbForRegion()` factory establish the multi-region data-residency seam (US + UK share a US region with UK handled contractually at MVP; an India region exists; an EU region is added at V2) — the seam is built without over-engineering full multi-region machinery
@@ -187,7 +187,7 @@ Which phases cover which requirements. Roadmap: `.planning/ROADMAP.md` (11 phase
 | FND-04 | Phase 1 — Foundation | Pending |
 | FND-05 | Phase 1 — Foundation | Pending |
 | FND-06 | Phase 1 — Foundation | Pending |
-| FND-07 | Phase 1 — Foundation | Pending |
+| FND-07 | Phase 1 — Foundation | Complete |
 | FND-08 | Phase 1 — Foundation | Pending |
 | FND-09 | Phase 1 — Foundation | Complete |
 | FND-10 | Phase 1 — Foundation | Complete |
