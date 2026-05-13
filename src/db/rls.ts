@@ -48,7 +48,14 @@ import { authenticatedRole, authUid } from 'drizzle-orm/supabase';
  * ledger written only by the service-role client). That is a one-line local edit to
  * this constant — NOT an edit to the schema-scan test.
  */
-export const NON_TENANT_TABLES = ['corpus', '__drizzle_migrations'] as const;
+export const NON_TENANT_TABLES = [
+  'corpus',
+  '__drizzle_migrations',
+  // Plan 07: Stripe webhook idempotency ledger. Written only by getServiceClient
+  // (the webhook has no user session) and not scoped to a single tenant — it
+  // dedupes on Stripe's event.id, which is global to our Stripe account.
+  'processed_stripe_events',
+] as const;
 
 /**
  * The `tenant_isolation` policy applied to every tenant-scoped table, keyed on the

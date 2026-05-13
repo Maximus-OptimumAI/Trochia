@@ -19,6 +19,7 @@ import { initTRPC, TRPCError } from '@trpc/server';
 import superjson from 'superjson';
 
 import type { TRPCContext } from '@/server/context';
+import { entitlements } from '@/modules/billing/entitlements';
 
 const t = initTRPC.context<TRPCContext>().create({
   transformer: superjson,
@@ -52,16 +53,28 @@ export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
 });
 
 /**
- * Gate a procedure on the tenant having `feature` in its plan.
+ * Gate a procedure on the tenant having `feature` in its plan (FND-06, D-02b).
  *
- * Phase-1 STUB — always allows. TODO(Plan 07): implement
- *   const ent = await entitlements(ctx.account);
- *   if (!ent.features.includes(feature)) throw new TRPCError({ code: 'FORBIDDEN' });
+ * `entitlements(ctx.account)` is a pure read over the persisted
+ * `accounts.subscription_status` + `accounts.tier`; the Stripe webhook keeps
+ * those columns fresh. This middleware throws `FORBIDDEN` when the feature
+ * isn't in the active tier's allowlist — the tRPC-layer backstop to the
+ * `proxy.ts` route gate (T-1-39).
+ *
+ * Plan 07 replaces Plan 03's pass-through stub with this real implementation.
  */
 export function assertEntitled(feature: string) {
   return protectedProcedure.use(({ ctx, next }) => {
-    void feature; // TODO(Plan 07): replace with the real entitlements(ctx.account) check.
-    void ctx;
+    const ent = entitlements({
+      subscription_status: ctx.account.subscriptionStatus,
+      tier: ctx.account.tier,
+    });
+    if (!ent.active || !ent.features.includes(feature)) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: `Feature "${feature}" is not available on your current plan.`,
+      });
+    }
     return next();
   });
 }

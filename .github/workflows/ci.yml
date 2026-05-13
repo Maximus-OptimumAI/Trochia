@@ -58,6 +58,16 @@ jobs:
       LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY || 'sk-lf-ci' }}
       LANGFUSE_HOST: ${{ secrets.LANGFUSE_HOST || 'https://cloud.langfuse.com' }}
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY || 're_ci_key' }}
+      # Required-in-prod by src/lib/env.ts (Plan 07 / 01-07 flipped the Stripe + Inngest vars).
+      # Fallbacks keep the production build green before the real secrets are added.
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY || 'sk_test_ci' }}
+      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET || 'whsec_ci' }}
+      STRIPE_PRICE_PRE_RAISE_MONTHLY: ${{ secrets.STRIPE_PRICE_PRE_RAISE_MONTHLY || 'price_ci_pre_raise_m' }}
+      STRIPE_PRICE_PRE_RAISE_ANNUAL: ${{ secrets.STRIPE_PRICE_PRE_RAISE_ANNUAL || 'price_ci_pre_raise_a' }}
+      STRIPE_PRICE_ACTIVE_RAISE_MONTHLY: ${{ secrets.STRIPE_PRICE_ACTIVE_RAISE_MONTHLY || 'price_ci_active_raise_m' }}
+      STRIPE_PRICE_ACTIVE_RAISE_ANNUAL: ${{ secrets.STRIPE_PRICE_ACTIVE_RAISE_ANNUAL || 'price_ci_active_raise_a' }}
+      INNGEST_SIGNING_KEY: ${{ secrets.INNGEST_SIGNING_KEY || 'signkey-ci' }}
+      INNGEST_EVENT_KEY: ${{ secrets.INNGEST_EVENT_KEY || 'eventkey-ci' }}
       PLAYWRIGHT_BASE_URL: ${{ secrets.PLAYWRIGHT_BASE_URL }}
     steps:
       - uses: actions/checkout@v4

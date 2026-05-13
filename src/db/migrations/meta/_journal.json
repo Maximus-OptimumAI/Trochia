@@ -8,6 +8,13 @@
       "when": 1778617583086,
       "tag": "0000_sturdy_maestro",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1778707978399,
+      "tag": "0001_sticky_bloodstrike",
+      "breakpoints": true
     }
   ]
 }

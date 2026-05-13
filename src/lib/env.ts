@@ -54,13 +54,13 @@ const envSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: prodRequired(z.string().url()),
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: prodRequired(z.string()),
 
-  // ── Stripe ──
-  STRIPE_SECRET_KEY: z.string().optional(), // Plan 03 flips this to required-in-prod
-  STRIPE_WEBHOOK_SECRET: z.string().optional(), // Plan 03 flips this to required-in-prod
-  STRIPE_PRICE_PRE_RAISE_MONTHLY: z.string().optional(), // Plan 03 flips this to required-in-prod
-  STRIPE_PRICE_PRE_RAISE_ANNUAL: z.string().optional(), // Plan 03 flips this to required-in-prod
-  STRIPE_PRICE_ACTIVE_RAISE_MONTHLY: z.string().optional(), // Plan 03 flips this to required-in-prod
-  STRIPE_PRICE_ACTIVE_RAISE_ANNUAL: z.string().optional(), // Plan 03 flips this to required-in-prod
+  // ── Stripe ── (Plan 07 / 01-07-PLAN.md flipped these to required-in-prod)
+  STRIPE_SECRET_KEY: prodRequired(z.string()),
+  STRIPE_WEBHOOK_SECRET: prodRequired(z.string()),
+  STRIPE_PRICE_PRE_RAISE_MONTHLY: prodRequired(z.string()),
+  STRIPE_PRICE_PRE_RAISE_ANNUAL: prodRequired(z.string()),
+  STRIPE_PRICE_ACTIVE_RAISE_MONTHLY: prodRequired(z.string()),
+  STRIPE_PRICE_ACTIVE_RAISE_ANNUAL: prodRequired(z.string()),
 
   // ── AI chokepoint ──
   ANTHROPIC_API_KEY: prodRequired(z.string()), // Plan 04 / 01-04-PLAN.md flipped this to required-in-prod
@@ -87,9 +87,10 @@ const envSchema = z.object({
   RESEND_API_KEY: prodRequired(z.string()),
   EMAIL_FROM: z.string().optional(), // optional — `src/lib/email/client.ts` derives the from-address from SITE_URL's host when unset (no hardcoded domain)
 
-  // ── Inngest ──
-  INNGEST_SIGNING_KEY: z.string().optional(), // Plan 07 flips this to required-in-prod
-  INNGEST_EVENT_KEY: z.string().optional(), // Plan 07 flips this to required-in-prod
+  // ── Inngest ── (Plan 07 / 01-07-PLAN.md flipped these to required-in-prod;
+  // the Vercel↔Inngest integration auto-injects them on Vercel.)
+  INNGEST_SIGNING_KEY: prodRequired(z.string()),
+  INNGEST_EVENT_KEY: prodRequired(z.string()),
 
   // ── Upstash Redis (rate limiting) ──
   UPSTASH_REDIS_REST_URL: z.string().url().optional(), // Plan 04 flips this to required-in-prod
