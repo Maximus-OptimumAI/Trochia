@@ -15,15 +15,15 @@ Requirements for the full product (this milestone). Each maps to a roadmap phase
 ### Foundation & Platform — `FND`
 
 - [ ] **FND-01** `[MVP]`: A Next.js 15/16 + TypeScript + Tailwind + shadcn/ui monolith is deployed to Vercel (Fluid Compute), with the public marketing site served from the same repo and a working CI pipeline (lint + typecheck + Vitest + Playwright) on GitHub Actions
-- [ ] **FND-02** `[MVP]`: Supabase is provisioned (Postgres + pgvector HNSW + Storage); Drizzle ORM manages the schema and migrations; core tables exist — users/accounts, businesses (Business Memory), decks, investors, pipeline entries — using current Supabase publishable/secret keys (not anon/service_role)
-- [ ] **FND-03** `[MVP]`: Row-Level Security is enabled on every tenant-scoped table with default-deny policies; tRPC procedures run in a tenant-scoped context that enforces the same isolation; a CI check fails any new table that lacks RLS + a policy; a two-user integration test proves tenant A cannot read tenant B's rows
+- [x] **FND-02** `[MVP]`: Supabase is provisioned (Postgres + pgvector HNSW + Storage); Drizzle ORM manages the schema and migrations; core tables exist — users/accounts, businesses (Business Memory), decks, investors, pipeline entries — using current Supabase publishable/secret keys (not anon/service_role)
+- [x] **FND-03** `[MVP]`: Row-Level Security is enabled on every tenant-scoped table with default-deny policies; tRPC procedures run in a tenant-scoped context that enforces the same isolation; a CI check fails any new table that lacks RLS + a policy; a two-user integration test proves tenant A cannot read tenant B's rows
 - [ ] **FND-04** `[MVP]`: A founder can sign in with Google SSO (Supabase Auth); sessions persist 30 days and refresh on activity; magic-link sign-in and TOTP MFA are added at V2
 - [ ] **FND-05** `[MVP]`: Stripe billing is live with Pre-Raise ($49/mo, $39/mo annual) and Active Raise ($199/mo, $159/mo annual) tiers, a self-serve Stripe Customer Portal, a 7-day free trial, card-on-file required at signup, and no permanent free tier; webhooks are idempotent with a reconciliation path
 - [ ] **FND-06** `[MVP]`: An `entitlements()` function gates module/feature access by the founder's current Stripe tier (extensible to the Close Mode and Alumni tiers added at V3)
 - [ ] **FND-07** `[MVP]`: Resend sends transactional email; Sentry captures errors; Amplitude tracks product events; Langfuse traces every production Anthropic call (cache hit rate, tokens, latency, cost per user) — all wired from Phase 0
 - [ ] **FND-08** `[MVP]`: The site URL is read everywhere from `process.env.NEXT_PUBLIC_SITE_URL` (and `NEXT_PUBLIC_APP_URL`); it is never hardcoded, so the planned `trochia.asranest.com` → `trochia.ai` migration requires zero code changes
 - [ ] **FND-09** `[MVP]`: A single `ai/client.ts` chokepoint wraps all Anthropic calls — prompt caching on the stable prefix (corpus + Business Memory + taxonomy + tool schemas), model routing by task class (Opus deep reasoning / Sonnet drafting / Haiku classification), Zod-typed structured outputs, and the OpenAI/Codex fallback behind a config flag; no production code calls Anthropic outside it
-- [ ] **FND-10** `[MVP]`: A `tenant.region` column + `getDbForRegion()` factory establish the multi-region data-residency seam (US + UK share a US region with UK handled contractually at MVP; an India region exists; an EU region is added at V2) — the seam is built without over-engineering full multi-region machinery
+- [x] **FND-10** `[MVP]`: A `tenant.region` column + `getDbForRegion()` factory establish the multi-region data-residency seam (US + UK share a US region with UK handled contractually at MVP; an India region exists; an EU region is added at V2) — the seam is built without over-engineering full multi-region machinery
 - [ ] **FND-11** `[MVP]`: Background jobs run on Inngest via a single `serve()` endpoint — deck parsing, embedding, transcription, brief enrichment, e-sign webhooks, scheduled reminders — with per-key concurrency limits; a `jobs` table + Supabase Realtime gives the UI status polling
 - [ ] **FND-12** `[MVP]`: The onboarding flow shell works end-to-end: Google sign-in → welcome → Knowledge Pack Import → deck upload → automatic deck review → dashboard with three CTAs ("Generate VC fit list," "Prepare for an upcoming call," "Draft outreach"); target completion under 5 minutes; the funnel is instrumented in Amplitude
 
@@ -182,15 +182,15 @@ Which phases cover which requirements. Roadmap: `.planning/ROADMAP.md` (11 phase
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | FND-01 | Phase 1 — Foundation | Pending |
-| FND-02 | Phase 1 — Foundation | Pending |
-| FND-03 | Phase 1 — Foundation | Pending |
+| FND-02 | Phase 1 — Foundation | Complete |
+| FND-03 | Phase 1 — Foundation | Complete |
 | FND-04 | Phase 1 — Foundation | Pending |
 | FND-05 | Phase 1 — Foundation | Pending |
 | FND-06 | Phase 1 — Foundation | Pending |
 | FND-07 | Phase 1 — Foundation | Pending |
 | FND-08 | Phase 1 — Foundation | Pending |
 | FND-09 | Phase 1 — Foundation | Pending |
-| FND-10 | Phase 1 — Foundation | Pending |
+| FND-10 | Phase 1 — Foundation | Complete |
 | FND-11 | Phase 1 — Foundation | Pending |
 | FND-12 | Phase 1 — Foundation | Pending |
 | XC-01 | Phase 1 — Foundation (enforced all phases) | Pending |
