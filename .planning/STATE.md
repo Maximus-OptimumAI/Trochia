@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Plan 01-08 complete (marketing site live)
-last_updated: "2026-05-13T22:48:03.797Z"
+status: verifying
+stopped_at: Plan 01-09 complete — Phase 1 ready for verification
+last_updated: "2026-05-13T23:37:36.727Z"
 last_activity: 2026-05-13
 progress:
   total_phases: 11
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 9
-  completed_plans: 8
-  percent: 89
+  completed_plans: 9
+  percent: 100
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-05-11)
 
 ## Current Position
 
-Phase: 01 (foundation) — EXECUTING
+Phase: 01 (foundation) — COMPLETE (awaiting verification)
 Plan: 9 of 9
-Status: Ready to execute
+Status: Phase complete — ready for verification (`/gsd-verify-phase`)
 Last activity: 2026-05-13
 
-Progress: [█████████░] 89%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -57,6 +57,7 @@ Progress: [█████████░] 89%
 | Phase 01 P05 | ~45 min | 3 tasks | 22 files |
 | Phase 01 P08 | 75 min | 3 tasks tasks | 18 files files |
 | Phase 01 P07 | 3h | 3 tasks | 33 files |
+| Phase 01 P09 | ~1.5h | 3 tasks | 23 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,7 @@ Recent decisions affecting current work:
 - [Phase 01]: Plan 05 (observability + email): Sentry client/server/edge with shared SENSITIVE_FIELDS-driven beforeSend (src/lib/sentry-scrub.ts), withSentryConfig-wrapped next.config.ts; Amplitude typed AnalyticsEvent union with the D-12 onboarding funnel (browser SDK on client, node SDK on server for non-spoofable revenue events); Langfuse stub from Plan 04 FILLED (ai/client.ts untouched); Resend + react-email typed template registry (welcome/trial-ending/payment-failed/data-export-ready) — from-address derived from SITE_URL host (no hardcoded domain), Trochia→founder system mail ONLY; 11 env vars flipped prodRequired (Sentry × 5, Amplitude × 2, Langfuse × 3, Resend × 1); CI fallbacks added.
 - [Phase ?]: [Phase 01]: Plan 08 (marketing site): public marketing surface from same repo — / (8-section homepage, left-aligned hero + animated reduced-motion-aware HeroTimeline), /pricing (4 tiers + Tabs + feature matrix + 8-FAQ; PRICING_TIERS marketing constant kept in sync with Plan 07's TIERS by Code Review), /manifesto (1582-word operator-voice draft), /legal/{privacy,terms,security,dpa} (Trochia-authored; /legal/dpa renders Plan 06's DpaContent verbatim + links public/legal/dpa.pdf). Lighthouse > 90 gate on / flipped to required in ci.yml (Phase-1 exit gate). e2e/marketing.spec.ts 8/8 passing. Banned-string clean (XC-05); no hardcoded URLs (FND-08).
 - [Phase ?]: [Phase 01]: Plan 07 (Walking Skeleton): Supabase Auth Google SSO + @supabase/ssr cookies + Next-16 proxy.ts session-refresh + (app) hard subscription gate (fast-paths public routes for marketing speed). Stripe billing — pre_raise+active_raise active w/ trial_period_days:7 + automatic_tax + client_reference_id (close_mode+alumni present, active:false). Idempotent webhook (claimEvent on processed_stripe_events ledger added to NON_TENANT_TABLES, signature-verified, server-side checkout_completed). entitlements() pure + Stripe-free (replaces Plan 03 stub, structurally enforced); reconcile-stripe filled. TRPCReactProvider mounted in providers.tsx (layout.tsx untouched). STRIPE_*/INNGEST_* (8 vars) prodRequired + CI fallbacks. processed_stripe_events migration emitted (not auto-applied, that's the deploy checkpoint). FND-04/05/06/12.
+- [Phase ?]: [Phase 01]: Plan 09 (onboarding shell + dashboard + Settings + Billing): /onboarding/{import,deck,review} stepper screens (UI shells, skip-friendly, review uses SkeletonBlock not spinner; auto-advances 1.2s); onboardingRouter (getProgress/markStepComplete/skipStep) + accounts.onboarding_step/onboarding_completed_at (migration 0002_soft_zuras.sql NOT auto-applied). /app replaces Plan-07 skeleton with EmptyDashboard + 3 FND-12 CTA cards (each links to its Phase-2/4/5 placeholder, never disabled — Coming Phase N badge). 4 module placeholders. /app/settings: Delete-account Dialog (typed DELETE + 'Keep my account' dismiss → requestAccountDeletion + signOut) + Export-my-data. /app/billing: tier+status + Manage-billing → Customer Portal + Cancel-subscription Dialog ('Keep subscription' dismiss → Portal per D-02c). Sonner Toaster mounted in (app)/layout.tsx. FND-12 funnel end-to-end instrumented. FND-12 + XC-02 + XC-04. Phase 1 complete.
 
 ### Pending Todos
 
@@ -99,6 +101,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-13T22:47:25.074Z
-Stopped at: Plan 01-08 complete (marketing site live)
+Last session: 2026-05-13T23:37:11.413Z
+Stopped at: Plan 01-09 complete — Phase 1 ready for verification
 Resume file: None

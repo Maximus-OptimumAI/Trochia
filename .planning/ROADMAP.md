@@ -46,7 +46,7 @@ Trochia AI is an agentic Founder Operating System for raising capital — one Ne
   - [x] 01-06-PLAN.md — Compliance plumbing: vendor data-flow inventory (docs/vendor-data-flow.md) + clickwrap DPA + downloadable PDF + data-subject-rights (export → Storage → signed URL → email; account soft-delete; restore-within-30d) + tRPC procedures [XC-01, XC-04]
   - [x] 01-07-PLAN.md — **Walking Skeleton:** Supabase Auth Google SSO + proxy.ts /app gate + Stripe billing (2 tiers, Customer Portal, 7-day trial, card-on-file, idempotent webhook + reconcile cron) + `entitlements()` (replaces the Plan-03 stub) + sign-up/sign-in/welcome/tier-picker/Checkout + /app shows tier + /reactivate + Vercel deploy + SKELETON.md [FND-04, FND-05, FND-06, FND-12] *(autonomous: false — Google OAuth config, Stripe dashboard setup, session-timer config, deploy confirmation)*
   - [x] 01-08-PLAN.md — Marketing site: homepage (8 sections, left-aligned hero + animated raise timeline, Lighthouse>90 gate) + /pricing (all 4 tiers, Active Raise featured, Close Mode/Alumni V3 badge no-CTA, monthly/annual Tabs, feature matrix, 8-Q FAQ) + /manifesto (1500–2000 words) + /legal/{privacy,terms,security,dpa} [FND-01, FND-08, XC-05]
-  - [ ] 01-09-PLAN.md — Onboarding stepper (Import/Deck/Review shells + funnel instrumentation + accounts.onboarding_* schema [BLOCKING: db:push]) + /app dashboard (empty state + 3 FND-12 CTA cards) + module placeholders + /app/settings (delete account + export data) + /app/billing (Customer Portal + cancel) + /styleguide session-gate [FND-12, XC-02, XC-04] *(autonomous: false — drizzle-kit push)*
+  - [x] 01-09-PLAN.md — Onboarding stepper (Import/Deck/Review shells + funnel instrumentation + accounts.onboarding_* schema [BLOCKING: db:push]) + /app dashboard (empty state + 3 FND-12 CTA cards) + module placeholders + /app/settings (delete account + export data) + /app/billing (Customer Portal + cancel) + /styleguide session-gate [FND-12, XC-02, XC-04] *(autonomous: false — drizzle-kit push)*
 
 ### Phase 2: Knowledge Layer + Memory
 **Goal**: The Business Memory + Pipeline Memory spine works — founders convert their existing ChatGPT/Claude context into a confirmed Business Memory in minutes, a grounded+cited ambient Q&A answers from the curated corpus + memory, and a unified raise timeline anchors the "one operator" feel. This phase carries the explicit "is the moat real?" gate on design partners' own data.
@@ -192,7 +192,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/9 | Planned | - |
+| 1. Foundation | 9/9 | Complete | 2026-05-13 |
 | 2. Knowledge Layer + Memory | 0/TBD | Not started | - |
 | 3. Pitch Lab — Deck Reviewer | 0/TBD | Not started | - |
 | 4. Investor Pipeline | 0/TBD | Not started | - |

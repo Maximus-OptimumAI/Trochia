@@ -61,3 +61,29 @@ Follow-up (out of Plan 07's scope):
 
 Plan 07's verification is CI-green, not Windows-local-green. The pre-existing
 marketing flake is logged here for the verifier / a later plan to harden.
+
+## 01-09 (onboarding shell + dashboard + Settings + Billing) — pending operational steps (2026-05-13)
+
+Code shipped (3 commits: 6c29c69 stepper+router+schema, 4a88dea dashboard+CTA cards+module placeholders, 22193ce Settings + Billing). Two operational steps the founder runs together with Plan 07's outstanding migration:
+
+1. **Run the new migration.** Plan 09 emitted `src/db/migrations/0002_soft_zuras.sql` (ADD COLUMN `accounts.onboarding_step` + `accounts.onboarding_completed_at`). It is NOT auto-applied. Run alongside Plan 07's `0001_sticky_bloodstrike.sql` (`processed_stripe_events`):
+
+   ```bash
+   DATABASE_URL=… DIRECT_URL=… npx drizzle-kit migrate
+   ```
+
+   Both migrations are plain ADD COLUMN / CREATE TABLE — no destructive operations, no `drizzle-kit push` prompts expected.
+
+2. **Manual end-to-end check after deploy** (in addition to Plan 07's walk-through, recorded in `01-VALIDATION.md`'s Manual-Only table):
+   - Visit `/sign-up` → Continue with Google → `/onboarding/welcome` → Get started → tier picker → pick Active Raise Monthly → Stripe Checkout (`4242 4242 4242 4242`) → land at `/onboarding?checkout=success`.
+   - Should auto-route to `/onboarding/import`. Confirm: heading "Import your context", paste textarea, file dropzone, Continue + "Skip for now".
+   - Click Continue → `/onboarding/deck`. Confirm: heading "Upload your deck", file input, Google Slides URL Input, Continue + "Skip for now".
+   - Click Continue → `/onboarding/review`. Confirm: heading "Reviewing your deck…", SkeletonBlock progress mock (NOT a spinner), auto-advances after ~1.2s.
+   - Land at `/app`. Confirm: AppShell renders (sidebar with Business Memory / Pitch Lab / Pipeline / Live Raise / Data Room "Phase 7" / Raise Ops "Phase 9"), top bar "Dashboard", tier line ("Active Raise · trial ends YYYY-MM-DD"), the EmptyDashboard state ("Welcome to Trochia" + "Start Business Memory" → /app/memory), the three CTA cards with their "Coming Phase 4/5" badges.
+   - Click "Generate VC fit list" → `/app/pipeline` "coming in Phase 4" empty-state.
+   - Visit `/app/memory`, `/app/pitch`, `/app/live-raise` → each renders its "coming in Phase N" empty-state.
+   - Visit `/app/settings` → confirm Profile card, "Export my data" button, "Delete account" button → click → DestructiveConfirmDialog opens, confirm button is disabled until "DELETE" is typed, dismiss label is "Keep my account". (Do not actually delete; click "Keep my account".)
+   - Visit `/app/billing` → confirm tier display + "Manage billing" → opens Stripe Customer Portal; "Cancel subscription" → DestructiveConfirmDialog opens with "Keep subscription" dismiss.
+   - Verify Amplitude received `welcome_viewed`, `tier_selected`, `checkout_started`, `checkout_completed`, `knowledge_pack_step_viewed`, `deck_upload_step_viewed`, `review_step_viewed`, `dashboard_viewed` in roughly that order (the funnel is the FND-12 deliverable; live verification is in the Amplitude dashboard).
+
+The full Playwright happy-path click-through (one continuous browser session through all 8 funnel events) needs a live Supabase test user + a Checkout-stub harness; that lives in `e2e/skeleton.spec.ts`'s CI-only block alongside the Plan-07 webhook round-trip. Plan 09's `e2e/onboarding.spec.ts` + `e2e/app-shell.spec.ts` cover the proxy-gate matrix + "not a 404" contracts for the new routes — everything checkable without a live session.
