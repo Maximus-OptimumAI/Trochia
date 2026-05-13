@@ -63,8 +63,8 @@ const envSchema = z.object({
   STRIPE_PRICE_ACTIVE_RAISE_ANNUAL: z.string().optional(), // Plan 03 flips this to required-in-prod
 
   // ── AI chokepoint ──
-  ANTHROPIC_API_KEY: z.string().optional(), // Plan 04 flips this to required-in-prod
-  OPENAI_API_KEY: z.string().optional(), // Plan 04 flips this to required-in-prod (only when AI_FALLBACK_ENABLED)
+  ANTHROPIC_API_KEY: prodRequired(z.string()), // Plan 04 / 01-04-PLAN.md flipped this to required-in-prod
+  OPENAI_API_KEY: z.string().optional(), // Plan 04 owns this — only required-in-prod when AI_FALLBACK_ENABLED (kept optional; default-off fallback)
   AI_FALLBACK_ENABLED: booleanish, // Plan 04 owns this flag
 
   // ── Langfuse ──

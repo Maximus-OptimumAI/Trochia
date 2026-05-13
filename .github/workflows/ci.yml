@@ -16,7 +16,9 @@ on:
 #   NEXT_PUBLIC_SITE_URL  — required by src/lib/env.ts at build time
 #   NEXT_PUBLIC_APP_URL   — required by src/lib/env.ts at build time
 #   PLAYWRIGHT_BASE_URL   — Vercel preview URL for e2e (else the local webServer is used)
-# Later plans add: STRIPE_*, ANTHROPIC_API_KEY, etc. as test secrets.
+#   ANTHROPIC_API_KEY     — required-in-prod by src/lib/env.ts (build runs NODE_ENV=production);
+#                           a CI fallback is used until the real key secret is added.
+# Later plans add: STRIPE_*, INNGEST_*, etc. as test secrets.
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -40,6 +42,9 @@ jobs:
       SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY || 'ci-secret' }}
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'http://localhost:54321' }}
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 'ci-publishable' }}
+      # Required-in-prod by src/lib/env.ts (Plan 04 / 01-04 flipped ANTHROPIC_API_KEY).
+      # The CI fallback keeps the production build green before the real key secret is added.
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY || 'ci-anthropic-key' }}
       PLAYWRIGHT_BASE_URL: ${{ secrets.PLAYWRIGHT_BASE_URL }}
     steps:
       - uses: actions/checkout@v4
