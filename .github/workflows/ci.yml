@@ -94,7 +94,6 @@ jobs:
         run: npm run test:e2e
 
       - name: Lighthouse CI
-        # Soft-fail for now (the marketing `/` route ships in Plan 08; flip to a
-        # hard gate then). Asserts perf/a11y/best-practices/SEO >= 0.9 on `/`.
-        continue-on-error: true
+        # Required gate (Phase-1 exit gate, Plan 08). Asserts
+        # perf/a11y/best-practices/SEO >= 0.9 on `/`. A regression fails CI.
         run: npx lhci autorun
