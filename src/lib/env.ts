@@ -72,12 +72,12 @@ const envSchema = z.object({
   LANGFUSE_SECRET_KEY: z.string().optional(), // Plan 05 flips this to required-in-prod
   LANGFUSE_HOST: z.string().url().optional(), // Plan 05 owns this (defaults to cloud)
 
-  // ── Sentry ──
-  SENTRY_DSN: z.string().optional(), // Plan 05 flips this to required-in-prod
-  NEXT_PUBLIC_SENTRY_DSN: z.string().optional(), // Plan 05 flips this to required-in-prod
-  SENTRY_ORG: z.string().optional(), // Plan 05 owns this (build-time source maps)
-  SENTRY_PROJECT: z.string().optional(), // Plan 05 owns this (build-time source maps)
-  SENTRY_AUTH_TOKEN: z.string().optional(), // Plan 05 owns this (build-time source maps)
+  // ── Sentry ── (Plan 05 / 01-05-PLAN.md flipped these to required-in-prod)
+  SENTRY_DSN: prodRequired(z.string()),
+  NEXT_PUBLIC_SENTRY_DSN: prodRequired(z.string()),
+  SENTRY_ORG: prodRequired(z.string()), // build-time source-map upload
+  SENTRY_PROJECT: prodRequired(z.string()), // build-time source-map upload
+  SENTRY_AUTH_TOKEN: prodRequired(z.string()), // build-time source-map upload
 
   // ── Amplitude ──
   AMPLITUDE_API_KEY: z.string().optional(), // Plan 05 flips this to required-in-prod

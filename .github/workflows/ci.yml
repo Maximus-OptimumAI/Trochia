@@ -45,6 +45,19 @@ jobs:
       # Required-in-prod by src/lib/env.ts (Plan 04 / 01-04 flipped ANTHROPIC_API_KEY).
       # The CI fallback keeps the production build green before the real key secret is added.
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY || 'ci-anthropic-key' }}
+      # Required-in-prod by src/lib/env.ts (Plan 05 / 01-05 flipped the observability + email vars).
+      # Fallbacks keep the production build green before the real secrets are added.
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN || 'https://ci@ci.ingest.sentry.io/0' }}
+      NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN || 'https://ci@ci.ingest.sentry.io/0' }}
+      SENTRY_ORG: ${{ secrets.SENTRY_ORG || 'ci-org' }}
+      SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT || 'ci-project' }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN || 'ci-sentry-auth-token' }}
+      AMPLITUDE_API_KEY: ${{ secrets.AMPLITUDE_API_KEY || 'ci-amplitude-key' }}
+      NEXT_PUBLIC_AMPLITUDE_API_KEY: ${{ secrets.NEXT_PUBLIC_AMPLITUDE_API_KEY || 'ci-amplitude-key' }}
+      LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY || 'pk-lf-ci' }}
+      LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY || 'sk-lf-ci' }}
+      LANGFUSE_HOST: ${{ secrets.LANGFUSE_HOST || 'https://cloud.langfuse.com' }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY || 're_ci_key' }}
       PLAYWRIGHT_BASE_URL: ${{ secrets.PLAYWRIGHT_BASE_URL }}
     steps:
       - uses: actions/checkout@v4
