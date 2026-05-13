@@ -22,9 +22,9 @@ Requirements for the full product (this milestone). Each maps to a roadmap phase
 - [ ] **FND-06** `[MVP]`: An `entitlements()` function gates module/feature access by the founder's current Stripe tier (extensible to the Close Mode and Alumni tiers added at V3)
 - [ ] **FND-07** `[MVP]`: Resend sends transactional email; Sentry captures errors; Amplitude tracks product events; Langfuse traces every production Anthropic call (cache hit rate, tokens, latency, cost per user) — all wired from Phase 0
 - [ ] **FND-08** `[MVP]`: The site URL is read everywhere from `process.env.NEXT_PUBLIC_SITE_URL` (and `NEXT_PUBLIC_APP_URL`); it is never hardcoded, so the planned `trochia.asranest.com` → `trochia.ai` migration requires zero code changes
-- [ ] **FND-09** `[MVP]`: A single `ai/client.ts` chokepoint wraps all Anthropic calls — prompt caching on the stable prefix (corpus + Business Memory + taxonomy + tool schemas), model routing by task class (Opus deep reasoning / Sonnet drafting / Haiku classification), Zod-typed structured outputs, and the OpenAI/Codex fallback behind a config flag; no production code calls Anthropic outside it
+- [x] **FND-09** `[MVP]`: A single `ai/client.ts` chokepoint wraps all Anthropic calls — prompt caching on the stable prefix (corpus + Business Memory + taxonomy + tool schemas), model routing by task class (Opus deep reasoning / Sonnet drafting / Haiku classification), Zod-typed structured outputs, and the OpenAI/Codex fallback behind a config flag; no production code calls Anthropic outside it
 - [x] **FND-10** `[MVP]`: A `tenant.region` column + `getDbForRegion()` factory establish the multi-region data-residency seam (US + UK share a US region with UK handled contractually at MVP; an India region exists; an EU region is added at V2) — the seam is built without over-engineering full multi-region machinery
-- [ ] **FND-11** `[MVP]`: Background jobs run on Inngest via a single `serve()` endpoint — deck parsing, embedding, transcription, brief enrichment, e-sign webhooks, scheduled reminders — with per-key concurrency limits; a `jobs` table + Supabase Realtime gives the UI status polling
+- [x] **FND-11** `[MVP]`: Background jobs run on Inngest via a single `serve()` endpoint — deck parsing, embedding, transcription, brief enrichment, e-sign webhooks, scheduled reminders — with per-key concurrency limits; a `jobs` table + Supabase Realtime gives the UI status polling
 - [ ] **FND-12** `[MVP]`: The onboarding flow shell works end-to-end: Google sign-in → welcome → Knowledge Pack Import → deck upload → automatic deck review → dashboard with three CTAs ("Generate VC fit list," "Prepare for an upcoming call," "Draft outreach"); target completion under 5 minutes; the funnel is instrumented in Amplitude
 
 ### Knowledge Layer & Memory — `KNW`
@@ -107,13 +107,13 @@ Requirements for the full product (this milestone). Each maps to a roadmap phase
 
 ### Cross-Cutting — `XC` `[XC]`
 
-- [ ] **XC-01** `[XC]`: No customer data is used for model training — stated in the product UI, ToS, and DPA, and enforced contractually with API providers (Anthropic confirmed no-training/7-day retention; the OpenAI/Codex fallback and Claude-Code build tooling are explicitly covered in a vendor data-flow inventory)
+- [x] **XC-01** `[XC]`: No customer data is used for model training — stated in the product UI, ToS, and DPA, and enforced contractually with API providers (Anthropic confirmed no-training/7-day retention; the OpenAI/Codex fallback and Claude-Code build tooling are explicitly covered in a vendor data-flow inventory)
 - [ ] **XC-02** `[XC]`: All external actions (email sends, intro requests, signature requests, payments) require explicit founder approval — there is no autonomous outreach at any phase
 - [ ] **XC-03** `[XC]`: Sensitive fields (cap-table data, audio) are encrypted at rest beyond Supabase's native encryption (dedicated keys); financial figures never appear in logs or training pipelines; a logging-scrub discipline + CI lint enforce this
 - [ ] **XC-04** `[XC]`: A founder can export all their data on demand; account deletion triggers a 30-day soft delete then permanent purge; a GDPR/UK-GDPR/DPDP-grade DPA is signed automatically at signup (clickwrap) with data-subject-rights plumbing in place (UK and India founders are onboarded from MVP)
 - [ ] **XC-05** `[XC]`: The compliance-language guardrails hold everywhere: never "rolling fund"; never "investment advice"; never "legal advice" without "not"/"this is not" prefixed; Legal Stack carries its disclaimer on every screen; SAFE generation has its un-bypassable lawyer-review gate; F&F carries its not-an-adviser copy; e-sign is ESIGN/eIDAS-compliant only — a banned-string CI check runs from Phase 0
-- [ ] **XC-06** `[XC]`: Prompt caching is active on every production Anthropic call from day 1 (the `claude-api` skill mandates it); cache hit rate is instrumented in Langfuse, not assumed
-- [ ] **XC-07** `[XC]`: Uploaded content (decks, transcripts, pasted knowledge packs) is treated as untrusted input — delimited, screened for prompt-injection payloads, and the model's output is validated against the expected schema before use; RAG answers cite real sources and never invent them
+- [x] **XC-06** `[XC]`: Prompt caching is active on every production Anthropic call from day 1 (the `claude-api` skill mandates it); cache hit rate is instrumented in Langfuse, not assumed
+- [x] **XC-07** `[XC]`: Uploaded content (decks, transcripts, pasted knowledge packs) is treated as untrusted input — delimited, screened for prompt-injection payloads, and the model's output is validated against the expected schema before use; RAG answers cite real sources and never invent them
 - [ ] **XC-08** `[MVP]`: Unified raise timeline — a single chronological view across all modules showing every raise event (deck reviewed, investor added, application submitted, call held, transcript ingested, follow-up sent, SAFE generated/signed, cap-table update, etc.), filterable by module and investor, with each event linking back to its source surface; this anchors the "one operator" feel from day one and is the cross-module read-side of the memory spine
 - [ ] **XC-09** `[V2]`: Cross-module fact-conflict surfacing — when the same fact appears differently across modules (e.g., the deck says MRR is X, Business Memory says Y, an investor-call transcript references Z), Trochia detects the conflict and surfaces it to the founder for resolution with a "which is correct?" UI that updates the source of truth in Business Memory and (with founder approval) flags the affected downstream surfaces (current deck slide, in-flight outreach drafts, queued pre-call briefs)
 
@@ -189,17 +189,17 @@ Which phases cover which requirements. Roadmap: `.planning/ROADMAP.md` (11 phase
 | FND-06 | Phase 1 — Foundation | Pending |
 | FND-07 | Phase 1 — Foundation | Pending |
 | FND-08 | Phase 1 — Foundation | Pending |
-| FND-09 | Phase 1 — Foundation | Pending |
+| FND-09 | Phase 1 — Foundation | Complete |
 | FND-10 | Phase 1 — Foundation | Complete |
-| FND-11 | Phase 1 — Foundation | Pending |
+| FND-11 | Phase 1 — Foundation | Complete |
 | FND-12 | Phase 1 — Foundation | Pending |
-| XC-01 | Phase 1 — Foundation (enforced all phases) | Pending |
+| XC-01 | Phase 1 — Foundation (enforced all phases) | Complete |
 | XC-02 | Phase 1 — Foundation (enforced all phases) | Pending |
 | XC-03 | Phase 1 — Foundation (enforced all phases) | Pending |
 | XC-04 | Phase 1 — Foundation (enforced all phases) | Pending |
 | XC-05 | Phase 1 — Foundation (enforced all phases) | Pending |
-| XC-06 | Phase 1 — Foundation (enforced all phases) | Pending |
-| XC-07 | Phase 1 — Foundation (enforced all phases) | Pending |
+| XC-06 | Phase 1 — Foundation (enforced all phases) | Complete |
+| XC-07 | Phase 1 — Foundation (enforced all phases) | Complete |
 | KNW-01 | Phase 2 — Knowledge Layer + Memory | Pending |
 | KNW-02 | Phase 2 — Knowledge Layer + Memory | Pending |
 | KNW-03 | Phase 2 — Knowledge Layer + Memory | Pending |

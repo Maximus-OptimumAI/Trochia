@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 1 context gathered
-last_updated: "2026-05-13T00:10:41.986Z"
+last_updated: "2026-05-13T00:50:31.937Z"
 last_activity: 2026-05-13
 progress:
   total_phases: 11
   completed_phases: 0
   total_plans: 9
-  completed_plans: 3
-  percent: 33
+  completed_plans: 4
+  percent: 44
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-05-11)
 ## Current Position
 
 Phase: 01 (foundation) — EXECUTING
-Plan: 4 of 9
+Plan: 5 of 9
 Status: Ready to execute
 Last activity: 2026-05-13
 
-Progress: [███░░░░░░░] 33%
+Progress: [████░░░░░░] 44%
 
 ## Performance Metrics
 
@@ -52,6 +52,7 @@ Progress: [███░░░░░░░] 33%
 - Trend: —
 
 *Updated after each plan completion*
+| Phase 01 P01-04 | ~50 min | 3 tasks | 22 files |
 
 ## Accumulated Context
 
@@ -66,6 +67,7 @@ Recent decisions affecting current work:
 - Geography at MVP = US + UK + India simultaneously (multi-region seam in Phase 1; EU residency added Phase 8)
 - One Next.js monolith, marketing site in same repo, no microservices at MVP
 - Phase 1 must decide Next.js 16.x vs 15-pinned
+- [Phase ?]: AI chokepoint (Plan 04): runAgent<T>() in src/ai/client.ts is the single Anthropic path; prompt-caching on the stable prefix; Zod structured output via forced tool use; OpenAI fallback config-flagged off (AI_FALLBACK_ENABLED); Langfuse via the src/lib/langfuse.ts stub (Plan 05 fills it). Model ids: claude-haiku-4-5 / claude-sonnet-4-6 / claude-opus-4-7. Inngest: one serve() at /api/inngest; deploy trigger = postbuild script firing ai/health-check.requested; purge-soft-deleted fully implemented (30d); reconcile-stripe stubbed for Plan 07. ANTHROPIC_API_KEY flipped required-in-prod.
 
 ### Pending Todos
 
@@ -89,6 +91,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-13T00:10:23.713Z
+Last session: 2026-05-13T00:49:39.198Z
 Stopped at: Phase 1 context gathered
 Resume file: None
