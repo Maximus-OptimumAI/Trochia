@@ -1,25 +1,34 @@
 import { redirect } from 'next/navigation';
+import { eq } from 'drizzle-orm';
 
 import { AppShell } from '@/components/shell/app-shell';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { CtaCards } from '@/components/dashboard/cta-cards';
+import { EmptyDashboard } from '@/components/dashboard/empty-dashboard';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getServiceClient } from '@/db/client';
 import { accounts } from '@/db/schema';
-import { eq } from 'drizzle-orm';
 import { entitlements } from '@/modules/billing/entitlements';
 import { TIERS } from '@/modules/billing/tiers';
 import { DashboardViewedTracker } from './tracker';
 
 /**
- * `/app` (FND-04, FND-06, FND-12) — the Walking-Skeleton payoff.
+ * `/app` dashboard (Plan 01-09 — replaces Plan 01-07's Walking-Skeleton tier-display).
  *
- * The `proxy.ts` gate already guarantees: session present AND
- * `isActiveOrTrialing(account) === true` (else `/sign-in` or `/reactivate`).
- * So here we just read the account, compute the tier display, and render.
+ * UI-SPEC §"/app (dashboard)":
+ *   - app shell (sidebar + top bar from Plan 02)
+ *   - top bar title "Dashboard"
+ *   - content: when no Business Memory exists → the empty-dashboard state
+ *     ("Welcome to Trochia" + "Start Business Memory" → /app/memory)
+ *   - always-visible: the three FND-12 action cards with "Coming Phase N"
+ *     badges (rendered by <CtaCards>)
+ *   - a subtle tier line ("Active Raise · trial ends {date}") read from the
+ *     persisted account row
  *
- * Plan 09 fills the empty-dashboard state + the FND-12 CTA cards. Phase 1
- * goal: render the founder's tier — proving `entitlements()` end-to-end.
+ * Phase-1 simplification (D-03 narrowing): the `businesses` table is not yet
+ * modeled, so `<EmptyDashboard>` always renders. Phase 2 (Memory) replaces the
+ * unconditional render with a real "no Business Memory exists" check.
+ *
+ * Fires `dashboard_viewed` via the <DashboardViewedTracker /> client bridge.
  */
 export default async function AppDashboardPage() {
   const supabase = await createServerSupabaseClient();
@@ -40,7 +49,18 @@ export default async function AppDashboardPage() {
     subscription_status: account.subscriptionStatus,
     tier: account.tier,
   });
-  const tierName = ent.tier ? TIERS[ent.tier].displayName : 'No active plan';
+  const tierName = ent.tier ? TIERS[ent.tier].displayName : null;
+  const status = account.subscriptionStatus;
+  const periodEnd = account.currentPeriodEnd
+    ? new Date(account.currentPeriodEnd).toISOString().slice(0, 10)
+    : null;
+
+  // TODO(Phase 2): when the businesses table exists, gate the EmptyDashboard
+  // render on `!hasBusinessMemory` instead of rendering it unconditionally.
+  // Phase 1 (D-03) doesn't have a businesses table so we always show the
+  // empty-dashboard state — the EmptyDashboard's "Start Business Memory" CTA
+  // is the entry point Phase 2 wires up.
+  const hasBusinessMemory = false;
 
   return (
     <AppShell
@@ -50,26 +70,25 @@ export default async function AppDashboardPage() {
       userEmail={user.email ?? undefined}
     >
       <DashboardViewedTracker />
-      <div className="flex flex-col gap-6">
-        <Card>
-          <h2 className="text-h4 text-ink">You&apos;re on the {tierName} plan.</h2>
-          <p className="mt-2 text-body-sm text-graphite">
-            Subscription status: <span className="font-mono">{account.subscriptionStatus}</span>
-            {account.currentPeriodEnd ? (
+      <div className="flex flex-col gap-10">
+        {tierName && (
+          <p className="text-body-sm text-graphite">
+            {tierName}
+            {status === 'trialing' && periodEnd ? (
               <>
-                {' '}· renews{' '}
-                <span className="font-mono">
-                  {new Date(account.currentPeriodEnd).toISOString().slice(0, 10)}
-                </span>
+                {' '}· trial ends <span className="font-mono">{periodEnd}</span>
+              </>
+            ) : status === 'active' && periodEnd ? (
+              <>
+                {' '}· renews <span className="font-mono">{periodEnd}</span>
               </>
             ) : null}
           </p>
-          <div className="mt-6 flex gap-3">
-            <Button variant="secondary" size="compact" render={<a href="/app/billing" />}>
-              Manage billing
-            </Button>
-          </div>
-        </Card>
+        )}
+
+        {!hasBusinessMemory && <EmptyDashboard />}
+
+        <CtaCards />
       </div>
     </AppShell>
   );
