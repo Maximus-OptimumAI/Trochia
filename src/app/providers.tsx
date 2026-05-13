@@ -18,6 +18,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 
 import { AnalyticsProvider } from '@/components/analytics-provider';
+import { TRPCReactProvider } from '@/lib/trpc-client';
 
 function makeQueryClient() {
   return new QueryClient({
@@ -40,10 +41,15 @@ export function Providers({ children }: { children: ReactNode }) {
       {/*
         Extension point — register additional context providers HERE, never in
         layout.tsx:
-          Plan 05 (this) → <AnalyticsProvider> (Amplitude browser SDK init)
-          Plan 07 → wrap <TRPCReactProvider>{children}</TRPCReactProvider>
+          Plan 05 → <AnalyticsProvider> (Amplitude browser SDK init)
+          Plan 07 (this) → <TRPCReactProvider> wraps {children} so any client
+                          component can use the typed tRPC hooks. Lives INSIDE
+                          AnalyticsProvider so any tRPC-triggered UI state can
+                          still emit funnel events.
       */}
-      <AnalyticsProvider>{children}</AnalyticsProvider>
+      <AnalyticsProvider>
+        <TRPCReactProvider>{children}</TRPCReactProvider>
+      </AnalyticsProvider>
     </QueryClientProvider>
   );
 }
