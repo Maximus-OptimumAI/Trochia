@@ -14,7 +14,8 @@
     "test:e2e": "playwright test",
     "check:banned": "node scripts/check-banned-strings.mjs",
     "db:push": "drizzle-kit push",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "gen:dpa-pdf": "tsx scripts/generate-dpa-pdf.ts"
   },
   "dependencies": {
     "@amplitude/analytics-browser": "^2.42.2",

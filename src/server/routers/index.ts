@@ -2,10 +2,12 @@
  * The root tRPC router. Sub-routers are added per feature in later phases.
  */
 import { accountRouter } from '@/server/routers/account';
+import { complianceRouter } from '@/server/routers/compliance';
 import { router } from '@/server/trpc';
 
 export const appRouter = router({
   account: accountRouter,
+  compliance: complianceRouter,
 });
 
 /** The router type the client (`src/lib/trpc-client.ts`) is generic over. */
