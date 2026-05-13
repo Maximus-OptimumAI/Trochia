@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Plan 01-08 complete (marketing site live)
-last_updated: "2026-05-13T21:08:04.757Z"
+last_updated: "2026-05-13T22:48:03.797Z"
 last_activity: 2026-05-13
 progress:
   total_phases: 11
   completed_phases: 0
   total_plans: 9
-  completed_plans: 7
-  percent: 78
+  completed_plans: 8
+  percent: 89
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-05-11)
 ## Current Position
 
 Phase: 01 (foundation) — EXECUTING
-Plan: 8 of 9
+Plan: 9 of 9
 Status: Ready to execute
 Last activity: 2026-05-13
 
-Progress: [████████░░] 78%
+Progress: [█████████░] 89%
 
 ## Performance Metrics
 
@@ -56,6 +56,7 @@ Progress: [████████░░] 78%
 | Phase 01 P06 | 55 min | 3 tasks | 13 files |
 | Phase 01 P05 | ~45 min | 3 tasks | 22 files |
 | Phase 01 P08 | 75 min | 3 tasks tasks | 18 files files |
+| Phase 01 P07 | 3h | 3 tasks | 33 files |
 
 ## Accumulated Context
 
@@ -74,6 +75,7 @@ Recent decisions affecting current work:
 - [Phase ?]: Plan 06 (compliance plumbing): clickwrap DPA single-source (dpa-sections.ts text + DpaContent view + committed public/legal/dpa.pdf via npm run gen:dpa-pdf), recordDpaAcceptance writes legal_acceptances + accounts.dpa_* idempotent at DPA_VERSION 2026-05; data-rights: exportAccountData -> JSON dump (forbidden cols stripped) -> tenant-isolated Supabase Storage exports/{accountId}/{ts}.json -> 48h signed URL -> data-export-ready email; softDeleteAccount sets accounts.deleted_at via getServiceClient + revokes owner sessions, restoreAccount within 30d, Plan-04 purge-soft-deleted cron does the permanent purge; complianceRouter = acceptDpa/dpaStatus/requestDataExport/requestAccountDeletion/restoreAccount; docs/vendor-data-flow.md is the XC-01 evidence base.
 - [Phase 01]: Plan 05 (observability + email): Sentry client/server/edge with shared SENSITIVE_FIELDS-driven beforeSend (src/lib/sentry-scrub.ts), withSentryConfig-wrapped next.config.ts; Amplitude typed AnalyticsEvent union with the D-12 onboarding funnel (browser SDK on client, node SDK on server for non-spoofable revenue events); Langfuse stub from Plan 04 FILLED (ai/client.ts untouched); Resend + react-email typed template registry (welcome/trial-ending/payment-failed/data-export-ready) — from-address derived from SITE_URL host (no hardcoded domain), Trochia→founder system mail ONLY; 11 env vars flipped prodRequired (Sentry × 5, Amplitude × 2, Langfuse × 3, Resend × 1); CI fallbacks added.
 - [Phase ?]: [Phase 01]: Plan 08 (marketing site): public marketing surface from same repo — / (8-section homepage, left-aligned hero + animated reduced-motion-aware HeroTimeline), /pricing (4 tiers + Tabs + feature matrix + 8-FAQ; PRICING_TIERS marketing constant kept in sync with Plan 07's TIERS by Code Review), /manifesto (1582-word operator-voice draft), /legal/{privacy,terms,security,dpa} (Trochia-authored; /legal/dpa renders Plan 06's DpaContent verbatim + links public/legal/dpa.pdf). Lighthouse > 90 gate on / flipped to required in ci.yml (Phase-1 exit gate). e2e/marketing.spec.ts 8/8 passing. Banned-string clean (XC-05); no hardcoded URLs (FND-08).
+- [Phase ?]: [Phase 01]: Plan 07 (Walking Skeleton): Supabase Auth Google SSO + @supabase/ssr cookies + Next-16 proxy.ts session-refresh + (app) hard subscription gate (fast-paths public routes for marketing speed). Stripe billing — pre_raise+active_raise active w/ trial_period_days:7 + automatic_tax + client_reference_id (close_mode+alumni present, active:false). Idempotent webhook (claimEvent on processed_stripe_events ledger added to NON_TENANT_TABLES, signature-verified, server-side checkout_completed). entitlements() pure + Stripe-free (replaces Plan 03 stub, structurally enforced); reconcile-stripe filled. TRPCReactProvider mounted in providers.tsx (layout.tsx untouched). STRIPE_*/INNGEST_* (8 vars) prodRequired + CI fallbacks. processed_stripe_events migration emitted (not auto-applied, that's the deploy checkpoint). FND-04/05/06/12.
 
 ### Pending Todos
 
@@ -97,6 +99,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-13T21:08:04.697Z
+Last session: 2026-05-13T22:47:25.074Z
 Stopped at: Plan 01-08 complete (marketing site live)
 Resume file: None
