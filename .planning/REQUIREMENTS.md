@@ -110,7 +110,7 @@ Requirements for the full product (this milestone). Each maps to a roadmap phase
 - [x] **XC-01** `[XC]`: No customer data is used for model training — stated in the product UI, ToS, and DPA, and enforced contractually with API providers (Anthropic confirmed no-training/7-day retention; the OpenAI/Codex fallback and Claude-Code build tooling are explicitly covered in a vendor data-flow inventory)
 - [ ] **XC-02** `[XC]`: All external actions (email sends, intro requests, signature requests, payments) require explicit founder approval — there is no autonomous outreach at any phase
 - [ ] **XC-03** `[XC]`: Sensitive fields (cap-table data, audio) are encrypted at rest beyond Supabase's native encryption (dedicated keys); financial figures never appear in logs or training pipelines; a logging-scrub discipline + CI lint enforce this
-- [ ] **XC-04** `[XC]`: A founder can export all their data on demand; account deletion triggers a 30-day soft delete then permanent purge; a GDPR/UK-GDPR/DPDP-grade DPA is signed automatically at signup (clickwrap) with data-subject-rights plumbing in place (UK and India founders are onboarded from MVP)
+- [x] **XC-04** `[XC]`: A founder can export all their data on demand; account deletion triggers a 30-day soft delete then permanent purge; a GDPR/UK-GDPR/DPDP-grade DPA is signed automatically at signup (clickwrap) with data-subject-rights plumbing in place (UK and India founders are onboarded from MVP)
 - [ ] **XC-05** `[XC]`: The compliance-language guardrails hold everywhere: never "rolling fund"; never "investment advice"; never "legal advice" without "not"/"this is not" prefixed; Legal Stack carries its disclaimer on every screen; SAFE generation has its un-bypassable lawyer-review gate; F&F carries its not-an-adviser copy; e-sign is ESIGN/eIDAS-compliant only — a banned-string CI check runs from Phase 0
 - [x] **XC-06** `[XC]`: Prompt caching is active on every production Anthropic call from day 1 (the `claude-api` skill mandates it); cache hit rate is instrumented in Langfuse, not assumed
 - [x] **XC-07** `[XC]`: Uploaded content (decks, transcripts, pasted knowledge packs) is treated as untrusted input — delimited, screened for prompt-injection payloads, and the model's output is validated against the expected schema before use; RAG answers cite real sources and never invent them
@@ -196,7 +196,7 @@ Which phases cover which requirements. Roadmap: `.planning/ROADMAP.md` (11 phase
 | XC-01 | Phase 1 — Foundation (enforced all phases) | Complete |
 | XC-02 | Phase 1 — Foundation (enforced all phases) | Pending |
 | XC-03 | Phase 1 — Foundation (enforced all phases) | Pending |
-| XC-04 | Phase 1 — Foundation (enforced all phases) | Pending |
+| XC-04 | Phase 1 — Foundation (enforced all phases) | Complete |
 | XC-05 | Phase 1 — Foundation (enforced all phases) | Pending |
 | XC-06 | Phase 1 — Foundation (enforced all phases) | Complete |
 | XC-07 | Phase 1 — Foundation (enforced all phases) | Complete |

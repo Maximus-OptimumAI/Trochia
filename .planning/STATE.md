@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 1 context gathered
-last_updated: "2026-05-13T00:50:31.937Z"
+last_updated: "2026-05-13T01:48:29.811Z"
 last_activity: 2026-05-13
 progress:
   total_phases: 11
   completed_phases: 0
   total_plans: 9
-  completed_plans: 4
-  percent: 44
+  completed_plans: 5
+  percent: 56
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-05-11)
 ## Current Position
 
 Phase: 01 (foundation) — EXECUTING
-Plan: 5 of 9
+Plan: 6 of 9
 Status: Ready to execute
 Last activity: 2026-05-13
 
-Progress: [████░░░░░░] 44%
+Progress: [██████░░░░] 56%
 
 ## Performance Metrics
 
@@ -53,6 +53,7 @@ Progress: [████░░░░░░] 44%
 
 *Updated after each plan completion*
 | Phase 01 P01-04 | ~50 min | 3 tasks | 22 files |
+| Phase 01 P06 | 55 min | 3 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -68,6 +69,7 @@ Recent decisions affecting current work:
 - One Next.js monolith, marketing site in same repo, no microservices at MVP
 - Phase 1 must decide Next.js 16.x vs 15-pinned
 - [Phase ?]: AI chokepoint (Plan 04): runAgent<T>() in src/ai/client.ts is the single Anthropic path; prompt-caching on the stable prefix; Zod structured output via forced tool use; OpenAI fallback config-flagged off (AI_FALLBACK_ENABLED); Langfuse via the src/lib/langfuse.ts stub (Plan 05 fills it). Model ids: claude-haiku-4-5 / claude-sonnet-4-6 / claude-opus-4-7. Inngest: one serve() at /api/inngest; deploy trigger = postbuild script firing ai/health-check.requested; purge-soft-deleted fully implemented (30d); reconcile-stripe stubbed for Plan 07. ANTHROPIC_API_KEY flipped required-in-prod.
+- [Phase ?]: Plan 06 (compliance plumbing): clickwrap DPA single-source (dpa-sections.ts text + DpaContent view + committed public/legal/dpa.pdf via npm run gen:dpa-pdf), recordDpaAcceptance writes legal_acceptances + accounts.dpa_* idempotent at DPA_VERSION 2026-05; data-rights: exportAccountData -> JSON dump (forbidden cols stripped) -> tenant-isolated Supabase Storage exports/{accountId}/{ts}.json -> 48h signed URL -> data-export-ready email; softDeleteAccount sets accounts.deleted_at via getServiceClient + revokes owner sessions, restoreAccount within 30d, Plan-04 purge-soft-deleted cron does the permanent purge; complianceRouter = acceptDpa/dpaStatus/requestDataExport/requestAccountDeletion/restoreAccount; docs/vendor-data-flow.md is the XC-01 evidence base.
 
 ### Pending Todos
 
@@ -91,6 +93,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-13T00:49:39.198Z
+Last session: 2026-05-13T01:48:02.241Z
 Stopped at: Phase 1 context gathered
 Resume file: None
