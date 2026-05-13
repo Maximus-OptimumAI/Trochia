@@ -77,6 +77,13 @@ export const accounts = pgTable(
     // ── Legal / DPA bookkeeping ──
     dpaAcceptedAt: timestamp('dpa_accepted_at', { withTimezone: true }),
     dpaVersion: text('dpa_version'),
+    // ── Onboarding progress (Plan 09 — FND-12) ──
+    // `onboarding_step` tracks the founder's position in the 5-step onboarding
+    // funnel ('welcome' | 'tier' | 'import' | 'deck' | 'review') or `null` when
+    // onboarding is done. `onboarding_completed_at` is set when the founder
+    // finishes (or skips through) the review step → dashboard.
+    onboardingStep: text('onboarding_step'),
+    onboardingCompletedAt: timestamp('onboarding_completed_at', { withTimezone: true }),
     // ── Soft delete (account deletion is a service-role op; see db/client.ts) ──
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

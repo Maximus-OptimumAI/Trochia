@@ -15,6 +15,13 @@
       "when": 1778707978399,
       "tag": "0001_sticky_bloodstrike",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778712748423,
+      "tag": "0002_soft_zuras",
+      "breakpoints": true
     }
   ]
 }

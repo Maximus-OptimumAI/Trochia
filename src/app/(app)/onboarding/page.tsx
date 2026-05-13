@@ -9,19 +9,24 @@ import { isActiveOrTrialing } from '@/modules/billing/entitlements';
 import { TierPicker } from './tier-picker';
 
 /**
- * `/onboarding` index (Plan 01-07, FND-12).
+ * `/onboarding` index (Plan 01-07 scaffold; Plan 01-09 refined for FND-12).
  *
- * Decides which onboarding step to show based on the account row + the
- * `?checkout=` query param:
+ * Decides which onboarding surface to show based on the account row + the
+ * `?checkout=` query param + `accounts.onboarding_step` / `onboarding_completed_at`:
  *   - DPA not yet accepted ⇒ `/onboarding/welcome`
- *   - DPA accepted, no active sub, no `?checkout` ⇒ render the tier picker
- *   - `?checkout=success` ⇒ `/app` (webhook will already have set the sub state;
- *                            if it hasn't yet, the reconcile cron catches up)
- *   - `?checkout=cancelled` ⇒ re-render the tier picker (founder can try again)
- *   - active sub + DPA accepted ⇒ `/app`
+ *   - `?checkout=success` ⇒ the webhook flips the sub to `trialing` and the
+ *                            founder enters the Knowledge-Pack-Import step
+ *                            (`/onboarding/import`); also persist
+ *                            `onboarding_step = 'import'` if not already set.
+ *   - `?checkout=cancelled` ⇒ re-render the tier picker.
+ *   - DPA accepted + no active sub ⇒ tier picker.
+ *   - DPA accepted + active sub + `onboarding_completed_at` set ⇒ `/app`.
+ *   - DPA accepted + active sub + `onboarding_step` set ⇒ that step's page.
+ *   - DPA accepted + active sub + no step set ⇒ `/onboarding/import` (start the
+ *     stepper after Checkout).
  *
- * Plan 09 owns the full onboarding tree — it refines this index + adds
- * `/onboarding/import|deck|review` after the founder picks a tier.
+ * Plan 09 owns the post-Checkout half: `/onboarding/import|deck|review` are the
+ * stepper screens this index hands off to.
  */
 export default async function OnboardingPage({
   searchParams,
@@ -48,22 +53,49 @@ export default async function OnboardingPage({
     subscription_status: account.subscriptionStatus,
     tier: account.tier,
   });
+  const onboardingDone = !!account.onboardingCompletedAt;
+  const step = account.onboardingStep ?? null;
 
-  // Send the founder to welcome the first time through (clickwrap acceptance
-  // happens there).
+  // Send the founder to the welcome screen the first time through (clickwrap
+  // acceptance happens there).
   if (!dpaAccepted) redirect('/onboarding/welcome');
 
-  // Checkout return: success → /app (webhook does the work); cancelled → stay
-  // on the tier picker.
+  // Checkout return: cancelled → stay on the tier picker.
+  if (checkout === 'cancelled') {
+    return <TierPicker />;
+  }
+
+  // Checkout success → enter the stepper at step 1. Set `onboarding_step` if
+  // not yet set so a refresh keeps the founder in the funnel.
   if (checkout === 'success') {
+    if (step !== 'import' && step !== 'deck' && step !== 'review') {
+      await service
+        .update(accounts)
+        .set({ onboardingStep: 'import' })
+        .where(eq(accounts.id, account.id));
+    }
+    redirect('/onboarding/import');
+  }
+
+  // Onboarding already finished → /app.
+  if (onboardingDone && active) {
     redirect('/app');
   }
 
-  // If they already have an active sub and DPA accepted → /app.
-  if (active && checkout !== 'cancelled') {
-    redirect('/app');
+  // Active sub but mid-stepper → resume.
+  if (active) {
+    if (step === 'import') redirect('/onboarding/import');
+    if (step === 'deck') redirect('/onboarding/deck');
+    if (step === 'review') redirect('/onboarding/review');
+    // No step recorded but they have an active sub — they likely landed here
+    // post-Checkout without `?checkout=success` (refresh, etc). Start at step 1.
+    await service
+      .update(accounts)
+      .set({ onboardingStep: 'import' })
+      .where(eq(accounts.id, account.id));
+    redirect('/onboarding/import');
   }
 
-  // Otherwise: show the tier picker.
+  // DPA accepted, no active sub → tier picker.
   return <TierPicker />;
 }
