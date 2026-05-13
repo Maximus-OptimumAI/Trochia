@@ -14,14 +14,14 @@ Requirements for the full product (this milestone). Each maps to a roadmap phase
 
 ### Foundation & Platform — `FND`
 
-- [ ] **FND-01** `[MVP]`: A Next.js 15/16 + TypeScript + Tailwind + shadcn/ui monolith is deployed to Vercel (Fluid Compute), with the public marketing site served from the same repo and a working CI pipeline (lint + typecheck + Vitest + Playwright) on GitHub Actions
+- [x] **FND-01** `[MVP]`: A Next.js 15/16 + TypeScript + Tailwind + shadcn/ui monolith is deployed to Vercel (Fluid Compute), with the public marketing site served from the same repo and a working CI pipeline (lint + typecheck + Vitest + Playwright) on GitHub Actions
 - [x] **FND-02** `[MVP]`: Supabase is provisioned (Postgres + pgvector HNSW + Storage); Drizzle ORM manages the schema and migrations; core tables exist — users/accounts, businesses (Business Memory), decks, investors, pipeline entries — using current Supabase publishable/secret keys (not anon/service_role)
 - [x] **FND-03** `[MVP]`: Row-Level Security is enabled on every tenant-scoped table with default-deny policies; tRPC procedures run in a tenant-scoped context that enforces the same isolation; a CI check fails any new table that lacks RLS + a policy; a two-user integration test proves tenant A cannot read tenant B's rows
 - [ ] **FND-04** `[MVP]`: A founder can sign in with Google SSO (Supabase Auth); sessions persist 30 days and refresh on activity; magic-link sign-in and TOTP MFA are added at V2
 - [ ] **FND-05** `[MVP]`: Stripe billing is live with Pre-Raise ($49/mo, $39/mo annual) and Active Raise ($199/mo, $159/mo annual) tiers, a self-serve Stripe Customer Portal, a 7-day free trial, card-on-file required at signup, and no permanent free tier; webhooks are idempotent with a reconciliation path
 - [ ] **FND-06** `[MVP]`: An `entitlements()` function gates module/feature access by the founder's current Stripe tier (extensible to the Close Mode and Alumni tiers added at V3)
 - [x] **FND-07** `[MVP]`: Resend sends transactional email; Sentry captures errors; Amplitude tracks product events; Langfuse traces every production Anthropic call (cache hit rate, tokens, latency, cost per user) — all wired from Phase 0
-- [ ] **FND-08** `[MVP]`: The site URL is read everywhere from `process.env.NEXT_PUBLIC_SITE_URL` (and `NEXT_PUBLIC_APP_URL`); it is never hardcoded, so the planned `trochia.asranest.com` → `trochia.ai` migration requires zero code changes
+- [x] **FND-08** `[MVP]`: The site URL is read everywhere from `process.env.NEXT_PUBLIC_SITE_URL` (and `NEXT_PUBLIC_APP_URL`); it is never hardcoded, so the planned `trochia.asranest.com` → `trochia.ai` migration requires zero code changes
 - [x] **FND-09** `[MVP]`: A single `ai/client.ts` chokepoint wraps all Anthropic calls — prompt caching on the stable prefix (corpus + Business Memory + taxonomy + tool schemas), model routing by task class (Opus deep reasoning / Sonnet drafting / Haiku classification), Zod-typed structured outputs, and the OpenAI/Codex fallback behind a config flag; no production code calls Anthropic outside it
 - [x] **FND-10** `[MVP]`: A `tenant.region` column + `getDbForRegion()` factory establish the multi-region data-residency seam (US + UK share a US region with UK handled contractually at MVP; an India region exists; an EU region is added at V2) — the seam is built without over-engineering full multi-region machinery
 - [x] **FND-11** `[MVP]`: Background jobs run on Inngest via a single `serve()` endpoint — deck parsing, embedding, transcription, brief enrichment, e-sign webhooks, scheduled reminders — with per-key concurrency limits; a `jobs` table + Supabase Realtime gives the UI status polling
@@ -111,7 +111,7 @@ Requirements for the full product (this milestone). Each maps to a roadmap phase
 - [ ] **XC-02** `[XC]`: All external actions (email sends, intro requests, signature requests, payments) require explicit founder approval — there is no autonomous outreach at any phase
 - [ ] **XC-03** `[XC]`: Sensitive fields (cap-table data, audio) are encrypted at rest beyond Supabase's native encryption (dedicated keys); financial figures never appear in logs or training pipelines; a logging-scrub discipline + CI lint enforce this
 - [x] **XC-04** `[XC]`: A founder can export all their data on demand; account deletion triggers a 30-day soft delete then permanent purge; a GDPR/UK-GDPR/DPDP-grade DPA is signed automatically at signup (clickwrap) with data-subject-rights plumbing in place (UK and India founders are onboarded from MVP)
-- [ ] **XC-05** `[XC]`: The compliance-language guardrails hold everywhere: never "rolling fund"; never "investment advice"; never "legal advice" without "not"/"this is not" prefixed; Legal Stack carries its disclaimer on every screen; SAFE generation has its un-bypassable lawyer-review gate; F&F carries its not-an-adviser copy; e-sign is ESIGN/eIDAS-compliant only — a banned-string CI check runs from Phase 0
+- [x] **XC-05** `[XC]`: The compliance-language guardrails hold everywhere: never "rolling fund"; never "investment advice"; never "legal advice" without "not"/"this is not" prefixed; Legal Stack carries its disclaimer on every screen; SAFE generation has its un-bypassable lawyer-review gate; F&F carries its not-an-adviser copy; e-sign is ESIGN/eIDAS-compliant only — a banned-string CI check runs from Phase 0
 - [x] **XC-06** `[XC]`: Prompt caching is active on every production Anthropic call from day 1 (the `claude-api` skill mandates it); cache hit rate is instrumented in Langfuse, not assumed
 - [x] **XC-07** `[XC]`: Uploaded content (decks, transcripts, pasted knowledge packs) is treated as untrusted input — delimited, screened for prompt-injection payloads, and the model's output is validated against the expected schema before use; RAG answers cite real sources and never invent them
 - [ ] **XC-08** `[MVP]`: Unified raise timeline — a single chronological view across all modules showing every raise event (deck reviewed, investor added, application submitted, call held, transcript ingested, follow-up sent, SAFE generated/signed, cap-table update, etc.), filterable by module and investor, with each event linking back to its source surface; this anchors the "one operator" feel from day one and is the cross-module read-side of the memory spine
@@ -181,14 +181,14 @@ Which phases cover which requirements. Roadmap: `.planning/ROADMAP.md` (11 phase
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FND-01 | Phase 1 — Foundation | Pending |
+| FND-01 | Phase 1 — Foundation | Complete |
 | FND-02 | Phase 1 — Foundation | Complete |
 | FND-03 | Phase 1 — Foundation | Complete |
 | FND-04 | Phase 1 — Foundation | Pending |
 | FND-05 | Phase 1 — Foundation | Pending |
 | FND-06 | Phase 1 — Foundation | Pending |
 | FND-07 | Phase 1 — Foundation | Complete |
-| FND-08 | Phase 1 — Foundation | Pending |
+| FND-08 | Phase 1 — Foundation | Complete |
 | FND-09 | Phase 1 — Foundation | Complete |
 | FND-10 | Phase 1 — Foundation | Complete |
 | FND-11 | Phase 1 — Foundation | Complete |
@@ -197,7 +197,7 @@ Which phases cover which requirements. Roadmap: `.planning/ROADMAP.md` (11 phase
 | XC-02 | Phase 1 — Foundation (enforced all phases) | Pending |
 | XC-03 | Phase 1 — Foundation (enforced all phases) | Pending |
 | XC-04 | Phase 1 — Foundation (enforced all phases) | Complete |
-| XC-05 | Phase 1 — Foundation (enforced all phases) | Pending |
+| XC-05 | Phase 1 — Foundation (enforced all phases) | Complete |
 | XC-06 | Phase 1 — Foundation (enforced all phases) | Complete |
 | XC-07 | Phase 1 — Foundation (enforced all phases) | Complete |
 | KNW-01 | Phase 2 — Knowledge Layer + Memory | Pending |
