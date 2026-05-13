@@ -17,6 +17,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 
+import { AnalyticsProvider } from '@/components/analytics-provider';
+
 function makeQueryClient() {
   return new QueryClient({
     defaultOptions: {
@@ -38,10 +40,10 @@ export function Providers({ children }: { children: ReactNode }) {
       {/*
         Extension point — register additional context providers HERE, never in
         layout.tsx:
-          Plan 05 → wrap <AnalyticsProvider>{children}</AnalyticsProvider>
+          Plan 05 (this) → <AnalyticsProvider> (Amplitude browser SDK init)
           Plan 07 → wrap <TRPCReactProvider>{children}</TRPCReactProvider>
       */}
-      {children}
+      <AnalyticsProvider>{children}</AnalyticsProvider>
     </QueryClientProvider>
   );
 }

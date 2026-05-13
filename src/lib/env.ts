@@ -67,10 +67,10 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().optional(), // Plan 04 owns this — only required-in-prod when AI_FALLBACK_ENABLED (kept optional; default-off fallback)
   AI_FALLBACK_ENABLED: booleanish, // Plan 04 owns this flag
 
-  // ── Langfuse ──
-  LANGFUSE_PUBLIC_KEY: z.string().optional(), // Plan 05 flips this to required-in-prod
-  LANGFUSE_SECRET_KEY: z.string().optional(), // Plan 05 flips this to required-in-prod
-  LANGFUSE_HOST: z.string().url().optional(), // Plan 05 owns this (defaults to cloud)
+  // ── Langfuse ── (Plan 05 / 01-05-PLAN.md flipped these to required-in-prod)
+  LANGFUSE_PUBLIC_KEY: prodRequired(z.string()),
+  LANGFUSE_SECRET_KEY: prodRequired(z.string()),
+  LANGFUSE_HOST: prodRequired(z.string().url()),
 
   // ── Sentry ── (Plan 05 / 01-05-PLAN.md flipped these to required-in-prod)
   SENTRY_DSN: prodRequired(z.string()),
@@ -79,9 +79,9 @@ const envSchema = z.object({
   SENTRY_PROJECT: prodRequired(z.string()), // build-time source-map upload
   SENTRY_AUTH_TOKEN: prodRequired(z.string()), // build-time source-map upload
 
-  // ── Amplitude ──
-  AMPLITUDE_API_KEY: z.string().optional(), // Plan 05 flips this to required-in-prod
-  NEXT_PUBLIC_AMPLITUDE_API_KEY: z.string().optional(), // Plan 05 flips this to required-in-prod
+  // ── Amplitude ── (Plan 05 / 01-05-PLAN.md flipped these to required-in-prod)
+  AMPLITUDE_API_KEY: prodRequired(z.string()),
+  NEXT_PUBLIC_AMPLITUDE_API_KEY: prodRequired(z.string()),
 
   // ── Resend ──
   RESEND_API_KEY: z.string().optional(), // Plan 05 flips this to required-in-prod

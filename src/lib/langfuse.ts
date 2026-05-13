@@ -1,35 +1,36 @@
 /**
- * Langfuse seam — STUB until Plan 05.
+ * Langfuse seam — WIRED (Plan 05).
  *
- * `src/ai/client.ts` consumes `getLangfuseClient()` + `isLangfuseConfigured()`
- * from THIS file. That is deliberate: Plan 05 (observability + email) provisions
- * the Langfuse account/keys and fills in the real implementation HERE — it does
- * NOT touch `src/ai/client.ts`. Do NOT move the `new Langfuse(...)` construction
- * back into `ai/client.ts`; the indirection is the whole point.
+ * `src/ai/client.ts` (Plan 04) consumes `getLangfuseClient()` +
+ * `isLangfuseConfigured()` from this file. The indirection is deliberate: the
+ * Anthropic chokepoint never imports the Langfuse SDK directly, and this file
+ * is the only place that constructs the client. Do NOT move the
+ * `new Langfuse(...)` construction back into `ai/client.ts`.
  *
- * Until Plan 05:
- *   - `isLangfuseConfigured()` → false
- *   - `getLangfuseClient()`    → null
- * `ai/client.ts` does `const langfuse = getLangfuseClient()` and `langfuse?.trace(...)`
- * so the trace path is a safe no-op in Phase 1 and "just works" once Plan 05 lands.
+ * - `isLangfuseConfigured()` → true iff the 3 env vars are set.
+ * - `getLangfuseClient()`    → memoized singleton when configured, else `null`.
+ * Cache-hit-rate (XC-06) lands here via `ai/client.ts`'s `trace.update(...)`
+ * calls — the deploy-time Haiku health-check produces the first real trace.
  */
-import type { Langfuse } from 'langfuse';
+import { Langfuse } from 'langfuse';
 
-/**
- * True iff the Langfuse credentials are configured.
- *
- * TODO(Plan 05): return `Boolean(env.LANGFUSE_PUBLIC_KEY && env.LANGFUSE_SECRET_KEY && env.LANGFUSE_HOST)`.
- */
+import { env } from '@/lib/env';
+
+/** True iff the 3 Langfuse credentials are set. */
 export function isLangfuseConfigured(): boolean {
-  return false;
+  return Boolean(env.LANGFUSE_PUBLIC_KEY && env.LANGFUSE_SECRET_KEY && env.LANGFUSE_HOST);
 }
 
-/**
- * The memoized Langfuse client, or `null` when unconfigured.
- *
- * TODO(Plan 05): when `isLangfuseConfigured()`, return a memoized singleton
- * `new Langfuse({ publicKey: env.LANGFUSE_PUBLIC_KEY, secretKey: env.LANGFUSE_SECRET_KEY, baseUrl: env.LANGFUSE_HOST })`.
- */
+let cached: Langfuse | null = null;
+
+/** The memoized Langfuse client, or `null` when unconfigured. */
 export function getLangfuseClient(): Langfuse | null {
-  return null;
+  if (!isLangfuseConfigured()) return null;
+  if (cached) return cached;
+  cached = new Langfuse({
+    publicKey: env.LANGFUSE_PUBLIC_KEY,
+    secretKey: env.LANGFUSE_SECRET_KEY,
+    baseUrl: env.LANGFUSE_HOST,
+  });
+  return cached;
 }
