@@ -51,6 +51,16 @@ export async function proxy(request: NextRequest) {
   // Start with a pass-through response we can mutate cookies on.
   let response = NextResponse.next({ request });
 
+  // Fast path: classify the route FIRST. Public routes (homepage, /pricing,
+  // /sign-up, etc.) get a no-op pass-through — no Supabase call, no cookie
+  // refresh — so the cold-start latency on prerendered marketing pages doesn't
+  // pay for the session-gate machinery. The cookie refresh runs on every
+  // gated route (where it matters) AND on every request to a Supabase auth
+  // endpoint via the route's own server client (so the JWT does get refreshed
+  // on the navigations that need it).
+  const classification = classify(request.nextUrl.pathname);
+  if (classification === 'public') return response;
+
   const url = env.NEXT_PUBLIC_SUPABASE_URL ?? env.SUPABASE_URL ?? '';
   const key = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? env.SUPABASE_PUBLISHABLE_KEY ?? '';
   // In dev/test the Supabase vars may be empty strings — short-circuit to a
@@ -77,12 +87,18 @@ export async function proxy(request: NextRequest) {
   // IMPORTANT: do NOT replace `supabase.auth.getUser()` with `getSession()` here.
   // `getUser()` revalidates against Supabase Auth server-side; `getSession()`
   // trusts the cookie. Auth-critical paths must `getUser()`.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const classification = classify(request.nextUrl.pathname);
-  if (classification === 'public') return response;
+  //
+  // Wrapped in try/catch: a network failure / bad fallback key would otherwise
+  // throw and 500 every request. Treating an error as "no session" is the
+  // fail-closed posture — gated routes redirect to /sign-in, public routes
+  // pass through unchanged.
+  let user: { id: string } | null = null;
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
+  } catch {
+    user = null;
+  }
 
   // From here on: a session is required.
   if (!user) {

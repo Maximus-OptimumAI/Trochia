@@ -29,3 +29,35 @@ and there is no `.env.local`). Then 01-03-SUMMARY.md can be written and STATE/RO
 Q1 (RLS-JWT-claims plumbing) — RESOLVED: option (a), a `tenant_id` custom claim via
 `custom_access_token_hook`; request-scoped Drizzle client runs as `authenticated` with the JWT's
 claims set per transaction (`db.rls(fn)` in `src/db/client.ts`).
+
+## 01-07 — local-windows Chromium render flake on marketing pages (2026-05-13)
+
+`e2e/marketing.spec.ts` (6 tests) passes in CI per Plan 08's SUMMARY ("8/8 passed") but
+fails when run on this Windows machine via Playwright's local webServer. The chromium
+browser renders "This page couldn't load" / Reload / Back instead of the served HTML —
+even though `curl http://localhost:3000/` returns the correct 200 + full HTML for the
+same URL.
+
+Diagnosis attempted in Plan 07:
+- Removed proxy.ts overhead from public routes (the proxy now fast-paths `/`, `/pricing`,
+  `/sign-up`, `/sign-in`, `/legal/*` without calling Supabase). curl after the fix gets
+  `/` in ~3.7s cold start, `/pricing` in ~0.04s warm.
+- Despite that, the marketing tests still render "page couldn't load" in headless
+  Chromium under Windows + Playwright's bundled webServer.
+- The auth + skeleton + styleguide e2e (which Plan 07 ships) all pass — they use
+  `request.get()` (Playwright's request fixture, server-side bytes only, no browser).
+
+This is NOT a regression introduced by Plan 07 — the marketing tests pre-dating my
+proxy.ts also fail the same way locally. CI (Linux runner against the Vercel preview
+URL) is the canonical test environment and is green.
+
+Follow-up (out of Plan 07's scope):
+1. Investigate the chromium "page couldn't load" cause on Windows. Hypothesis: a
+   font / module-preload / Sentry / Amplitude resource fetch timing out and Chrome's
+   "this page couldn't load" overlay short-circuits the render.
+2. Either harden the marketing spec to use `request.get()` (mirroring Plan 07's auth
+   spec pattern) — server-side bytes are the actual contract — or move the local
+   webServer to a launched-once-per-suite worker.
+
+Plan 07's verification is CI-green, not Windows-local-green. The pre-existing
+marketing flake is logged here for the verifier / a later plan to harden.
