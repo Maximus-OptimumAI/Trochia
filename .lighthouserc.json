@@ -3,6 +3,9 @@
     "collect": {
       "url": ["http://localhost:3000/"],
       "numberOfRuns": 1,
+      "startServerCommand": "npm run start",
+      "startServerReadyPattern": "Ready in",
+      "startServerReadyTimeout": 120000,
       "settings": {
         "preset": "desktop"
       }
