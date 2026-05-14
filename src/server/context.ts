@@ -84,21 +84,56 @@ async function resolveAccount(userId: string): Promise<AccountRow | null> {
 
 /**
  * Build the per-request context. tRPC's fetch adapter calls this with `{ req }`.
+ *
+ * **Auth path (post PR-2 — /codex 01-07 [P1]):** revalidate the session with
+ * `auth.getUser()` before reading the tenant. `getUser()` round-trips to
+ * Supabase Auth (a JWKS-verified server call) — so a revoked / banned / signed-
+ * out account is rejected immediately, not after the ≤1h JWT TTL rolls over.
+ * `proxy.ts` already does the same on `/app/*` route nav, but the proxy's
+ * `classify()` returns `'public'` for `/api/trpc/*` (so prerendered marketing
+ * pages don't pay the auth round-trip on every static asset). That means tRPC
+ * mutations from an already-loaded `/app` page would otherwise ride the cached
+ * cookie indefinitely. The revalidation here closes that window for every
+ * protectedProcedure call. Cost: ~30ms per tRPC request — acceptable.
+ *
+ * `getSession()` is still called afterwards solely to obtain the JWT access
+ * token (the canonical reference for the RLS-claims-driven request client). It
+ * is safe to trust at this point because `getUser()` already revalidated the
+ * cookie chain; if the session had been revoked, we'd have returned above.
  */
 // `req` is part of the adapter contract; cookies/session come from `next/headers`,
 // so the request object itself isn't read here.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function createTRPCContext(opts: { req: Request }): Promise<TRPCContext> {
   const supabase = makeSupabase();
+
+  // Network-revalidated auth check — fail-closed on revocation / ban / signout.
+  // Wrapped in try/catch: a network failure must not 500 the request; the
+  // ergonomic protectedProcedure layer will throw UNAUTHORIZED via the null
+  // context branch, mirroring proxy.ts's fail-closed posture.
+  let userId: string | null = null;
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (!error && data.user) userId = data.user.id;
+  } catch {
+    userId = null;
+  }
+
+  if (!userId) {
+    return { session: null, tenantId: null, region: null, db: null, account: null, supabase };
+  }
+
+  // The user IS valid — fetch the session for the access token used to drive
+  // the request-scoped RLS client. `getSession()` here is safe because we just
+  // revalidated the cookie chain above.
   const {
     data: { session },
   } = await supabase.auth.getSession();
-
   if (!session) {
     return { session: null, tenantId: null, region: null, db: null, account: null, supabase };
   }
 
-  const account = await resolveAccount(session.user.id);
+  const account = await resolveAccount(userId);
   if (!account || account.deletedAt) {
     // Authenticated but no (live) tenant yet — onboarding hasn't created one. Treat as
     // unauthenticated for the purposes of tenant-scoped procedures.

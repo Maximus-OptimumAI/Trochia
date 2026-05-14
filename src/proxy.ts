@@ -29,7 +29,18 @@ import { createServerClient } from '@supabase/ssr';
 import { env } from '@/lib/env';
 import { isActiveOrTrialing } from '@/modules/billing/entitlements';
 
-/** Routes inside `/app/*` and `/onboarding/*` etc. are gated; everything else is open. */
+/** Routes inside `/app/*` and `/onboarding/*` etc. are gated; everything else is open.
+ *
+ * **`/api/trpc/*` is intentionally `'public'` here.** tRPC is a transport, not a
+ * route — the per-procedure auth gate lives in `src/server/context.ts` where
+ * `createTRPCContext` calls `supabase.auth.getUser()` (network-revalidated) on
+ * every request before resolving the tenant. Adding a parallel `getUser()` here
+ * would double-pay the round-trip without changing the auth posture. Same logic
+ * for the other `/api/*` non-webhook routes (checkout, portal, accept-legal):
+ * each handler calls `getUser()` directly. The proxy's role is to gate the
+ * `/app/*` and `/onboarding/*` HTML navigations, not to second-guess every API
+ * handler. /codex 01-07 reviewed and confirmed this split as correct (PR-2).
+ */
 function classify(pathname: string):
   | 'public'
   | 'app' // session + active sub required
