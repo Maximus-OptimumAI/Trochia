@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 
 import { AppShell } from '@/components/shell/app-shell';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
@@ -26,7 +26,8 @@ export default async function BillingPage() {
 
   const service = getServiceClient();
   const account = await service.query.accounts.findFirst({
-    where: eq(accounts.ownerUserId, user.id),
+    // Live tenant only — mirrors the partial-unique index in migration 0003.
+    where: and(eq(accounts.ownerUserId, user.id), isNull(accounts.deletedAt)),
   });
   if (!account) redirect('/onboarding');
 

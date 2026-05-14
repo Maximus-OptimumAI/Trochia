@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "accounts_owner_user_id_uniq" ON "accounts" USING btree ("owner_user_id") WHERE deleted_at IS NULL;

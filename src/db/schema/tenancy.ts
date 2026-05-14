@@ -10,8 +10,9 @@
  * bookkeeping. One business per account in Phase 1, so `accounts.owner_user_id` is
  * the 1:1 link the auth hook uses to resolve `tenant_id`.
  */
+import { sql } from 'drizzle-orm';
 import { authUsers } from 'drizzle-orm/supabase';
-import { pgEnum, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
 import { ownUserRowPolicy, tenantIsolationPolicy } from '@/db/rls';
 
@@ -89,7 +90,21 @@ export const accounts = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [tenantIsolationPolicy(t.id)],
+  (t) => [
+    tenantIsolationPolicy(t.id),
+    // Phase-1 D-03 enforces 1:1 auth.users.id → accounts.id while the account
+    // is LIVE (deleted_at IS NULL). Without this constraint, concurrent
+    // first-login callbacks (src/app/auth/callback/route.ts) can race and
+    // create two live accounts for one user; the Custom Access Token Auth Hook's
+    // `LIMIT 1` (src/db/migrations/0000_*.sql) and src/server/context.ts's
+    // `findFirst` would then pick different tenants nondeterministically. The
+    // partial predicate keeps the constraint compatible with soft-delete +
+    // re-onboard (the deleted row's owner_user_id is free for re-use).
+    // Surfaced by /codex 01-07 review (P1) — fix in PR-1.
+    uniqueIndex('accounts_owner_user_id_uniq')
+      .on(t.ownerUserId)
+      .where(sql`deleted_at IS NULL`),
+  ],
 );
 
 /**

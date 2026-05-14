@@ -14,7 +14,7 @@ import 'server-only';
 
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 
 import { getServiceClient } from '@/db/client';
 import { getDbForRegion, type Region, DEFAULT_REGION } from '@/db/region';
@@ -63,11 +63,21 @@ function makeSupabase() {
   });
 }
 
-/** Look up the tenant for a user. RLS-bypassing service client — a narrow, audited call site. */
+/**
+ * Look up the LIVE tenant for a user. RLS-bypassing service client — a narrow,
+ * audited call site.
+ *
+ * Filters on `deleted_at IS NULL` to mirror the partial-unique index
+ * `accounts_owner_user_id_uniq` (migration 0003) — the schema guarantees at
+ * most one live row per `owner_user_id`, and the same predicate here keeps a
+ * soft-deleted row from shadowing the live one (a user can soft-delete then
+ * re-onboard within the 30-day window; both rows coexist, but only the live
+ * one is the "current tenant").
+ */
 async function resolveAccount(userId: string): Promise<AccountRow | null> {
   const service = getServiceClient();
   const row = await service.query.accounts.findFirst({
-    where: eq(accounts.ownerUserId, userId),
+    where: and(eq(accounts.ownerUserId, userId), isNull(accounts.deletedAt)),
   });
   return row ?? null;
 }
