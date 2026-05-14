@@ -137,7 +137,7 @@ export async function cleanup(): Promise<void> {
   if (!HAS_TEST_DB) return;
   const db = admin();
   await db.execute(
-    sql`truncate table public.legal_acceptances, public.subscriptions, public.jobs, public.sessions, public.accounts, public.users restart identity cascade`,
+    sql`truncate table public.legal_acceptances, public.subscriptions, public.processed_stripe_events, public.jobs, public.sessions, public.accounts, public.users restart identity cascade`,
   );
   await db.execute(sql`delete from auth.users where email like '%@test.local'`);
 }
