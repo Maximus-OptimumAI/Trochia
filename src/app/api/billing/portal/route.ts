@@ -5,7 +5,7 @@
  * customer id and 303-redirect to the portal URL.
  */
 import { NextResponse } from 'next/server';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getServiceClient } from '@/db/client';
@@ -23,7 +23,8 @@ export async function POST() {
 
   const service = getServiceClient();
   const account = await service.query.accounts.findFirst({
-    where: eq(accounts.ownerUserId, user.id),
+    // Live tenant only — mirrors the partial-unique index in migration 0003.
+    where: and(eq(accounts.ownerUserId, user.id), isNull(accounts.deletedAt)),
   });
   if (!account?.stripeCustomerId) {
     // No customer object yet — pick a plan via Checkout first.

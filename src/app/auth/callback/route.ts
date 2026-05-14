@@ -16,7 +16,7 @@
  * to absolute paths starting with `/`).
  */
 import { NextResponse, type NextRequest } from 'next/server';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getServiceClient } from '@/db/client';
@@ -52,6 +52,17 @@ export async function GET(request: NextRequest) {
   // injected yet (the Auth Hook only fires on token issuance, which has
   // already happened; the request client we'd build now wouldn't see this
   // user's tenant_id because they don't yet have an `accounts` row).
+  //
+  // Concurrency: two simultaneous first-login callbacks for the same user_id
+  // could both pass a read-then-insert check and produce two live accounts —
+  // a fatal nondeterminism for the auth-hook tenant resolution (the hook's
+  // `LIMIT 1` picks one, src/server/context.ts's `findFirst` may pick the
+  // other). PR-1 fixes this with:
+  //   1. a partial UNIQUE index on accounts(owner_user_id) WHERE deleted_at IS NULL
+  //      (migration 0003 + tenancy.ts), and
+  //   2. an atomic INSERT ... ON CONFLICT DO NOTHING here (no read-first),
+  //      then a single SELECT to pick up whichever row won the race.
+  // Surfaced by /codex 01-07 review (P1).
   const service = getServiceClient();
   try {
     await service
@@ -59,16 +70,19 @@ export async function GET(request: NextRequest) {
       .values({ id: user.id, email: user.email ?? '' })
       .onConflictDoNothing({ target: users.id });
 
-    const existing = await service.query.accounts.findFirst({
-      where: eq(accounts.ownerUserId, user.id),
-    });
-    if (!existing) {
-      await service.insert(accounts).values({
-        ownerUserId: user.id,
-        region: 'us',
-        subscriptionStatus: 'none',
-      });
-    }
+    // Atomic: at most one row per user_id while deleted_at IS NULL — enforced
+    // by the partial unique index `accounts_owner_user_id_uniq`. On a concurrent
+    // race the loser is a no-op; the follow-up SELECT sees the winning row.
+    //
+    // Raw SQL because Drizzle 0.44's `onConflictDoNothing` doesn't accept the
+    // index predicate clause that's required for Postgres to infer a partial
+    // unique index. PR-4 (drizzle 0.45 upgrade) is expected to add native
+    // support; replace with the typed builder then.
+    await service.execute(sql`
+      insert into ${accounts} (owner_user_id, region, subscription_status)
+      values (${user.id}, 'us', 'none')
+      on conflict (owner_user_id) where deleted_at is null do nothing
+    `);
   } catch (err) {
     logger.error('auth/callback: failed to resolve account row', { err, userId: user.id });
     return NextResponse.redirect(new URL('/sign-in?error=account_setup_failed', APP_URL));
@@ -77,9 +91,11 @@ export async function GET(request: NextRequest) {
   // Best-effort analytics — never block the redirect.
   void track('signed_in').catch(() => undefined);
 
-  // Look up the (now-existing) account to decide where to land.
+  // Read back the (now-existing) live account — must filter on the same
+  // partial-unique predicate so a soft-deleted row from a prior account
+  // never shadows the live one.
   const account = await service.query.accounts.findFirst({
-    where: eq(accounts.ownerUserId, user.id),
+    where: and(eq(accounts.ownerUserId, user.id), isNull(accounts.deletedAt)),
   });
   const dpaAccepted = !!account?.dpaAcceptedAt;
   const active =
