@@ -105,6 +105,13 @@ function storageClient() {
  */
 export async function exportAccountData(accountId: string): Promise<{ downloadUrl: string; expiresAt: Date }> {
   const data = await buildAccountDataExport(accountId);
+  // The export JSON is the founder's own data being returned to the founder;
+  // `data.account.email` is intentionally present (it survives stripForbidden
+  // because the FORBIDDEN_COLUMN_PATTERNS list is separate from logger
+  // SENSITIVE_FIELDS — exports preserve PII for the data-subject, logs strip it).
+  // `accountEmail` here is used solely for routing the export-ready email and
+  // is never passed into a logger payload — sendEmail's PR-5 fix drops the
+  // `to:` field from all log entries.
   const accountEmail = (data.account?.email as string | undefined) ?? undefined;
 
   const supabase = storageClient();

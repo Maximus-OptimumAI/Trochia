@@ -152,11 +152,19 @@ import {
   SOFT_DELETE_WINDOW_DAYS,
 } from '@/modules/data-rights/delete-account';
 
+// The data export's FORBIDDEN list is intentionally separate from the
+// logger's SENSITIVE_FIELDS (per PR-5 / /codex 01-07): the export carries
+// the founder's own PII (email, etc.) BACK to them as a GDPR data-portability
+// dump; the logger strips PII before logs/Sentry ship to vendors. Tests for
+// the export check the export-shaped list only.
+const SENSITIVE_FIELDS_EXCLUDING_EXPORT_INTENT = new Set(
+  Array.from(SENSITIVE_FIELDS).filter((k) => k !== 'email'),
+);
 function isForbiddenKey(k: string): boolean {
   if (/_secret$/i.test(k) || /_key$/i.test(k) || /secret/i.test(k) || /password/i.test(k) || /token/i.test(k)) {
     return true;
   }
-  return SENSITIVE_FIELDS.has(k);
+  return SENSITIVE_FIELDS_EXCLUDING_EXPORT_INTENT.has(k);
 }
 
 function collectKeys(obj: unknown, acc: string[] = []): string[] {

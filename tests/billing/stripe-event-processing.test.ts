@@ -86,6 +86,14 @@ d('processStripeEventTransactional — claim-after-side-effect (PR-3)', () => {
     // Point the runtime `getServiceClient` at the test DB by setting the env
     // BEFORE any module load that reads it.
     process.env.DATABASE_URL = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
+    // PR-5 / codex #3 race test (below) asserts tier mirroring across the
+    // subscription-before-checkout sequence. Stub deterministic Stripe price
+    // IDs so `priceIdToTierAndPeriod` resolves; mirrors the pattern in
+    // tests/billing/tiers.test.ts. `??=` so CI's real values aren't clobbered.
+    process.env.STRIPE_PRICE_PRE_RAISE_MONTHLY ??= 'price_pre_raise_m';
+    process.env.STRIPE_PRICE_PRE_RAISE_ANNUAL ??= 'price_pre_raise_a';
+    process.env.STRIPE_PRICE_ACTIVE_RAISE_MONTHLY ??= 'price_active_raise_m';
+    process.env.STRIPE_PRICE_ACTIVE_RAISE_ANNUAL ??= 'price_active_raise_a';
     await migrateTestDb();
     await cleanup();
   });
@@ -202,6 +210,127 @@ d('processStripeEventTransactional — claim-after-side-effect (PR-3)', () => {
       sql`select count(*)::text as count from public.processed_stripe_events where event_id = ${event.id}`,
     );
     expect(Number(claims[0].count)).toBe(1);
+  });
+
+  it('PR-5 / codex #3: subscription-before-checkout race — both events converge on the same account, tier/period applied, customer_id persisted, ledger has exactly 2 rows', async () => {
+    const { processStripeEventTransactional } = await loadProcess();
+
+    // Seed an account WITHOUT a stripe_customer_id (the state before
+    // checkout.session.completed has run). This is the precise window the
+    // codex review flagged: customer.subscription.created arrives first,
+    // findAccountByCustomer returns null, and the event would have orphaned
+    // the tier/period until the 6h reconcile cron.
+    const db = getServiceClientForTests();
+    const userId = randomUUID();
+    await db.execute(
+      sql`insert into auth.users (id, email) values (${userId}, ${`${userId}@test.local`}) on conflict do nothing`,
+    );
+    await db
+      .insert(schema.users)
+      .values({ id: userId, email: `${userId}@test.local` })
+      .onConflictDoNothing();
+    const [acct] = await db
+      .insert(schema.accounts)
+      .values({ ownerUserId: userId, region: 'us', subscriptionStatus: 'none' })
+      .returning({ id: schema.accounts.id });
+
+    // Pick a period end ~30 days out — asserted directly after both events.
+    const periodEndSeconds = Math.floor(Date.now() / 1000) + 30 * 24 * 3600;
+    const expectedPeriodEnd = new Date(periodEndSeconds * 1000);
+    const expectedCustomer = 'cus_not_yet_persisted';
+
+    // ─── EVENT 1 ── customer.subscription.created arrives FIRST. The Stripe
+    // object carries the customer id but our accounts row has not been told.
+    // metadata.account_id is what `subscription_data.metadata` (set at
+    // checkout-session creation by src/modules/billing/checkout.ts) stamps on
+    // every subscription Stripe produces — the fallback resolves the account.
+    const event1 = {
+      id: 'evt_ordering_sub',
+      object: 'event',
+      type: 'customer.subscription.created',
+      api_version: '2024-06-20',
+      created: Math.floor(Date.now() / 1000),
+      data: {
+        object: {
+          id: 'sub_test_ordering',
+          status: 'trialing',
+          customer: expectedCustomer,
+          items: { data: [{ price: { id: process.env.STRIPE_PRICE_PRE_RAISE_MONTHLY ?? 'price_pre_raise_m' } }] },
+          current_period_end: periodEndSeconds,
+          metadata: { account_id: acct.id },
+        },
+      },
+      livemode: false,
+      pending_webhooks: 0,
+      request: { id: null, idempotency_key: null },
+    } as unknown as Stripe.Event;
+
+    const r1 = await processStripeEventTransactional(event1);
+    expect(r1.deduped).toBe(false);
+    expect(r1.apply?.accountId).toBe(acct.id);
+    expect(r1.apply?.tier).toBe('pre_raise');
+    expect(r1.apply?.period).toBe('monthly');
+
+    // After event 1: stripe_customer_id persisted via the fallback path; tier
+    // + period mirrored to accounts; currentPeriodEnd reflects the unix-seconds
+    // → Date conversion in mirrorSubscription.
+    const [afterEvent1] = await db
+      .select()
+      .from(schema.accounts)
+      .where(sql`${schema.accounts.id} = ${acct.id}`);
+    expect(afterEvent1.stripeCustomerId).toBe(expectedCustomer);
+    expect(afterEvent1.tier).toBe('pre_raise');
+    expect(afterEvent1.currentPeriodEnd?.getTime()).toBe(expectedPeriodEnd.getTime());
+
+    // ─── EVENT 2 ── checkout.session.completed arrives SECOND for the SAME
+    // account/customer. client_reference_id carries the account id (set by
+    // checkout.ts). This event must resolve to the SAME account, NOT clobber
+    // the tier/period that event 1 just wrote, NOT change the already-persisted
+    // stripe_customer_id, and add its own claim row to the ledger.
+    const event2 = {
+      id: 'evt_ordering_chk',
+      object: 'event',
+      type: 'checkout.session.completed',
+      api_version: '2024-06-20',
+      created: Math.floor(Date.now() / 1000),
+      data: {
+        object: {
+          id: 'cs_test_ordering',
+          client_reference_id: acct.id,
+          customer: expectedCustomer,
+          subscription: 'sub_test_ordering',
+        },
+      },
+      livemode: false,
+      pending_webhooks: 0,
+      request: { id: null, idempotency_key: null },
+    } as unknown as Stripe.Event;
+
+    const r2 = await processStripeEventTransactional(event2);
+    expect(r2.deduped).toBe(false);
+    expect(r2.apply?.accountId).toBe(acct.id); // SAME account, not a different one
+
+    // After event 2: tier + currentPeriodEnd from event 1 SURVIVED (the
+    // checkout handler only writes subscriptionStatus + stripeCustomerId,
+    // never tier/period); stripeCustomerId unchanged (matches existing,
+    // hits the skip-update branch in state.ts:196); subscriptionStatus is
+    // 'trialing' (set explicitly by the checkout handler).
+    const [afterEvent2] = await db
+      .select()
+      .from(schema.accounts)
+      .where(sql`${schema.accounts.id} = ${acct.id}`);
+    expect(afterEvent2.tier).toBe('pre_raise');
+    expect(afterEvent2.currentPeriodEnd?.getTime()).toBe(expectedPeriodEnd.getTime());
+    expect(afterEvent2.stripeCustomerId).toBe(expectedCustomer);
+    expect(afterEvent2.subscriptionStatus).toBe('trialing');
+
+    // ─── Ledger: exactly 2 rows, one per event_id ── proves PR-3's
+    // claim-after-side-effect contract held across BOTH events (neither
+    // throw rolled the other back; neither was claimed twice).
+    const claims = await db.execute<{ count: string }>(
+      sql`select count(*)::text as count from public.processed_stripe_events where event_id in (${event1.id}, ${event2.id})`,
+    );
+    expect(Number(claims[0].count)).toBe(2);
   });
 
   it('replay of an already-processed event_id → deduped, no extra writes', async () => {

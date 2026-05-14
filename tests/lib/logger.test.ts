@@ -21,7 +21,7 @@ describe('lib/logger', () => {
     expect(serialized).toContain('"name":"x"');
   });
 
-  it('deep-redacts nested sensitive fields and arrays', () => {
+  it('deep-redacts nested sensitive fields and arrays (incl. email post PR-5)', () => {
     const out = redactSensitive({
       user: { ssn: '123-45-6789', email: 'a@b.c' },
       rounds: [{ valuationCap: 8_000_000 }, { valuationCap: 12_000_000 }],
@@ -30,7 +30,24 @@ describe('lib/logger', () => {
     expect(s).not.toContain('123-45-6789');
     expect(s).not.toContain('8000000');
     expect(s).not.toContain('12000000');
-    expect(s).toContain('a@b.c');
+    // PR-5: email is now in SENSITIVE_FIELDS — GDPR/DPA compliance.
+    expect(s).not.toContain('a@b.c');
+  });
+
+  it('PR-5: redacts the `email` key and compound email keys (customerEmail, ownerEmail, etc.)', () => {
+    const out = redactSensitive({
+      email: 'founder@example.com',
+      customerEmail: 'customer@example.com',
+      ownerEmail: 'owner@example.com',
+      accountEmail: 'acct@example.com',
+      // Sanity: keys that don't include 'email' substring stay visible.
+      name: 'visible-string',
+    }) as Record<string, unknown>;
+    expect(out.email).toBe('[redacted]');
+    expect(out.customerEmail).toBe('[redacted]');
+    expect(out.ownerEmail).toBe('[redacted]');
+    expect(out.accountEmail).toBe('[redacted]');
+    expect(out.name).toBe('visible-string');
   });
 
   it('matches compound sensitive keys (e.g. stripeSecret, userPassword)', () => {
