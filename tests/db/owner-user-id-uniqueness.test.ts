@@ -25,7 +25,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { sql } from 'drizzle-orm';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import * as schema from '@/db/schema';
 import {
@@ -49,9 +49,11 @@ d('accounts.owner_user_id partial-unique invariant (PR-1)', () => {
     await closeTestDb();
   });
 
-  beforeEach(async () => {
-    await cleanup();
-  });
+  // No `beforeEach: cleanup()` — every test below mints a fresh randomUUID()
+  // userId so cross-test row collisions are impossible by construction. The
+  // (now-serial, see vitest.config.ts `fileParallelism: false`) cleanup at
+  // beforeAll + afterAll bounds the file's data lifetime; per-test cleanup
+  // would be redundant.
 
   /**
    * Mirror of src/app/auth/callback/route.ts upsert: atomic insert that
