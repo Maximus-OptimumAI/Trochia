@@ -29,6 +29,13 @@
       "when": 1778735901731,
       "tag": "0003_owner_user_id_uniq",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1778858143509,
+      "tag": "0004_owner_self_read_policy",
+      "breakpoints": true
     }
   ]
 }

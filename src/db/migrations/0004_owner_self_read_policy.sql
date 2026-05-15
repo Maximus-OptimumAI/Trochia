@@ -1,0 +1,1 @@
+CREATE POLICY "owner_self_read" ON "accounts" AS PERMISSIVE FOR SELECT TO "authenticated" USING ("accounts"."owner_user_id" = (select auth.uid()));

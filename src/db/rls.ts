@@ -89,3 +89,33 @@ export function ownUserRowPolicy(idColumn: AnyPgColumn) {
     withCheck: sql`${idColumn} = ${authUid}`,
   });
 }
+
+/**
+ * Owner-self-read on `accounts` (PR-6 / codex re-verify 2026-05-15 [P1]).
+ *
+ * Lets an authenticated user read THEIR OWN `accounts` row by matching
+ * `owner_user_id = auth.uid()`, regardless of whether their JWT carries a
+ * populated `tenant_id` claim. The defect this addresses: first-login OAuth
+ * mints a JWT BEFORE the account row exists → `custom_access_token_hook`
+ * resolves `tenant_id = NULL` → the existing `tenant_isolation` policy
+ * (keyed on the claim) denies the row → `proxy.ts`'s `/app/*` gate loops
+ * the user back to `/onboarding` until JWT TTL (~1h) or sign-out/in.
+ *
+ * Scope: FOR SELECT only — writes still go through `tenant_isolation`
+ * (the WITH CHECK predicate on that policy keeps the owner from creating /
+ * updating rows on a stale claim, which is the right posture).
+ *
+ * Threat-model line: "the authenticated owner can read their own account
+ * row via owner_user_id even when the tenant_id claim is stale or null."
+ * The row IS theirs by foreign key — semantically benign. Two-user RLS
+ * test (`tests/rls/two-user-isolation.test.ts`) proves tenant B's
+ * authenticated client still CANNOT see tenant A's row through this path
+ * (auth.uid() doesn't match A's owner_user_id).
+ */
+export function ownerSelfReadPolicy(ownerColumn: AnyPgColumn) {
+  return pgPolicy('owner_self_read', {
+    for: 'select',
+    to: authenticatedRole,
+    using: sql`${ownerColumn} = ${authUid}`,
+  });
+}

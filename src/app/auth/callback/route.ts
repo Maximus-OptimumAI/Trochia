@@ -88,6 +88,25 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/sign-in?error=account_setup_failed', APP_URL));
   }
 
+  // PR-6 / codex re-verify 2026-05-15 [P1]: refresh the Supabase session AFTER
+  // the account upsert so the next JWT carries the now-resolvable `tenant_id`
+  // claim. `exchangeCodeForSession()` above minted a token whose claim was
+  // null (the custom_access_token_hook ran BEFORE the row existed). Without
+  // this refresh the founder's session cookie carries the stale-null claim
+  // until JWT TTL (~1h) or sign-out/in — proxy.ts's `/app/*` gate then loops
+  // them back to `/onboarding` because RLS on `accounts` denies the claim-
+  // driven read. Best-effort: if the refresh fails (network blip, Supabase
+  // hiccup), we still redirect — proxy.ts's `ownerSelfReadPolicy` fallback
+  // (PR-6 Fix B) catches the stale-claim case on the next request.
+  try {
+    await supabase.auth.refreshSession();
+  } catch (err) {
+    logger.warn('auth/callback: refreshSession failed (non-fatal — proxy fallback covers)', {
+      err,
+      userId: user.id,
+    });
+  }
+
   // Best-effort analytics — never block the redirect.
   void track('signed_in').catch(() => undefined);
 

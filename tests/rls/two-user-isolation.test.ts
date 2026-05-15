@@ -119,4 +119,76 @@ d('two-user tenant isolation', () => {
     ).rejects.toThrow();
   });
 
+  /**
+   * PR-6 / codex re-verify 2026-05-15 [P1] — owner_self_read policy semantics.
+   *
+   * The new policy (migration 0004) permits an authenticated user to read
+   * THEIR OWN `accounts` row by `owner_user_id = auth.uid()`, regardless of
+   * the `tenant_id` claim. This widens the SELECT-side surface on `accounts`
+   * to two policies (`tenant_isolation` for normal request flow,
+   * `owner_self_read` for the stale-claim recovery path the proxy uses).
+   *
+   * The two-user proof has THREE shapes worth asserting separately:
+   *
+   *   (1) Normal claim flow still works — A's claims-driven SELECT returns
+   *       A's account (proves owner_self_read didn't somehow disable
+   *       tenant_isolation).
+   *
+   *   (2) Stale-null-claim recovery — A with `tenant_id = null` can STILL
+   *       read A's account via owner_self_read (the exact failure mode the
+   *       proxy fallback handles). This proves the policy permits the
+   *       owner without requiring the claim.
+   *
+   *   (3) Cross-tenant scoping — B with EITHER B's normal claims OR a
+   *       stale-null claim can NEVER read A's account row through
+   *       owner_self_read, because auth.uid() resolves to B.userId and the
+   *       USING predicate (`owner_user_id = auth.uid()`) doesn't match A's
+   *       owner_user_id. This is the scope-correctness proof.
+   */
+  it('owner_self_read: tenant A reads own account even with a stale-null tenant_id claim', async () => {
+    // Simulate the first-login window: A's JWT carries auth.uid() = A.userId
+    // but tenant_id is null (the custom_access_token_hook ran before the
+    // accounts row materialised). owner_self_read permits the SELECT.
+    const staleClaimsA = { sub: A.userId, role: 'authenticated' as const, tenant_id: null };
+    const aStale = tenantClient(staleClaimsA);
+
+    await aStale.rls(async (tx) => {
+      const rows = await tx.select({ id: schema.accounts.id }).from(schema.accounts);
+      expect(rows.map((r) => r.id)).toEqual([A.accountId]);
+    });
+  });
+
+  it("owner_self_read: tenant B (normal claims) cannot read tenant A's account by owner_user_id", async () => {
+    // B is authenticated with B's own valid claims. owner_self_read's USING
+    // predicate is `owner_user_id = auth.uid()` — auth.uid() resolves to
+    // B.userId, which does NOT match A.ownerUserId, so the policy denies.
+    // The tenant_isolation policy also denies (B's tenant_id != A.accountId).
+    // Net: B sees zero of A's rows. The policy is correctly scoped.
+    const b = tenantClient(B.claims);
+
+    await b.rls(async (tx) => {
+      const aRowsViaOwnerSelfRead = await tx.execute<{ id: string }>(
+        sql`select id from public.accounts where owner_user_id = ${A.userId}`,
+      );
+      expect(aRowsViaOwnerSelfRead.length).toBe(0);
+    });
+  });
+
+  it("owner_self_read: tenant B with a stale-null claim STILL cannot read tenant A's account", async () => {
+    // The adversarial case — B is in their own first-login window (null
+    // tenant_id) but tries to read A's account via owner_user_id. auth.uid()
+    // is still B.userId, owner_self_read's USING is still
+    // `owner_user_id = B.userId` ≠ A.ownerUserId, denied. Proves the
+    // resilience layer does NOT widen the cross-tenant surface.
+    const staleClaimsB = { sub: B.userId, role: 'authenticated' as const, tenant_id: null };
+    const bStale = tenantClient(staleClaimsB);
+
+    await bStale.rls(async (tx) => {
+      const aRows = await tx.execute<{ id: string }>(
+        sql`select id from public.accounts where owner_user_id = ${A.userId}`,
+      );
+      expect(aRows.length).toBe(0);
+    });
+  });
+
 });

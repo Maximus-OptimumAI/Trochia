@@ -100,3 +100,54 @@ test.describe('Walking Skeleton — webhook round-trip (CI-only)', () => {
     expect(true).toBe(true);
   });
 });
+
+/**
+ * PR-6 / codex re-verify 2026-05-15 [P1] — first-login tenant_id claim
+ * populated after the route's `refreshSession()` (Fix A).
+ *
+ * Locally we cannot drive a real OAuth round-trip (no live Supabase OAuth
+ * provider; no real `custom_access_token_hook` running). The CI-against-
+ * Vercel-preview path is the same one the webhook round-trip spec above
+ * uses: mint a user via supabase.auth.admin, drive `exchangeCodeForSession`
+ * with a magic-link or signInWithIdToken, decode the JWT in the resulting
+ * session cookie, assert `tenant_id` is non-null.
+ *
+ * Skipping rules: this spec skips when running locally (no real Supabase
+ * admin key) — by design. Per the PR-6 plan, this test is the high-fidelity
+ * proof that Fix A actually materialises the claim, but PR-6 merge is gated
+ * on the unit + integration + RLS tests passing, NOT this e2e. When the
+ * Vercel preview is healthy and the secret matrix is wired, this slot
+ * activates and adds the runtime-truth assertion.
+ */
+test.describe('PR-6 — first-login JWT tenant_id claim (CI-only)', () => {
+  test.skip(
+    !IS_CI_AGAINST_PREVIEW || !HAS_REAL_SUPABASE,
+    'Requires PLAYWRIGHT_BASE_URL + real SUPABASE_SECRET_KEY (Vercel preview run)',
+  );
+
+  test('after first-login callback completes, the session cookie JWT carries a non-null tenant_id', async () => {
+    // Implementation slot for the post-deploy manual-verification pass:
+    //
+    //  1. Mint a fresh test user via `supabase.auth.admin.createUser({
+    //       email: `pr6-${Date.now()}@test.local`, email_confirm: true })`.
+    //  2. Generate a one-shot sign-in link via `supabase.auth.admin
+    //       .generateLink({ type: 'magiclink', email })` and follow the link
+    //       with `request.get(link.action_link, { maxRedirects: 0 })` to
+    //       capture the PKCE code from the redirect's Location header.
+    //  3. Drive `request.get('/auth/callback?code=...')` and capture the
+    //       `sb-*` cookies on the response.
+    //  4. Decode the access token from the cookie payload (base64url-decode
+    //       the second segment; parse JSON).
+    //  5. Assert `payload.tenant_id` exists and is a non-null UUID.
+    //
+    // We deliberately throw so this test FAILS LOUDLY when the skip
+    // condition clears (Vercel preview healthy + real SUPABASE_SECRET_KEY)
+    // rather than silently passing. `expect(true).toBe(true)` would be a
+    // coverage trap — the test would activate, pass without proving the
+    // fix, and the only place asserting tenant_id is actually populated
+    // on the JWT would go quiet.
+    throw new Error(
+      'PR-6 e2e implementation needed — see comments for steps 1-5. Implement when Vercel preview is healthy and SUPABASE_SECRET_KEY is wired into the secret matrix.',
+    );
+  });
+});
