@@ -16,6 +16,7 @@ Trochia AI is an agentic Founder Operating System for raising capital — one Ne
 - [ ] **Phase 2: Knowledge Layer + Memory** - Business Memory extraction/confirmation, curated corpus embeddings, grounded+cited ambient Q&A, unified raise timeline — the moat, validated on design-partner data
 - [ ] **Phase 3: Pitch Lab — Deck Reviewer** - Deck parsing + Claude Opus reviewer with a Langfuse-hosted eval harness gating false-positive rate and zero fabricated slide refs
 - [ ] **Phase 4: Investor Pipeline** - VC/accelerator match, application tracker, outreach drafter, warm-intro mapper, bulk actions + CSV
+- [ ] **Phase 4.5: Admin Dashboard + Security Hardening + Observability — INSERTED** - Super-admin dashboard with tenant directory + AI cost view + support actions; security hardening above Phase 1 baseline (rate limiting, per-tenant token caps, admin MFA, security headers, session policy, secret rotation drill, backup-restore drill); observability layer turning Sentry/Langfuse/Amplitude silos into one agent-searchable `platform_events` log + trust-preserving error UX. **Mandatory gate before Phase 5 design partners reach prod.**
 - [ ] **Phase 5: Live Raise (MVP soft-launch checkpoint)** - Pre-call briefs, transcript ingestion, follow-up drafter, Pipeline Memory kanban — go/no-go gate: 25 design partners onboarded & paying, activation thresholds met
 - [ ] **Phase 6: Voice Pitch Coach + Q&A Drill + Browser Extension** - In-browser pitch capture, deterministic voice metrics + Opus structure scoring, Q&A Drill, Chrome/Edge Knowledge Pack sync
 - [ ] **Phase 7: Data Room Orchestration** - Vertical-aware checklist, Drive `drive.file`-scoped orchestration, access analytics, DDQ filler, Gmail pipeline sync, cross-module fact-conflict surfacing
@@ -86,6 +87,20 @@ Trochia AI is an agentic Founder Operating System for raising capital — one Ne
   3. The outreach drafter produces a 4–7 sentence (<120 word) personalized email per investor enriched with the partner's recent X/LinkedIn posts + fund investments + podcasts (Exa + Firecrawl), tone-matched, with subject + 2 alternatives, in <20s — the founder approves and sends via their own Gmail
   4. The warm-intro mapper cross-references a founder's LinkedIn export against the target list and outputs `{target_investor, intro_path, intro_strength_score, suggested_intro_template}` + a drafted intro request in <60s for networks up to 5,000 contacts, with no bulk scraping
   5. A founder can multi-select pipeline rows to bulk-change stage/tag/delete, export the pipeline (or a filtered subset) to CSV in Carta/CRM column order, and CSV-import an initial pipeline with a mapped-column preview before commit
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 4.5: Admin Dashboard + Security Hardening + Observability — INSERTED
+**Goal**: Before exposing the product to 25 paying design partners in Phase 5, every operational surface a solo founder needs to safely run prod is built and verified — a super-admin dashboard with tenant directory + AI cost view + support actions, security hardening above Phase 1's baseline (rate limiting, per-tenant token caps, MFA for admins, security headers, session policy, backup-restore drill), and an observability layer that turns Sentry/Langfuse/Amplitude silos into one agent-searchable event log so Claude Code / Codex can debug from real history. **No design partner traffic reaches prod until Phase 4.5 ships.**
+**Mode:** mvp
+**Depends on**: Phase 4 (Investor Pipeline complete — admin dashboard needs real tenants/data to be meaningful)
+**Requirements**: ADM-01, ADM-02, ADM-03, ADM-04, ADM-05, ADM-06, ADM-07, ADM-08, SEC-01, SEC-02, SEC-03, SEC-04, SEC-05, SEC-06, SEC-07, OBS-01, OBS-02, OBS-03, OBS-04, OBS-05, OBS-06
+**Success Criteria** (what must be TRUE):
+  1. A super-admin (MFA-enforced via `SUPER_ADMIN_USER_IDS` env-var list) lands on `/admin`, sees the full tenant directory, drills into any tenant, views their MTD AI cost / token usage against their tier cap / last 50 platform events / Sentry issues / Langfuse traces / Stripe state — all from one surface in <3 clicks, with a persistent "you are acting as admin" banner
+  2. Rate limiting is live on Opus / auth / outreach routes via `@upstash/ratelimit` tRPC middleware (10 req/min per user on Opus-backed routes; 5/min on outreach drafter; 100/15-min on auth) and per-tenant monthly AI token caps fire 50%/80%/100% alerts with tier-aware soft-suspend at 100% (Pre-Raise 100K in / 50K out, Active Raise 1M / 500K, Close Mode 5M / 2.5M, Alumni 50K / 25K); one runaway-cost test on a sandbox tenant proves the cap holds
+  3. Every meaningful platform action (tenant signup, deck upload, brief generated, follow-up sent, billing event, error, admin action) writes a typed row to `platform_events`; a super-admin can query the last 30 days by tenant/event-type/time-range; an admin-only `/api/admin/events/search` endpoint returns scoped results so Claude Code / Codex agents can pull real history into debug sessions
+  4. Every user-facing error path returns a copy-reviewed, trust-preserving message via the `TrochiaError` → message mapping — zero bare 500/400/"Internal Server Error" surfaces in the product even when Anthropic/Stripe/Supabase/Inngest fail; Sentry still receives the full technical trace; a bug spotter fires Slack DMs on new error classes + error-rate spikes (>2σ over 1h baseline) + p95 latency regressions on top-10 routes
+  5. Security baseline is verified: CSP/HSTS/X-Frame-Options/Referrer-Policy/Permissions-Policy headers active and enforced (CSP started in report-only mode for 1 week then enforced); idle timeout (24h access / 7d refresh, down from 30d) + refresh-token rotation + sign-out-on-password-change + sign-out-on-tenant-suspension live; TOTP MFA enforced for super-admins; secret rotation runbook exists at `docs/runbooks/secret-rotation.md` and one full rotation drill is recorded; one Supabase PITR restore-to-staging drill is recorded with RTO/RPO documented; off-platform uptime monitoring is live with page-to-founder-phone
 **Plans**: TBD
 **UI hint**: yes
 
@@ -188,7 +203,7 @@ Trochia AI is an agentic Founder Operating System for raising capital — one Ne
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 4.5 → 5 → 6 → 7 → 8 → 9 → 10 → 11
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -196,6 +211,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 2. Knowledge Layer + Memory | 0/TBD | Not started | - |
 | 3. Pitch Lab — Deck Reviewer | 0/TBD | Not started | - |
 | 4. Investor Pipeline | 0/TBD | Not started | - |
+| 4.5. Admin Dashboard + Security Hardening + Observability (INSERTED) | 0/TBD | Not started | - |
 | 5. Live Raise (MVP soft-launch checkpoint) | 0/TBD | Not started | - |
 | 6. Voice Pitch Coach + Q&A Drill + Browser Extension | 0/TBD | Not started | - |
 | 7. Data Room Orchestration | 0/TBD | Not started | - |
@@ -221,3 +237,7 @@ Established in Phase 1, enforced in every later phase:
 - Untrusted-input handling (delimited, prompt-injection screened, output schema-validated; RAG cites real sources)
 - DPA / data-subject-rights / export / 30-day-soft-delete-then-purge plumbing
 - Encryption at rest beyond Supabase native for sensitive fields (cap-table, audio); financial figures never in logs/training; logging-scrub lint
+- Every Phase 5+ mutation handler MUST call `logEvent()` to write a `platform_events` row for its meaningful state change (enforced by code review + lint rule on tRPC mutation procedures)
+- Every Phase 5+ user-facing error path MUST map through `TrochiaError` (lint rule: no bare `throw new Error()` in tRPC procedures or route handlers; bare errors trip CI)
+- Every Phase 5+ Opus-backed AI route MUST chain the `@upstash/ratelimit` middleware (lint rule on the tRPC procedure chain)
+- Every Phase 5+ tenant-scoped mutation MUST be visible to the admin dashboard (audited via the OBS-01 helper presence in the handler)
