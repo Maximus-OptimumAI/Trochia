@@ -10,6 +10,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "gate": "bash scripts/pre-push-gate.sh",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "check:banned": "node scripts/check-banned-strings.mjs",
