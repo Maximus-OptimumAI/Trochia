@@ -29,6 +29,13 @@ export const SENSITIVE_FIELDS: ReadonlySet<string> = new Set([
   'token',
   'secret',
   'apiKey',
+  // PR-5 / /codex 01-07 [P2] finding #5: user emails are PII under GDPR.
+  // The substring matcher catches `email`, `customerEmail`, `ownerEmail`,
+  // `accountEmail`, etc. We DELIBERATELY do NOT add the short keys `to`
+  // or `recipient` — those substring-match too aggressively (`to` would
+  // hit `tomorrow`, `accountToken`, etc.). The fix at call sites is to
+  // not pass raw emails as `to:` in log payloads — see src/lib/email/client.ts.
+  'email',
 ]);
 
 const REDACTED = '[redacted]';

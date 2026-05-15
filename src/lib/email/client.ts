@@ -74,8 +74,10 @@ export async function sendEmail<T extends TemplateName>(
 
   const resend = getResend();
   if (!resend) {
+    // PR-5 / /codex 01-07 [P2] finding #5: do NOT log the recipient address.
+    // The template name is enough operational signal. (The substring redactor
+    // can't safely intercept the short key `to:`; the fix is to drop it.)
     logger.info('sendEmail: RESEND_API_KEY not set — skipping send', {
-      to: args.to,
       template: args.template,
     });
     return { html, sent: false };
@@ -88,11 +90,10 @@ export async function sendEmail<T extends TemplateName>(
       subject,
       html,
     });
-    logger.info('sendEmail: sent', { to: args.to, template: args.template });
+    logger.info('sendEmail: sent', { template: args.template });
     return { html, sent: true };
   } catch (err) {
     logger.warn('sendEmail: send failed (non-fatal)', {
-      to: args.to,
       template: args.template,
       err,
     });

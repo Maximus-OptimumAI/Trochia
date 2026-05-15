@@ -50,7 +50,17 @@ export async function createCheckoutSession(opts: CreateCheckoutOpts): Promise<{
     customer: opts.customerId,
     customer_email: opts.customerId ? undefined : opts.customerEmail,
     line_items: [{ price: priceId, quantity: 1 }],
-    subscription_data: { trial_period_days: 7 },
+    subscription_data: {
+      trial_period_days: 7,
+      // PR-5 / /codex 01-07 [P2] finding #3: Stripe doesn't guarantee webhook
+      // ordering. A customer.subscription.created event can arrive BEFORE the
+      // checkout.session.completed that first persists stripe_customer_id on
+      // the account — in which case findAccountByCustomer returns null and the
+      // tier/period mapping silently drops until the 6-hour reconcile cron
+      // catches it. Embed the account_id in subscription metadata so
+      // applySubscriptionState can fall back to a by-id lookup in that window.
+      metadata: { account_id: opts.accountId },
+    },
     payment_method_collection: 'always',
     automatic_tax: { enabled: true },
     success_url: `${APP_URL}/onboarding?checkout=success`,

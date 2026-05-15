@@ -97,6 +97,10 @@ interface SubLike {
   customer: string;
   items: { data: Array<{ price: { id: string } }> };
   current_period_end?: number | null;
+  /** PR-5: PR-5/codex finding #3 — checkout sets `subscription_data.metadata.account_id`
+   *  so out-of-order subscription events can resolve the account before
+   *  `accounts.stripe_customer_id` is persisted. */
+  metadata?: Record<string, string> | null;
 }
 
 function priceIdFromSub(sub: SubLike): string | null {
@@ -209,7 +213,24 @@ export async function applySubscriptionState(
     case 'customer.subscription.created':
     case 'customer.subscription.updated': {
       const sub = event.data.object as unknown as SubLike;
-      const account = await findAccountByCustomer(db, sub.customer);
+      let account = await findAccountByCustomer(db, sub.customer);
+      // PR-5 / /codex 01-07 [P2] finding #3: webhook ordering — if the
+      // subscription event arrives BEFORE checkout.session.completed has
+      // persisted stripe_customer_id on the account, fall back to the
+      // account_id we stamped on subscription_data.metadata at checkout
+      // creation. This closes the pre-customer-mapping race that previously
+      // left the subscription tier/period orphaned until the 6h cron.
+      if (!account && sub.metadata?.account_id) {
+        account = await findAccountById(db, sub.metadata.account_id);
+        if (account) {
+          // Persist the customer_id now so future events can use the fast path.
+          await db
+            .update(accounts)
+            .set({ stripeCustomerId: sub.customer, updatedAt: new Date() })
+            .where(eq(accounts.id, account.id));
+          account.stripeCustomerId = sub.customer;
+        }
+      }
       if (!account) return null;
       const { tier, period } = await mirrorSubscription(db, account, sub);
       return { accountId: account.id, tier, period };
