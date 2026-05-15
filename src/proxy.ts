@@ -127,15 +127,40 @@ export async function proxy(request: NextRequest) {
   // authenticated user — RLS guarantees they can only see their own row. This
   // is one extra round-trip per `/app` request; cheaper than spinning up the
   // Drizzle request client in middleware.
-  const { data: account, error } = await supabase
+  let { data: account, error } = await supabase
     .from('accounts')
     .select('subscription_status')
     .limit(1)
     .maybeSingle();
 
-  // If we cannot read the account (RLS denial, missing row, network error), be
-  // conservative: send them to onboarding to (re)acquire a subscription. The
-  // auth callback ensures a row exists at sign-in; this branch is a safety net.
+  // PR-6 / codex re-verify 2026-05-15 [P1] — owner_user_id fallback.
+  //
+  // The first lookup above keys on the JWT's `tenant_id` claim (via the
+  // `tenant_isolation` RLS policy). On a first-login session whose JWT was
+  // minted BEFORE the accounts row existed, that claim is null and the read
+  // returns empty — even though the row IS the user's by owner_user_id. The
+  // `owner_self_read` policy (migration 0004) lets the owner read their own
+  // row by `auth.uid()`; this second query selects through that policy.
+  // Net effect: a stale-claim session no longer loops to /onboarding.
+  //
+  // Cost: one extra round-trip ONLY on the stale-claim path. Happy path
+  // (claim populated) lands on the first read and returns immediately.
+  if (!error && !account) {
+    const fallback = await supabase
+      .from('accounts')
+      .select('subscription_status')
+      .eq('owner_user_id', user.id)
+      .limit(1)
+      .maybeSingle();
+    account = fallback.data;
+    error = fallback.error;
+  }
+
+  // If we still cannot read the account (RLS denial, missing row, network
+  // error), be conservative: send them to onboarding to (re)acquire a
+  // subscription. The auth callback ensures a row exists at sign-in; this
+  // branch is a safety net after BOTH the claim-driven AND owner_user_id reads
+  // fail.
   if (error || !account) {
     const redirectTo = new URL('/onboarding', request.url);
     return NextResponse.redirect(redirectTo);

@@ -14,7 +14,7 @@ import { sql } from 'drizzle-orm';
 import { authUsers } from 'drizzle-orm/supabase';
 import { pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
-import { ownUserRowPolicy, tenantIsolationPolicy } from '@/db/rls';
+import { ownUserRowPolicy, ownerSelfReadPolicy, tenantIsolationPolicy } from '@/db/rls';
 
 /**
  * The data-residency region the tenant's data lives in (FND-10 / D-05).
@@ -92,6 +92,13 @@ export const accounts = pgTable(
   },
   (t) => [
     tenantIsolationPolicy(t.id),
+    // PR-6 / codex re-verify 2026-05-15 [P1]: owner reads own account by
+    // owner_user_id = auth.uid() even when the tenant_id claim is stale or
+    // null. The resilience layer behind src/proxy.ts's account-resolution
+    // fallback — keeps a first-login OAuth (whose JWT was minted before the
+    // accounts row existed) from looping back to /onboarding. FOR SELECT
+    // only; writes still go through tenant_isolation. See src/db/rls.ts.
+    ownerSelfReadPolicy(t.ownerUserId),
     // Phase-1 D-03 enforces 1:1 auth.users.id → accounts.id while the account
     // is LIVE (deleted_at IS NULL). Without this constraint, concurrent
     // first-login callbacks (src/app/auth/callback/route.ts) can race and
