@@ -63,3 +63,17 @@ breaking every test in the file once node_modules was reverted to 0.44.7.
 **Rule:** When a PR adds a new table that tests write to, the same PR must
 add that table to the cleanup truncate list. Worth a grep before opening
 any future PR that includes a migration creating a new table.
+
+---
+
+## Lesson: Vercel Framework Preset (2026-05-15)
+
+**Root cause of "preview failing on every PR" since project creation:** Vercel project's Framework Preset was set to "Other" instead of "Next.js" during initial import. Auto-detection failed.
+
+**Symptom:** Build succeeds (`next build` runs fine, 32/32 static pages generated, "Build Completed"), but every route returns Vercel platform 404 with `cle1:cle1::...` ID format. Reason: "Other" preset deploys `public/` as static site and never applies Next.js routing rules to `.next/` output.
+
+**Time burned:** ~3 hours, 5 hypotheses tested in sequence (env vars, proxy.ts code, build cache, Node 24, Sentry wrapper) — all were downstream of the misconfig, none could have fixed it.
+
+**Rule:** On every Vercel project import, immediately verify Settings → Build and Deployment → Framework Preset = "Next.js". Do not trust auto-detection.
+
+**Side fix:** Sentry stripped from next.config.ts (Sentry was never set up on sentry.io — env vars were "ci-project" placeholders). Restore when wiring to real Sentry project in Phase 5.
