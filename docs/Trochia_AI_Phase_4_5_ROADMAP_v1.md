@@ -1,5 +1,7 @@
 # Trochia AI — Phase 4.5 ROADMAP Insertion (v1)
 
+**See companion appendix**: `docs/Trochia_AI_Phase_4_5_ROADMAP_v1_APPENDIX_2026-05-16.md` — adds SEC-08 (trust surface: ToS + cookie consent + GDPR deletion) and SEC-09 (abuse hardening: CAPTCHA + OWASP audit + XSS tests), bringing total to 23 tickets.
+
 **Document type**: Canonical ROADMAP.md patch + ticket specs at parity depth with Phases 1-11.
 **Slot**: Between Phase 4 (Investor Pipeline) and Phase 5 (Live Raise / MVP soft-launch checkpoint).
 **Rationale**: Phase 5 is the explicit go/no-go gate where 25 paying design partners onboard onto prod. Phase 4.5 is the hardening pass that must complete before that gate — admin dashboard so the founder can see what's happening, security baseline above Phase 1's defaults, and an observability layer that turns Sentry/Langfuse/Amplitude silos into one agent-searchable event log.
