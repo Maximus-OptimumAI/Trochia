@@ -92,6 +92,10 @@ const serverSchema = clientSchema.extend({
   STRIPE_PRICE_PRE_RAISE_ANNUAL: prodRequired(z.string()),
   STRIPE_PRICE_ACTIVE_RAISE_MONTHLY: prodRequired(z.string()),
   STRIPE_PRICE_ACTIVE_RAISE_ANNUAL: prodRequired(z.string()),
+  STRIPE_PRICE_CLOSE_MODE_MONTHLY: prodRequired(z.string()),
+  STRIPE_PRICE_CLOSE_MODE_ANNUAL: prodRequired(z.string()),
+  STRIPE_PRICE_ALUMNI_MONTHLY: prodRequired(z.string()),
+  STRIPE_PRICE_ALUMNI_ANNUAL: prodRequired(z.string()),
 
   // ── AI chokepoint ──
   ANTHROPIC_API_KEY: prodRequired(z.string()), // Plan 04 / 01-04-PLAN.md flipped this to required-in-prod
