@@ -192,11 +192,27 @@ beforeEach(() => {
 });
 
 describe('buildAccountDataExport', () => {
-  it('SELECTs every tenant-scoped table for the account', async () => {
+  it('SELECTs every tenant-scoped table for the account (Phase 1 + Phase 2 coverage)', async () => {
+    // The full set of tenant-scoped tables that must appear in a founder's
+    // data export. New phases that add tenant tables MUST extend this list
+    // AND the export function — `arrayContaining` would silently tolerate
+    // omissions, so we assert exact coverage by sorting + comparing.
+    const expectedTables = [
+      // Phase 1
+      'accounts',
+      'subscriptions',
+      'legal_acceptances',
+      'jobs',
+      'sessions',
+      // Phase 2 — Knowledge Layer + Memory
+      'business_memory',
+      'pipeline_entry',
+      'interaction',
+      'timeline_event',
+      'embeddings',
+    ];
     await buildAccountDataExport('acct-1');
-    expect(fakeDb.selectCalls).toEqual(
-      expect.arrayContaining(['accounts', 'subscriptions', 'legal_acceptances', 'jobs', 'sessions']),
-    );
+    expect([...fakeDb.selectCalls].sort()).toEqual([...expectedTables].sort());
   });
 
   it('strips forbidden columns from the dump (no *_secret / *_key / token / password / SENSITIVE_FIELDS key)', async () => {

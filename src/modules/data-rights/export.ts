@@ -16,8 +16,9 @@
  * one `accountId` (and read the `accounts` row by its `id`). RLS is the backstop, but
  * the export must be exactly this account's rows and nothing else — the explicit
  * `account_id = accountId` filter is the primary control (threat T-1-31). Future-phase
- * tables (businesses, decks, investors, pipeline) are added to this function as those
- * phases ship.
+ * tables (decks, investors, transcripts) are added to this function as those phases
+ * ship. Phase 2 added business_memory, pipeline_entry, interaction, timeline_event,
+ * embeddings — included below.
  *
  * Phase 1: synchronous (there's almost no data). If a tenant's dump ever gets large,
  * move the body into an Inngest function and have `requestDataExport` enqueue it.
@@ -32,6 +33,9 @@ import { accounts, sessions } from '@/db/schema/tenancy';
 import { subscriptions } from '@/db/schema/billing';
 import { legalAcceptances } from '@/db/schema/legal';
 import { jobs } from '@/db/schema/jobs';
+import { businessMemory, interaction, pipelineEntry } from '@/db/schema/memory';
+import { timelineEvent } from '@/db/schema/timeline';
+import { embeddings } from '@/db/schema/embeddings';
 import { sendDataExportReadyEmail } from '@/lib/email/data-export-ready';
 import { env } from '@/lib/env';
 import { AppError } from '@/lib/errors';
@@ -63,6 +67,11 @@ export interface AccountDataExport {
   legalAcceptances: Record<string, unknown>[];
   jobs: Record<string, unknown>[];
   sessions: Record<string, unknown>[];
+  businessMemory: Record<string, unknown>[];
+  pipelineEntries: Record<string, unknown>[];
+  interactions: Record<string, unknown>[];
+  timelineEvents: Record<string, unknown>[];
+  embeddings: Record<string, unknown>[];
 }
 
 /** Assemble the export JSON for `accountId` (every tenant-scoped table, forbidden columns stripped). */
@@ -76,16 +85,28 @@ export async function buildAccountDataExport(accountId: string): Promise<Account
   const legalRows = await db.select().from(legalAcceptances).where(eq(legalAcceptances.accountId, accountId));
   const jobRows = await db.select().from(jobs).where(eq(jobs.accountId, accountId));
   const sessionRows = await db.select().from(sessions).where(eq(sessions.accountId, accountId));
+  // Phase 2 — Knowledge Layer + Memory tables. RLS default-deny on each; the
+  // explicit account_id filter is the primary tenancy control (T-1-31).
+  const businessMemoryRows = await db.select().from(businessMemory).where(eq(businessMemory.accountId, accountId));
+  const pipelineRows = await db.select().from(pipelineEntry).where(eq(pipelineEntry.accountId, accountId));
+  const interactionRows = await db.select().from(interaction).where(eq(interaction.accountId, accountId));
+  const timelineRows = await db.select().from(timelineEvent).where(eq(timelineEvent.accountId, accountId));
+  const embeddingRows = await db.select().from(embeddings).where(eq(embeddings.accountId, accountId));
 
   return {
     exportedAt: new Date().toISOString(),
     schemaNote:
-      'Phase-1 export. Future modules (businesses, decks, investors, pipeline, transcripts) will appear here as those phases ship.',
+      'Phase 2 export. Includes Phase 1 (accounts, subscriptions, legal_acceptances, jobs, sessions) and Phase 2 Knowledge Layer (business_memory, pipeline_entry, interaction, timeline_event, embeddings). Future modules (decks, investors, transcripts) will appear here as those phases ship.',
     account: stripForbidden(accountRow as Record<string, unknown>),
     subscriptions: subsRows.map((r) => stripForbidden(r as Record<string, unknown>)),
     legalAcceptances: legalRows.map((r) => stripForbidden(r as Record<string, unknown>)),
     jobs: jobRows.map((r) => stripForbidden(r as Record<string, unknown>)),
     sessions: sessionRows.map((r) => stripForbidden(r as Record<string, unknown>)),
+    businessMemory: businessMemoryRows.map((r) => stripForbidden(r as Record<string, unknown>)),
+    pipelineEntries: pipelineRows.map((r) => stripForbidden(r as Record<string, unknown>)),
+    interactions: interactionRows.map((r) => stripForbidden(r as Record<string, unknown>)),
+    timelineEvents: timelineRows.map((r) => stripForbidden(r as Record<string, unknown>)),
+    embeddings: embeddingRows.map((r) => stripForbidden(r as Record<string, unknown>)),
   };
 }
 
