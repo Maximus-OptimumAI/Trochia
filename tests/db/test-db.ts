@@ -132,12 +132,25 @@ export async function rlsScan(): Promise<
   }));
 }
 
-/** Truncate the Phase-1 tables (+ the auth.users rows we created). Call in `afterAll`. */
+/** Truncate the Phase-1 + Phase-2 tables (+ the auth.users rows we created). Call in `afterAll`. */
 export async function cleanup(): Promise<void> {
   if (!HAS_TEST_DB) return;
   const db = admin();
   await db.execute(
-    sql`truncate table public.legal_acceptances, public.subscriptions, public.processed_stripe_events, public.jobs, public.sessions, public.accounts, public.users restart identity cascade`,
+    sql`truncate table
+      public.embeddings,
+      public.timeline_event,
+      public.interaction,
+      public.pipeline_entry,
+      public.business_memory,
+      public.legal_acceptances,
+      public.subscriptions,
+      public.processed_stripe_events,
+      public.jobs,
+      public.sessions,
+      public.accounts,
+      public.users
+      restart identity cascade`,
   );
   await db.execute(sql`delete from auth.users where email like '%@test.local'`);
 }
