@@ -99,7 +99,7 @@ completed: 2026-05-20
 
 Single Week 1 commit captures all 8 tasks (atomic-per-task commits would have been preferred but the workflow ran sequentially in two sessions and we landed at one commit for the Week):
 
-- **Tasks 1-8: schema foundation, RLS tests, migration, lessons** — `<COMMIT_SHA>` (feat — Phase 2 Week 1)
+- **Tasks 1-8: schema foundation, RLS tests, migration, lessons** — `4f8eebf` (feat — Phase 2 Week 1)
 
 **Plan metadata** (committed earlier in `acfab36`): Phase 2 PLAN docs (`02-CONTEXT.md`, `02-PLAN.md`, `02-01-PLAN.md`, `tasks/todo.md`)
 
