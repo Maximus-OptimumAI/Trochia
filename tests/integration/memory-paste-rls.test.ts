@@ -450,4 +450,120 @@ d('Phase-2 paste flow — RLS integration (memoryRouter)', () => {
       expect(Number(rows[0].n)).toBe(0);
     });
   });
+
+  // ───────────────────────────────────────────────────────────────────────
+  // Case 7 — Concurrent extracts honor atomicity (code-review P2-1/P2-2)
+  // ───────────────────────────────────────────────────────────────────────
+  //
+  // Two `extractFromPaste` calls firing in parallel from the same tenant must
+  // not (a) blow up with a unique-index 500 (Postgres atomic upsert), (b)
+  // overwrite a confirmed row (setWhere isNull(confirmedAt)), or (c) silently
+  // drop the audit-row insert. The atomic `INSERT ... ON CONFLICT DO UPDATE
+  // WHERE confirmed_at IS NULL` collapses the prior 3-branch SELECT-then-WRITE
+  // logic into one statement; this test pins that contract.
+
+  it(
+    "concurrent extractFromPaste on a confirmed row leaves the row untouched (P2-1)",
+    { timeout: TEST_TIMEOUT_MS },
+    async () => {
+      const aCaller = callerFor(A);
+
+      // Extract + confirm — the row is now `confirmedAt IS NOT NULL`.
+      extractMock.mockResolvedValueOnce(buildDraft({ companyName: 'Locked-In Co' }));
+      const extracted = await aCaller.memory.extractFromPaste({ paste: VALID_PASTE });
+      const confirmedRow = await aCaller.memory.confirmDraft({
+        confirmed: { ...extracted.draft, confirmedAt: new Date().toISOString() },
+      });
+      const originalConfirmedAt = confirmedRow.confirmedAt;
+
+      // Fire two parallel extracts. Both must return cleanly; neither may
+      // overwrite the confirmed row. The setWhere predicate is the safety net.
+      extractMock.mockResolvedValueOnce(buildDraft({ companyName: 'Racer-One Co' }));
+      extractMock.mockResolvedValueOnce(buildDraft({ companyName: 'Racer-Two Co' }));
+      const [r1, r2] = await Promise.all([
+        aCaller.memory.extractFromPaste({ paste: VALID_PASTE }),
+        aCaller.memory.extractFromPaste({ paste: VALID_PASTE }),
+      ]);
+
+      // Both responses must surface the prior confirmed row (Week-3 conflict UI).
+      expect(r1.existingConfirmed?.companyName).toBe('Locked-In Co');
+      expect(r2.existingConfirmed?.companyName).toBe('Locked-In Co');
+
+      // The DB row is unchanged — same confirmedAt, same companyName.
+      const persisted = await aCaller.memory.getDraft();
+      expect(persisted?.companyName).toBe('Locked-In Co');
+      expect(persisted?.confirmedAt?.toISOString()).toBe(originalConfirmedAt?.toISOString());
+    },
+  );
+
+  it(
+    "concurrent extractFromPaste on no-row tenant yields exactly one row (P2-2)",
+    { timeout: TEST_TIMEOUT_MS },
+    async () => {
+      const aCaller = callerFor(A);
+
+      // No prior row → both concurrent calls hit the INSERT path. The
+      // ON CONFLICT branch of the atomic upsert handles whichever loses the
+      // unique-index race; neither call should surface a 500.
+      extractMock.mockResolvedValueOnce(buildDraft({ companyName: 'Race-A Co' }));
+      extractMock.mockResolvedValueOnce(buildDraft({ companyName: 'Race-B Co' }));
+      const [r1, r2] = await Promise.all([
+        aCaller.memory.extractFromPaste({ paste: VALID_PASTE }),
+        aCaller.memory.extractFromPaste({ paste: VALID_PASTE }),
+      ]);
+
+      // Neither call surfaced an error; neither saw an `existingConfirmed`
+      // (the row was not confirmed when either call ran).
+      expect(r1.existingConfirmed).toBeNull();
+      expect(r2.existingConfirmed).toBeNull();
+
+      // Exactly one row in the DB — the unique index would have thrown
+      // without the atomic upsert; with it, one INSERT wins + the loser
+      // falls through to a no-op UPDATE on its own freshly-inserted row.
+      const adb = getServiceClientForTests();
+      const countRows = await adb.execute<{ n: string }>(
+        sql`select count(*)::text as n from public.business_memory where account_id = ${A.accountId}`,
+      );
+      expect(Number(countRows[0].n)).toBe(1);
+
+      // The persisted row is one of the two drafts (winner-take-all on the
+      // UPDATE branch is acceptable — Week-3 surfaces no conflict because the
+      // row never reached `confirmedAt`).
+      const persisted = await aCaller.memory.getDraft();
+      expect(['Race-A Co', 'Race-B Co']).toContain(persisted?.companyName);
+      expect(persisted?.confirmedAt).toBeNull();
+    },
+  );
+
+  it(
+    "concurrent confirmDraft on the same draft surfaces CONFLICT on the loser (P2-3)",
+    { timeout: TEST_TIMEOUT_MS },
+    async () => {
+      const aCaller = callerFor(A);
+
+      // Stage a draft row.
+      extractMock.mockResolvedValueOnce(buildDraft({ companyName: 'Pre-Confirm Co' }));
+      const { draft } = await aCaller.memory.extractFromPaste({ paste: VALID_PASTE });
+
+      // Two parallel confirms on the same draft row. The UPDATE WHERE clause
+      // re-asserts `confirmedAt IS NULL`, so only ONE call sees a row to
+      // update; the other gets CONFLICT (not a silent overwrite).
+      const results = await Promise.allSettled([
+        aCaller.memory.confirmDraft({
+          confirmed: { ...draft, confirmedAt: new Date().toISOString() },
+        }),
+        aCaller.memory.confirmDraft({
+          confirmed: { ...draft, confirmedAt: new Date().toISOString() },
+        }),
+      ]);
+
+      const fulfilled = results.filter((r) => r.status === 'fulfilled');
+      const rejected = results.filter((r) => r.status === 'rejected');
+      expect(fulfilled.length, 'exactly one confirm must succeed').toBe(1);
+      expect(rejected.length, 'exactly one confirm must surface CONFLICT').toBe(1);
+      // The rejected call surfaced CONFLICT, not a generic 500.
+      const rejectedError = (rejected[0] as PromiseRejectedResult).reason as { code?: string; message?: string };
+      expect(rejectedError.code).toBe('CONFLICT');
+    },
+  );
 });

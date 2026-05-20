@@ -177,15 +177,21 @@ export const memoryRouter = router({
 
       // 2 + 3. Persist + audit inside ONE RLS transaction so a partial failure
       //        cannot leave a `business_memory` row without its audit trail.
+      //
+      //        TOCTOU safety: instead of SELECT-then-branch (which races against
+      //        concurrent `confirmDraft` in another tab — see code-review P2-1
+      //        and P2-2), use an atomic `INSERT ... ON CONFLICT DO UPDATE WHERE
+      //        confirmed_at IS NULL`. Postgres evaluates the conflict + the
+      //        WHERE predicate atomically inside the row's lock, so:
+      //          - No row exists → INSERT fires; RETURNING yields the new row
+      //          - Draft row exists (confirmedAt IS NULL) → UPDATE fires; RETURNING yields the updated row
+      //          - Confirmed row exists (confirmedAt IS NOT NULL) → WHERE excludes the UPDATE; RETURNING is empty
+      //        The empty-RETURNING case is the signal that the founder re-extracted
+      //        on an already-confirmed memory; we re-read the row to surface it
+      //        as `existingConfirmed` for the Week-3 conflict UI. This collapses
+      //        the prior 3-branch SELECT-then-WRITE into one atomic statement +
+      //        one conditional re-read.
       const persisted = await ctx.db.rls(async (tx) => {
-        const existing = await tx
-          .select()
-          .from(businessMemory)
-          .where(eq(businessMemory.accountId, ctx.tenantId))
-          .limit(1);
-
-        const existingRow: BusinessMemoryRow | undefined = existing[0];
-
         // Build the persistable column set from the draft. jsonb groups +
         // provenance are written as-is (Zod has already validated their shape).
         const draftColumns = {
@@ -202,34 +208,40 @@ export const memoryRouter = router({
           provenance: draft.provenance,
         };
 
-        let existingConfirmed: BusinessMemoryRow | null = null;
-
-        if (!existingRow) {
-          // No row → INSERT a fresh draft.
-          await tx.insert(businessMemory).values({
+        const upserted = await tx
+          .insert(businessMemory)
+          .values({
             accountId: ctx.tenantId,
             ...draftColumns,
             extractedAt: now,
             lastUpdatedAt: now,
             updatedAt: now,
             confirmedAt: null,
-          });
-        } else if (existingRow.confirmedAt === null) {
-          // Existing draft → UPDATE in place. The unique index on accountId
-          // guarantees we are touching exactly one row.
-          await tx
-            .update(businessMemory)
-            .set({
+          })
+          .onConflictDoUpdate({
+            target: businessMemory.accountId,
+            set: {
               ...draftColumns,
               extractedAt: now,
               lastUpdatedAt: now,
               updatedAt: now,
-            })
-            .where(eq(businessMemory.accountId, ctx.tenantId));
-        } else {
-          // Existing CONFIRMED row → DO NOT overwrite. Surface the prior
-          // confirmed snapshot for the Week-3 conflict UI; persist nothing.
-          existingConfirmed = existingRow;
+            },
+            setWhere: isNull(businessMemory.confirmedAt),
+          })
+          .returning({ id: businessMemory.id });
+
+        let existingConfirmed: BusinessMemoryRow | null = null;
+        if (upserted.length === 0) {
+          // Conflict fired AND the `setWhere` predicate excluded the UPDATE —
+          // i.e. the existing row is confirmed. Re-read to surface the prior
+          // confirmed snapshot. This read sits inside the same RLS transaction
+          // so it cannot leak across tenants.
+          const reread = await tx
+            .select()
+            .from(businessMemory)
+            .where(eq(businessMemory.accountId, ctx.tenantId))
+            .limit(1);
+          existingConfirmed = reread[0] ?? null;
         }
 
         // Always append an audit row, even on the no-overwrite branch — the
@@ -349,7 +361,12 @@ export const memoryRouter = router({
           }
         }
 
-        await tx
+        // Concurrent-confirm guard (code-review P2-3): the UPDATE WHERE clause
+        // re-asserts `confirmedAt IS NULL` so a second confirm-in-flight cannot
+        // silently overwrite the first. If 0 rows match (another tab won the
+        // race), `returning()` is empty and we surface a CONFLICT error rather
+        // than reporting a phantom-successful confirm to the caller.
+        const updated = await tx
           .update(businessMemory)
           .set({
             companyName: confirmed.companyName ?? null,
@@ -367,7 +384,16 @@ export const memoryRouter = router({
             lastUpdatedAt: now,
             updatedAt: now,
           })
-          .where(eq(businessMemory.id, draftRow.id));
+          .where(and(eq(businessMemory.id, draftRow.id), isNull(businessMemory.confirmedAt)))
+          .returning({ id: businessMemory.id });
+
+        if (updated.length === 0) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message:
+              'This Business Memory was confirmed in another session. Reload to see the current state.',
+          });
+        }
 
         // Append the confirmation half of the paste-extract event. `latencyMs`
         // null — no AI call here; the confirmation is pure DB work.
