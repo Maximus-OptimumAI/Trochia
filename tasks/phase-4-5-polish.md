@@ -61,3 +61,14 @@ After all 3 fixes ship:
 - [ ] Sign-out lands on / (or /sign-in), not 404
 - [ ] accounts.current_period_end is populated with a future timestamp
 - [ ] Billing page shows "Pre-Raise · Active subscription · Renews [date]"
+
+## P4.5-POLISH-07: Agent worktree hygiene in gsd-executor
+
+**Severity**: Internal process
+**Cause**: Phase 2 Plan 02-02 surfaced two cases where subagents drifted from
+their worktree scope: T4 wrote to main repo path before catching itself,
+T7 used git stash inside worktree to investigate a pre-existing failure.
+**Recovery**: Both self-disclosed, both recovered cleanly. Commits unaffected.
+**Improvement**: Document throwaway-WIP-branch pattern as the right way to
+investigate trunk-vs-worktree behavior differences. Add to gsd-executor skill.
+**Estimated effort**: 30 min (doc update, no code change)
