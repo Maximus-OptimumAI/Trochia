@@ -60,7 +60,19 @@ Trochia AI is an agentic Founder Operating System for raising capital — one Ne
   3. The ambient Q&A sidebar on every page answers grounded in corpus + Business Memory + Pipeline Memory (pgvector retrieval + Opus synthesis), cites a real source in every answer, responds in median <8s, and says "I don't know" rather than fabricating
   4. Memory-staleness prompts surface non-blocking refresh nudges when Business Memory is >14 days old or a module references stale memory, linking to the affected section, snoozable per field
   5. The unified raise timeline shows every raise event chronologically across modules, filterable by module and investor, each event linking back to its source surface; the cross-cutting AI patterns (prompt caching verified, model tiering, Zod-validated structured outputs, eval-conformance scaffold, per-user cost monitoring) are in place
-**Plans**: TBD
+**Plans**: 11 plans (per `phases/02-knowledge-layer/02-PLAN.md` master)
+Plans:
+- [x] 02-01-PLAN.md — Schema spine (business_memory + pipeline_entry + interaction + timeline_event + embeddings; RLS + two-user isolation)
+- [x] 02-02-PLAN.md — Paste extractor (Sonnet 4.6 + Zod) + confirmation UI shell
+- [ ] 02-03-PLAN.md — Conflict resolver + PII redaction + prompt-injection sanitizer (this plan)
+- [ ] 02-04-PLAN.md — Embed pipeline (pgvector HNSW + Inngest + Voyage) + curated corpus loader
+- [ ] 02-05-PLAN.md — Eval harness scaffold (Langfuse + CI workflow)
+- [ ] 02-06-PLAN.md — RAG retrieve service + prompt-caching wiring
+- [ ] 02-07-PLAN.md — Q&A sidebar (Opus 4.7 + streamed citations) + per-user cost tracking
+- [ ] 02-08-PLAN.md — File upload Tier 2 (ChatGPT ZIP / Claude / Notion) + Inngest parser
+- [ ] 02-09-PLAN.md — Staleness prompts (>14d, snoozable 7/30/never)
+- [ ] 02-10-PLAN.md — Unified raise timeline UI
+- [ ] 02-11-PLAN.md — Design partner gate (8-criteria exit + Lesson 12)
 
 ### Phase 3: Pitch Lab — Deck Reviewer
 **Goal**: A founder uploads a deck and gets a grounded, structurally-validated review with zero fabricated slide references — backed by a Langfuse-hosted eval harness that runs in CI as a phase exit gate. "Ship the reviewer, evaluate later" is never acceptable.
