@@ -13,3 +13,6 @@ export const HealthCheckSchema = z.object({
   ok: z.boolean(),
 });
 export type HealthCheck = z.infer<typeof HealthCheckSchema>;
+
+// ── Phase 2 / KNW-01 — Business Memory schema-lock contract ─────────────────
+export * from './business-memory.zod';
