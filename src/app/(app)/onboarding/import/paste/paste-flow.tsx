@@ -1,7 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation } from '@tanstack/react-query';
 
@@ -207,7 +206,10 @@ export function PasteFlow() {
               onChange={(event) => setPaste(event.target.value)}
               placeholder={COPY.pastePlaceholder}
               className="min-h-64 w-full rounded-lg border border-stone bg-paper px-4 py-3 text-body text-ink placeholder:text-graphite focus-visible:border-ink focus-visible:outline-none"
-              aria-describedby="paste-flow-counter paste-flow-error"
+              aria-describedby={
+                extractError ? 'paste-flow-counter paste-flow-error' : 'paste-flow-counter'
+              }
+              aria-invalid={belowMin || aboveMax ? true : undefined}
               data-testid="paste-flow-textarea"
             />
           </label>
@@ -354,13 +356,6 @@ export function PasteFlow() {
           {COPY.doneCta}
         </Button>
       </div>
-      <Link
-        href="/onboarding/deck"
-        className="text-body-sm text-graphite underline-offset-4 hover:text-ink hover:underline"
-        data-testid="paste-flow-continue-link"
-      >
-        {COPY.doneCta}
-      </Link>
     </section>
   );
 }

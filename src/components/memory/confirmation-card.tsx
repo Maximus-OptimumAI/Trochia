@@ -232,6 +232,7 @@ export function ConfirmationCard({
             )}
             data-testid="confirmation-card-value"
           >
+            {isRejected && <span className="sr-only">Rejected: </span>}
             {renderReadValue(draftValue)}
           </p>
         )}

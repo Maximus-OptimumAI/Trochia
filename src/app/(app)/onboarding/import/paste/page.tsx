@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 
+import { OnboardingStepper } from '@/components/onboarding/stepper';
+
 import { PasteFlow } from './paste-flow';
 
 /**
@@ -29,7 +31,7 @@ export const metadata: Metadata = {
 
 export default function PastePage() {
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 bg-paper px-6 py-12 md:py-16">
+    <OnboardingStepper currentStep="import">
       <header className="flex flex-col gap-3">
         <h1 className="text-h2 text-ink">Import your business context</h1>
         <p className="text-body text-graphite">
@@ -38,6 +40,6 @@ export default function PastePage() {
         </p>
       </header>
       <PasteFlow />
-    </main>
+    </OnboardingStepper>
   );
 }
