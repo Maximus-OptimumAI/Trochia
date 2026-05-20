@@ -4,6 +4,7 @@
 import { accountRouter } from '@/server/routers/account';
 import { billingRouter } from '@/server/routers/billing';
 import { complianceRouter } from '@/server/routers/compliance';
+import { memoryRouter } from '@/server/routers/memory';
 import { onboardingRouter } from '@/server/routers/onboarding';
 import { router } from '@/server/trpc';
 
@@ -11,6 +12,7 @@ export const appRouter = router({
   account: accountRouter,
   billing: billingRouter,
   compliance: complianceRouter,
+  memory: memoryRouter,
   onboarding: onboardingRouter,
 });
 
