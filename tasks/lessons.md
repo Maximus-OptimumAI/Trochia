@@ -77,3 +77,24 @@ any future PR that includes a migration creating a new table.
 **Rule:** On every Vercel project import, immediately verify Settings → Build and Deployment → Framework Preset = "Next.js". Do not trust auto-detection.
 
 **Side fix:** Sentry stripped from next.config.ts (Sentry was never set up on sentry.io — env vars were "ci-project" placeholders). Restore when wiring to real Sentry project in Phase 5.
+
+## Lesson 11 (2026-05-19): Phase 1 smoke test passed end-to-end
+
+Full flow verified on Vercel preview:
+Google OAuth → onboarding → /pricing → Stripe Checkout (test card 4242)
+→ webhook delivered 200 → DB write → tier reflected.
+
+Test artifacts:
+- Stripe customer: cus_UY45YKDD7M8Ink
+- DB row: tier=pre_raise, subscription_status=active
+- Webhook events: checkout.session.completed, customer.subscription.created,
+  invoice.paid — all 200 OK at 19:25:37–39
+
+Three minor bugs deferred to Phase 4.5 polish (see tasks/phase-4-5-polish.md).
+
+Step 6b.8 closed. Phase 1 closure complete.
+
+### Priority queue update (2026-05-19)
+
+6b.8 End-to-end smoke test: ✅ DONE
+Next: 6c (Install Cursor CLI to Windows PATH)
