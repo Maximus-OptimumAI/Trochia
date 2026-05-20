@@ -1,0 +1,98 @@
+PROJECT NOTES — Acme (working name, will rebrand before launch)
+
+Use this context whenever I ask you to draft outreach, sharpen the pitch, or stress-test the model. Pretend you're a sharp pre-seed VC partner who has done the homework on consumer fintech in the LATAM corridor.
+
+==
+
+Who we are
+
+Acme is a consumer fintech building a US-dollar-denominated savings + remittance account for working-class Mexicans living in the US who send money home every two weeks. We started cutting code in November 2024. Incorporated as a Delaware C-Corp on January 14 2025. The legal name on the cert of incorporation is Acme Financial, Inc. — we ditched the original name (Cuenta Sólida) the second the trademark attorney told us a Tier-1 LATAM bank holds a confusable mark.
+
+Founders are me and Diego.
+
+- Me: Maria Esperanza, CEO. 28. Born in Monterrey, raised in Phoenix. 6 years at Square before this (last role: senior PM on the Cash App cross-border team, owned the Mexico corridor end-to-end, shipped the peso wallet to GA). I left in October 2024 to start this. I own 47% post-formation, vesting 4y/1y cliff.
+- Diego Restrepo, CTO. 31. Colombian, lives in Miami. 9 years building payments infra — Stripe Issuing, then 3 years at a stealth crypto-payments company that pivoted into oblivion. He owns 47%. Same vesting schedule. We left 6% in the option pool, which is tight, I know — we'll top it up before the priced round.
+
+==
+
+The problem (this is the part I keep getting wrong when I describe it on demo days, help me get it tight)
+
+The 12 million working-class Mexicans living in the US send roughly $63B/year back to family in Mexico. The current options are bad in three ways at once:
+
+1. Western Union / MoneyGram: 5–7% effective fee once you net out the FX spread. Trust is high (mom knows the brand) but the cost compounds — a $400 transfer every two weeks for a year is ~$2,500 of fees burned.
+2. App-based remitters (Remitly, Wise): better pricing, but they all require the sender to maintain a checking account at a US bank. Roughly 22% of our target users are underbanked or unbanked entirely. They literally cannot use Remitly without first getting a Chime card, which is its own painful onboarding cliff.
+3. Crypto rails (USDC + a local off-ramp): cheap, but the UX is unusable for someone who doesn't already speak Web3. We tested this — 100% of the 14 users we ran through a USDC-based flow gave up before completing a transfer.
+
+What everyone misses: this isn't really a remittance problem. It's a "where do I store the money between paychecks" problem. The sender wants to keep a dollar balance in a US-regulated account, earn a little yield, and send a chunk home on the 1st and 15th. Remittance is a feature of the savings account, not the other way around.
+
+==
+
+What we're building
+
+Acme is a US-dollar savings account (sponsored by Bond Bank, our partner BIN sponsor — LOI signed March 2025, MSA in legal review) for non-US-citizen workers. Federally insured up to FDIC limits via the sponsor bank. The deposit account earns 4.1% APY (passed through from the sponsor's money-market vehicle).
+
+Layered on top:
+- Free transfers to any CLABE in Mexico, settled same-day via SPEI. No fees, mid-market FX rate, capped at $2,500 per transfer / $10k per month per user.
+- Bi-weekly "auto-send" — user sets a recurring transfer of $X to their mom's account, debited automatically the day after their paycheck hits.
+- Bilingual app (Spanish-first; English toggle). Voice walkthrough for first-time users — we tested this with my aunt in Phoenix and it cut onboarding time from 14 minutes to 4.
+
+The big unlock is the auto-send. Everyone else makes you remember to send. We make sending the default and storing the harder action.
+
+==
+
+Traction (as of today — the numbers we'd put in front of an investor)
+
+- Closed beta opened February 2025. 1,140 users onboarded by mid-April.
+- 92% complete KYC in <5 minutes (the underbanked segment hit 87%, which is the bar I care about).
+- MRR sitting at $24,000 at end of April. That's the interchange + FX spread + a sponsorship rev-share from Bond Bank. Mostly interchange right now — the FX volume is the lever.
+- Total US-dollar deposits in the program: $1.94M. Average balance per active user: ~$1,700. Higher than I expected (I'd modeled $900); these users are more savings-oriented than the narrative gives them credit for.
+- We've moved £18,000 of pilot volume through a parallel UK-Mexico corridor (a side experiment Diego ran with three London-based domestic workers introduced via a NGO partner). Useful signal but not strategic — we'll shut it down before seed.
+- Growth has been ~38% MoM for the last 3 months. Mostly word-of-mouth out of two Catholic parishes in Phoenix and one in Houston.
+- Burn: $42k/month. Cash on hand: $310k (after the $400k pre-seed SAFE we closed in January led by an angel syndicate out of Houston). Runway: ~7 months at current burn, which is why we're starting the priced seed conversation now.
+
+==
+
+Why now
+
+- Bond Bank changed their sponsorship terms in Q4 2024 — they now underwrite ITIN-only customers, which historically every BIN sponsor refused. That single underwriting policy change opens the underbanked segment to a regulated fintech for the first time.
+- SPEI added 24/7 settlement in mid-2024 — so a US-side debit at 11pm Friday actually lands in mom's account by Saturday morning. Pre-2024 this was a Monday at the earliest, and the UX was destroyed by that delay.
+- Generative-AI customer support (we use Anthropic) made the cost of bilingual, voice-first onboarding tractable for a 2-person team. Two years ago we'd have needed a 6-person CX team to ship the same UX.
+
+==
+
+Why us
+
+- I lived this exact problem for 18 years (my dad was the one mailing money orders to Monterrey through Western Union; I'd hand them to the cashier when I was 9). The pitch is not a market study to me, it's a thing I watched cost my family thousands of dollars a year.
+- Diego shipped the same shape of product (cross-border payments at scale) for 9 years before this. The technical risk is small.
+- We're both bilingual, both immigrants (or first-gen, in my case), both former operators at the companies the incumbents copy when they finally try to enter this corridor.
+
+==
+
+Where we are on the raise
+
+We're raising a $2.5M seed at a $14M post. Lead is unconfirmed — three funds are in diligence (Forerunner, Maveron, and a Mexico-focused fund I'm not naming until we have a term sheet). The angel syndicate from January is rolling their pro-rata.
+
+Use of funds: extend runway to 18 months, hire 1 senior eng + 1 compliance lead + 1 growth marketer, and run the auto-send experiment to 10,000 active users.
+
+I want to be clear with investors that this is not a regulated bank — we're a fintech sitting on top of Bond Bank's charter. The deposit account is FDIC-insured because Bond Bank holds the relationship. We've never told a user "Acme is a bank" and the compliance team makes us shout this everywhere — the marketing copy says "powered by Bond Bank, Member FDIC" in 11-point type on every screen.
+
+One more compliance note: the 4.1% APY is a passed-through deposit rate from Bond Bank's money-market sweep, not a yield product. The marketing copy avoids the word "yield" entirely and never frames the account as a return-generating savings vehicle.
+
+==
+
+Open questions I'd love you to push on
+
+1. The CAC on parish-driven word-of-mouth is something like $4. That's not going to hold at 10,000 users. What's the realistic blended CAC at 10x scale? My model says $38; gut says $55–70 once we have to pay for it.
+2. Bond Bank can revoke the ITIN underwriting policy. If they do, the entire underbanked segment vanishes. Do I disclose this concentration risk to investors as a line item in the deck, or wait for them to ask?
+3. We have an opportunity to acquire 800 users from a defunct competitor (their team is shutting down; they offered us their customer list for $40k). Legal says we'd need fresh KYC on every one, which is operationally expensive. Worth it or skip?
+
+==
+
+Misc context
+
+- HQ is technically Phoenix (my apartment) but the entity is Delaware-domiciled. We'll move HQ to Mexico City after the seed (Diego's call — closer to the SPEI integration team at the sponsor bank's MX correspondent).
+- Two advisors on the cap table, no equity yet but warrants discussed: Ana Solis (former GM of Western Union LATAM, retired 2022; gave us 14 hours over Q1) and Brett Hutchins (compliance attorney at a top-5 fintech law firm, billable but at a friends rate).
+- Brand: we're rebranding from "Acme" to something Spanish-first before the seed announce. Three finalists in trademark clearance.
+- Customer support is currently me + Diego on a shared inbox. The first hire post-seed is a bilingual support lead — the 4am text messages from users in Phoenix who can't sleep until they confirm their mom received the money are not scaling.
+
+That's the full picture. Push back hard on the parts that don't hold together — I'd rather hear it from you than from a partner meeting on Sand Hill.

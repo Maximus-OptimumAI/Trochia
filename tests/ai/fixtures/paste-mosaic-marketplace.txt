@@ -1,0 +1,109 @@
+Mosaic — Claude context pack (rev 4)
+
+Background context for any prompt I run through this project. Reset every quarter; this is the Q2 rev.
+
+—
+
+## What Mosaic is
+
+Mosaic is a vetted two-sided marketplace where small independent furniture makers (the "Makers" — usually 1–3 person woodworking, ceramics, or metal shops) sell directly to interior designers and small architecture studios (the "Designers"). We're not a Etsy. Etsy is for consumer end-buyers. We're for the trade — designers who specify a credenza for a client and need it built to spec, with a real lead time, a real trade discount, and a real account manager.
+
+The category we replace: the "designer trade program" that big brands (Roche Bobois, BDDW, etc.) run, where designers get 30–40% off, plus the long tail of furniture-maker discovery that designers do today via Instagram DMs and Pinterest. We give them one searchable, vetted marketplace with the same trade discount baked in, real lead-time visibility, and a payments stack that doesn't make the Maker float production costs against a 90-day net.
+
+Founded January 2024. Incorporated as Mosaic Trade, Inc. in Delaware (C-Corp; we did the Delaware flip from the original NY LLC in July 2024 when our first institutional check landed). HQ is Brooklyn, two-person operations team in a coworking space in Greenpoint.
+
+## Founders + team
+
+Two founders, two early hires, one full-time contractor.
+
+- Sofia Park (CEO). Me. 34. Grew up in Seoul, BFA from RISD, MFA furniture design from Cranbrook. Spent 8 years running a 6-person furniture studio in Brooklyn before this — sold the studio to a hospitality contract manufacturer in late 2023 and used the (modest) proceeds to fund the first 9 months of Mosaic. I'm the marketplace expert on the Maker side; I've sat in the workshop, I know the cash-flow math that breaks a small studio.
+- Hassan Bakr (CTO). 38. Egyptian, lives in Brooklyn. 12 years building marketplaces — Etsy from 2013–2018 (last role: Staff Engineer on the Search team), then 4 years at StockX leading the offer-bidding infra team. He's the reason our search ranks vetted Makers correctly even when they don't have a million reviews; he ported the StockX bid-ranking model to a curated-supply marketplace shape.
+
+Two employees, both part-time at this stage:
+- A Maker-onboarding lead (full-time, ex-1stDibs ops). Manages our 142-Maker vetting pipeline.
+- A growth marketer (part-time, contract). Runs our designer-side acquisition.
+
+We've also got a part-time legal contractor — a friend from RISD who's now an IP attorney — who handles our terms of service and Maker contract templates.
+
+## Stage + raise
+
+Pre-seed. Closed a $750k pre-seed in March 2024 on a SAFE at $7M post-money cap from a small group of angel checks. Lead was Indie.vc (Bryce Roberts), with participation from a few hospitality-industry angels. Burn $34k/month, $390k cash on hand, ~11 months of runway. Planning to raise a seed in Q4 this year — $2.5M target, $14M-$18M post depending on how Q3 GMV trends.
+
+## Numbers
+
+This is the section I want sharper. Be ruthless on what I'm under-counting.
+
+Marketplace metrics (as of mid-April):
+
+- 142 vetted Makers on the platform (~280 in the queue, 38% acceptance rate from our vetting process)
+- 491 designers signed up; 312 of them have placed at least one order
+- GMV in Q1: $580,000 across 198 orders. Average order value $2,930
+- Take rate is 14% (we take 14% of GMV on each transaction). That means platform revenue Q1 was ~$81,200, which annualizes to ~$325k ARR if we held flat
+- We're not flat — GMV is growing 41% QoQ
+- Our average Maker takes ~6 weeks to deliver, median is 5 weeks. We've had two Makers fail to deliver (1.4% of orders) and we ate the refund both times — that's the cost of vetting failures, and it's been worth it for the trust signal with designers
+- Repeat rate: 38% of designers who placed a Q4 order placed another in Q1. That's the number I'm most proud of. It means the matching is working
+
+A note on the GMV calculation: the $580k Q1 figure includes a single $90k commercial-restaurant fit-out (a designer in Chicago specified 12 custom tables and 48 chairs from one of our Makers for a new restaurant). That's a tail outlier. If I strip it out, Q1 GMV was $490k. I have been showing investors the $580k figure but explicitly disclosing the outlier in the same line of the deck.
+
+## Why now
+
+Three things converged:
+
+1. Designer trade is shifting from brick-and-mortar showrooms to digital-first discovery. The 1stDibs IPO was the inflection — designers proved they will close 5-figure transactions online if the vetting + lead-time signals are right. We are not a 1stDibs (they're a luxury-vintage marketplace; we're new-make custom). But they cracked the trust problem and we're inheriting that tailwind.
+2. Independent makers are getting wrecked by post-pandemic real-estate cost increases. The marginal Maker in Brooklyn has had their workshop rent go up 40% since 2021. They need higher-margin sales channels (direct-to-trade) to survive. We're a survival tool for them. That motivates an unusually high quality of supply — Makers will jump through our vetting hoops because we materially change their P&L.
+3. The big brands that dominate trade today (Roche Bobois, B&B Italia, Kelly Wearstler's licensing program at Visual Comfort) have 16–24 week lead times that the new generation of designers — who run smaller, faster studios — can't tolerate. Our average lead time is 6 weeks. That's not us being scrappy; it's structural — small Makers can mobilize faster than big factories.
+
+## Why us
+
+- I am the Maker. I ran a furniture studio for 8 years. I know the cash-flow math. I know what a designer wants. I know what a Maker is willing to give up to get the right channel (a 14% take rate is high vs. Etsy's 6.5% but low vs. the 40% margin haircut at a traditional trade-showroom relationship — Makers know this and accept our terms because they've done the math).
+- Hassan is the marketplace infrastructure expert. He built Etsy's search. He built StockX's bid system. The technical risk on our matching + payments + lead-time-tracking stack is roughly zero.
+- We're the only marketplace in this category with deep founder DNA on the supply side. Every other attempt has been a designer-side or VC-side founder who needs to learn the Maker side as they go.
+
+## Open thread from the team Slack (relevant for fundraising)
+
+I'm pasting in a Slack thread from earlier this month because it's the cleanest record of our current investor conversations and what's still open. Some of this is rough — leave the typos.
+
+#fundraising channel. April 8.
+
+**Sofia Park** [2:14 PM]
+spoke with John Doe at Lightspeed this morning, he's the partner who covers consumer marketplaces in NYC. john@example.com is his direct. he asked us to send the Q1 metrics deck and 3 investor references before he'd commit to a follow-up. he was warm but cautious — said the take-rate trajectory matters more to him than the GMV growth, and we should have a clear 5-quarter take-rate-by-cohort chart before partner meeting. follow-up on 4/22. his cell is (555) 123-4567 if we need to text him to confirm the calendar slot
+
+**Hassan Bakr** [2:31 PM]
+got it. i'll put together the cohort take-rate. by the way, separate convo — i had coffee with priya nair (priya@example.org / +1 415 555 0199) on monday. she's a partner at Maveron now, came over from First Round last year. she covers vertical marketplaces. she was much more bullish than John was — wants to do a deep-dive on the Maker vetting funnel next week. she's pinging us by EOD with a calendar invite. she said specifically "the supply-side vetting is the moat, double down on that in your deck"
+
+**Sofia Park** [3:02 PM]
+that's huge. priya was on my long-shot list. lock it in. also re: John Doe — let's not over-rotate, Lightspeed is a 4-yr cycle fund, they're not closing on the timeline we want. priya at Maveron is the real shot
+
+**Hassan Bakr** [3:17 PM]
+agreed. one more thing — kevin chen (kevin@example.net) from Forerunner left me a voicemail this morning about whether we'd take a small angel check from his personal fund (he runs a small SPV alongside his Forerunner role, $2-3M total deployed per year). i told him we'd loop back next week. his number is 212-555-0143
+
+**Sofia Park** [3:24 PM]
+yes. small check from him is great. he can write into the seed too, that's the goal
+
+— end Slack snippet —
+
+The investor pipeline is roughly: 14 firms in some stage of conversation, 4 we'd consider for the lead (Maveron, Forerunner, Lightspeed, Bond), and ~10 we'd take a follow check from at favorable terms.
+
+## Pricing for the Makers
+
+Makers pay nothing to list. We take 14% of GMV at transaction. We pay Makers via a hold-and-release model — 50% on order acceptance, 50% on customer-confirmed delivery. We float the working capital between the two payment events (financed via a $250k Mercury working-capital facility, drawn down monthly).
+
+## Pricing for the Designers
+
+Designers pay $0 to use the marketplace. They get a 30% trade discount baked into the listed price (the Maker prices their product at retail, we surface the trade-discounted price to verified designers). Verification is a $50 one-time fee that gets refunded against their first $500 of orders (designed to eat fake-account spam).
+
+## Differentiators / moat
+
+1. **Maker vetting funnel.** 142 accepted out of ~840 applications since launch. We have a 6-criteria rubric (portfolio quality, production capacity, financial stability, communication responsiveness, prior trade experience, photo quality of listings). The bar is steep; this is the moat.
+2. **Lead-time honesty.** Every Maker commits to a lead time on every order. We track delivery accuracy. Makers who miss twice are paused; three strikes = removed. Our average delivery hits within 4 days of the committed lead time, which is unheard of in custom furniture.
+3. **Direct relationships, no rebadging.** The Maker is named on every order. The designer can chat directly with the Maker through our messaging. No anonymous middleman. This is the inverse of what 1stDibs does (they obfuscate the seller).
+4. **Hassan's matching stack.** The search and ranking is genuinely better than competitors — designers find a vetted Maker they'd actually work with in 2 searches instead of 14.
+
+## Risks I want pushed on
+
+1. The $90k Chicago restaurant order in Q1 GMV is a tail outlier. If I subtract it, my QoQ growth rate halves. Be honest about how investors will read this.
+2. The 38% repeat-rate number is from a small cohort (Q4 designers re-ordering in Q1). With n=84, the noise is real. What's my actual confidence on it?
+3. Take rate vs. Maker churn. If we move take rate to 16% (which our unit economics need at seed scale), do we lose Makers to a competitor that hasn't appeared yet but inevitably will?
+4. Hassan's recruiting capacity. We need to hire a senior eng before seed close. Hassan is reluctant — he's protective of the codebase. I need to manage this conversation.
+
+Push hard. The deck I'm rehearsing for the May Maveron meeting needs to survive a hostile partner.

@@ -1,0 +1,140 @@
+TRIBUTARY HEALTH — Claude project context
+(everything below is background; use it for any drafting task in this project)
+
+================================
+WHAT WE DO (TL;DR)
+================================
+
+Tributary is a remote-monitoring platform for ambulatory cardiology practices — the mid-sized, independent cardiology groups (not the big hospital systems, not the solo offices) that manage 4,000–30,000 active patients on heart-failure protocols. We pull data from in-home blood pressure cuffs, weight scales, and SpO2 sensors, run a continuous risk model on each patient, and surface the 1–3% of patients per week who need an intervention to the practice's nurse triage team before the patient ends up in the ER.
+
+We are NOT a consumer wellness product. We do not sell to patients. The buyer is the practice's medical director or director of nursing. Our patients are typically Medicare-aged, with NYHA Class II–III heart failure, and most of them are on a CMS-reimbursed Remote Patient Monitoring (RPM) code (CPT 99454/99457/99458). Reimbursement is the wedge: practices get paid roughly $48–$120/patient/month from Medicare for the RPM service, and our software is what makes the RPM workflow operationally tractable for a 4-nurse triage team.
+
+================================
+ENTITY / IP STRUCTURE (BE CAREFUL HERE — THE STORY IS UGLY)
+================================
+
+This is the section that has caused friction in every diligence conversation we've had so far. The honest version:
+
+I (Niamh O'Brien, CEO) started this in London in late 2022 because I was finishing a PhD at Imperial College and didn't think I'd end up commercializing it. The original entity was Tributary Health Ltd, a UK private limited company, registered at Companies House on November 14 2022. It's still active. It holds the original patent application (UK patent #GB2305xxxxx, filed February 2023, examination request submitted) for our risk-stratification model.
+
+In June 2024, after we'd validated the model on a 200-patient pilot at the Royal Brompton, I moved to Boston to commercialize. We did a "Delaware flip" — incorporated Tributary Health, Inc. (a Delaware C-Corp) on June 28 2024 as the parent. The UK Ltd became a wholly-owned subsidiary of the Delaware C-Corp. Standard structure on paper.
+
+The complication: the IP did NOT fully transfer. The original patent application sits with the UK Ltd. The model weights and the training data sit with the UK Ltd. We did an IP assignment from the UK Ltd to the Delaware C-Corp covering rights for commercial exploitation in the US and Canada, but the underlying patent rights remain with the UK Ltd. The legal reason was tax-driven (avoiding a deemed-distribution treatment under HMRC rules; our UK accountants got nervous about a clean transfer triggering a multi-million-pound deemed gain). The commercial reason was that we still planned to commercialize in the UK and EU later, and didn't want to fight a re-transfer back if we did.
+
+So the cap table picture investors see is:
+
+- Tributary Health, Inc. (Delaware C-Corp, parent, the operating company in the US)
+  - 100% owner of:
+    - Tributary Health Ltd (UK private limited company, IP-holding sub)
+
+The investors put their money into the Delaware C-Corp. The Delaware C-Corp has an exclusive, royalty-free, perpetual license to the UK Ltd's IP for the US and Canada. The UK Ltd still owns the IP root.
+
+I've had two seed investors push back hard on this structure. One walked because of it. The other (our eventual lead — Polaris Partners, who specialize in healthtech and have seen this structure before in UK-origin companies) was fine but priced the seed at a 12% discount versus what they'd offered if the structure had been clean.
+
+We are NOT planning to clean this up before the A. Our healthtech corporate counsel (Goodwin Procter, Boston) advised that the UK Ltd's residual ownership is more a story-cleanliness issue than a commercial blocker, and that an unwind costs ~$140k in legal + tax work that the A would not value. We'll likely consolidate everything in the Delaware entity before the B or before a strategic exit conversation, whichever comes first.
+
+If you're drafting an investor email, lead with "Delaware C-Corp, IP licensed from a UK subsidiary for tax-structure reasons, fully unwound at Series B." Don't volunteer more detail unless asked.
+
+================================
+WHERE WE ARE TODAY
+================================
+
+Stage: Seed-extending. We closed a $4.2M seed in October 2024 led by Polaris Partners ($2.8M of the round), with participation from Khosla Ventures, Founders Fund (small check, more relationship than thesis), and a physician-led syndicate from the Mass General Brigham network. Pre-money $18M, post $22.2M, 13% option pool. We're now considering an extension — Polaris has offered to lead a $3M bridge at the same cap to push us to a stronger A position in 4 quarters instead of 3.
+
+Headcount: 14. 4 in Boston (me, Raghav, our nurse-clinical lead, our compliance lead), 5 in London (the engineering core, Raghav's old team), 3 remote (US East Coast — sales + customer success), 2 contractors (a regulatory consultant in Maryland, a part-time CMO who's a practicing cardiologist at Brigham who joined as our medical advisor).
+
+Burn: $410k/month. Cash on hand: $2.8M (with the bridge), or $1.6M without. Runway: 9 months without bridge, 16 months with. Bridge decision needs to land by mid-June.
+
+================================
+FOUNDERS + KEY TEAM
+================================
+
+- Niamh O'Brien (CEO, me). 32. Irish, came up through the NHS as a clinical-pharmacology PhD at Imperial, with a 2-year stint as a McKinsey associate covering payer-provider strategy (left in 2021). I am clinical-fluent but not a physician. 36% post-Seed, 4-year vest from June 2024.
+- Raghav Krishnamurthy (CTO). 39. Indian-British, ex-Babylon Health (Senior ML Lead, 2017–2022) and ex-Google Health UK before that. He owns the ML pipeline and the risk model. He has 4 published papers on time-series modeling in cardiology — that's a credibility lever in every clinical-buyer conversation. 36% post-Seed.
+- Dr. James Chen (Chief Medical Officer, part-time at 0.6 FTE). 51. Practicing cardiologist at Brigham, electrophysiologist by training. Joined June 2024. Has 3% equity (vesting); paid as a 1099 consultant for the FTE portion. He is our credibility face in physician-buyer conversations.
+
+Advisors (not on the cap table, on advisor shares):
+- Dr. Sarah Boucher — cardiologist, former CMO of a 14-practice ambulatory cardiology group (now retired). 0.5% advisor shares, 2-year vest.
+- Dr. Aman Hussain — health economist, joint appointment Harvard School of Public Health + Brigham. 0.4% advisor shares. He's the reason we have a defensible cost-effectiveness model.
+- Sasha Rivera — former VP of RPM at Livongo (pre-Teladoc acquisition). 0.6% advisor shares. Coaches me on enterprise health-system sales every two weeks.
+- Dr. Tomás Aguilera — interventional cardiologist, Mass General. Informal advisor — no equity, no cash. Refers practices to us.
+
+================================
+PRODUCT
+================================
+
+Three workflow surfaces:
+
+1. **The clinician dashboard.** Web-based. The 4-nurse triage team uses this every morning for the daily patient review. The dashboard surfaces the top 30 highest-risk patients overnight based on the model output. Each patient row shows the trigger (e.g. "3-day rising weight trend + diastolic creep"), the suggested intervention from our care-pathway library, and a one-click messaging shortcut to the patient (via the patient's preferred channel — SMS, IVR call, or in-app message).
+
+2. **The patient app.** iOS + Android. The patient pairs their devices (we ship a kit on practice referral — Omron BP cuff, Withings scale, Masimo MightySat). The app does symptom check-ins, medication reminders, and 2-way messaging with the nurse triage team. Approximately 78% of our active patients use the app at least once per week; the other 22% are device-only patients who don't engage with the app but whose device data still streams.
+
+3. **The patient kit.** Hardware. We don't manufacture — we resell. Each kit is ~$340 in COGS. Practices either bill the kit through CPT 99453 (RPM device setup, $20–$25 reimbursed) and absorb the rest, or rent the kit from us ($14/patient/month, kit returned on disenrollment). Most practices choose the rental model.
+
+================================
+TRACTION (NUMBERS THAT MATTER)
+================================
+
+Customers:
+- 11 paying ambulatory cardiology practices on the platform. 9 in the US, 2 in the UK.
+- Combined active patient population: 6,840 patients enrolled, 5,990 with at least 16 days of device data in the past 30 (the CMS reimbursement threshold).
+- Largest customer: a 9-physician practice in Charlotte NC with 1,460 active patients. They renew in November and they are a reference customer.
+
+Revenue:
+- ARR end of March: $1.83M. ARR end of April: $1.94M.
+- Average revenue per active monitored patient (ARPAMP — a metric we invented): $48/month, blended across the US and UK customer bases.
+- Net retention 134% over the trailing 12 months (driven entirely by practices expanding their enrolled patient panel on our platform — no upsell to new modules yet).
+- Gross retention 100% — we have not lost a customer.
+
+Clinical outcomes (the slide that closes deals):
+- 33% reduction in 30-day heart-failure readmissions in the Charlotte cohort, measured against a matched 12-month pre-Tributary baseline (n=1,460 patients, paper in preparation).
+- 19% reduction in ER visits in the same cohort.
+- These results are NOT yet from a randomized controlled trial. We have one underway with Brigham (n=600, started January 2025, primary endpoint at 12 months).
+
+Operational:
+- Mean time from elevated risk flag to clinician outreach: 4.3 hours during clinic hours, 9.7 hours overnight. (Goal is <2 hours daytime, <6 hours overnight by end of year.)
+- False positive rate on the risk model: 14% (i.e., 14% of flagged patients did not actually require an intervention on review). Industry benchmarks I've seen are 25–40%, so this is a real moat.
+
+================================
+WHY NOW (FOR THE DECK)
+================================
+
+Three converging tailwinds. Investors keep nodding at #1 and pushing back on #2 — sharpen #2 for me.
+
+1. **CMS reimbursement is here and stable.** The RPM codes (99454/99457/99458) have been in place since 2019. Reimbursement rates went up in the 2024 CMS final rule. This is no longer "if CMS reimburses for RPM" — it's a stable revenue line for any practice that can operationalize the workflow. Our software makes the workflow operationally tractable. The reimbursement is the wedge.
+
+2. **Heart-failure prevalence is rising fast.** 6.7M US adults with HF in 2024, projected to 8.5M by 2030 per AHA. The supply of cardiologists is flat. The math doesn't work without RPM-enabled outpatient care. (This is the section investors push back on — the prevalence math is right but the link from "more HF patients" to "more software like ours" is two leaps.)
+
+3. **The AI model timing is finally right.** A risk model on time-series cardiac data was a research project 5 years ago. Now it's a deployable product with a regulatory pathway (we're pursuing a 510(k) De Novo classification as Software as a Medical Device — application drafted, scheduled for Q3 submission). Raghav's specific expertise — time-series ML on vital-sign data — was a niche academic field a decade ago and is now a commercial discipline with 5 deployed competitors.
+
+================================
+WHY US
+================================
+
+- I lived in the workflow. I shadowed 4 ambulatory cardiology practices over 14 months during the PhD. I know the precise reason RPM fails operationally for a 4-nurse triage team without software (it's the alert-volume management problem — every RPM platform either over-alerts and gets ignored, or under-alerts and misses the events that matter). Our risk model is shaped around solving exactly that problem.
+- Raghav has 12 years of time-series ML and 6 of them in cardiology specifically. He published the foundational paper our model is built on. The technical risk on our model improving over time is roughly zero.
+- Dr. Chen as our CMO gives us reputational credibility in physician-buyer conversations that competitors with non-physician founders cannot match. The 11 closed practices were all closed with him in the room or on the Zoom.
+
+================================
+REGULATORY POSTURE
+================================
+
+We're operating today under the FDA's enforcement discretion for Software as a Medical Device when used in a clinical-decision-support context (per the 2022 CDS final guidance). Our model surfaces information to a clinician, who makes the intervention decision — we are explicitly not a closed-loop automated treatment system.
+
+We are pursuing a 510(k) De Novo classification proactively. Application is drafted (with a regulatory consultant out of Maryland). Submission Q3. Expected clearance Q1 next year. This gives us a regulatory moat against competitors who are operating without it.
+
+This is not legal advice from me to you — go talk to a healthtech attorney before you map your own regulatory posture.
+
+================================
+THINGS I WANT YOU TO PUSH ON
+================================
+
+1. The entity / IP structure (Delaware parent + UK IP-holding sub). What's the cleanest one-paragraph explanation of this in a Series A deck? Right now I bury it in the data room and most investors miss it until late diligence — which is worse than leading with it.
+
+2. The 33% readmission-reduction number. It's measured against a pre-Tributary baseline at one practice. Be brutal — is this number defensible against a partner who pushes on the "matched cohort" methodology? My health-economist advisor Aman Hussain helped us structure it but I have not had it independently reviewed by a clinical-statistics person.
+
+3. The competitive landscape. There are five other companies I'd call direct competitors: Cadence Health, Connect America Medical, Vivify Health (now owned by United Health), HRS, and Resi. I don't think any of them have our model — I think they have a workflow product without a risk-stratification layer that matters. But I have not gotten a fair read on this from anyone with sales-side competitive intel.
+
+4. The bridge-vs-A decision. Polaris will lead the bridge at the seed cap, which is generous. The downside is we don't price the round, and the next investor sees a flat round signal. Worth it?
+
+5. The UK customer base. 2 of our 11 customers are UK-based. The UK reimbursement environment is completely different from the US (NHS rather than CPT). Should I drop the UK customers from the Series A narrative entirely, or use them as a "we already crossed the international boundary" story?
