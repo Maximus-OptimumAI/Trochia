@@ -66,6 +66,10 @@ jobs:
       STRIPE_PRICE_PRE_RAISE_ANNUAL: ${{ secrets.STRIPE_PRICE_PRE_RAISE_ANNUAL || 'price_ci_pre_raise_a' }}
       STRIPE_PRICE_ACTIVE_RAISE_MONTHLY: ${{ secrets.STRIPE_PRICE_ACTIVE_RAISE_MONTHLY || 'price_ci_active_raise_m' }}
       STRIPE_PRICE_ACTIVE_RAISE_ANNUAL: ${{ secrets.STRIPE_PRICE_ACTIVE_RAISE_ANNUAL || 'price_ci_active_raise_a' }}
+      STRIPE_PRICE_CLOSE_MODE_MONTHLY: ${{ secrets.STRIPE_PRICE_CLOSE_MODE_MONTHLY || 'price_ci_close_mode_m' }}
+      STRIPE_PRICE_CLOSE_MODE_ANNUAL: ${{ secrets.STRIPE_PRICE_CLOSE_MODE_ANNUAL || 'price_ci_close_mode_a' }}
+      STRIPE_PRICE_ALUMNI_MONTHLY: ${{ secrets.STRIPE_PRICE_ALUMNI_MONTHLY || 'price_ci_alumni_m' }}
+      STRIPE_PRICE_ALUMNI_ANNUAL: ${{ secrets.STRIPE_PRICE_ALUMNI_ANNUAL || 'price_ci_alumni_a' }}
       INNGEST_SIGNING_KEY: ${{ secrets.INNGEST_SIGNING_KEY || 'signkey-ci' }}
       INNGEST_EVENT_KEY: ${{ secrets.INNGEST_EVENT_KEY || 'eventkey-ci' }}
       PLAYWRIGHT_BASE_URL: ${{ secrets.PLAYWRIGHT_BASE_URL }}
