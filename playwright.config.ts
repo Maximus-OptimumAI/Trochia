@@ -23,7 +23,12 @@ const useExternalServer = rawBaseURL.length > 0;
 const baseURL = useExternalServer ? rawBaseURL : 'http://localhost:3000';
 
 export default defineConfig({
-  testDir: './e2e',
+  // Phase-1 e2e specs landed under `./e2e/`. Plan 02-02 / KNW-02b Task 10
+  // ships its onboarding-paste spec under `./tests/e2e/` to match the
+  // plan's <files> contract + the rest of the Vitest-style test layout
+  // under `./tests/**`. Both directories are scanned.
+  testDir: '.',
+  testMatch: ['e2e/**/*.spec.ts', 'tests/e2e/**/*.spec.ts'],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
