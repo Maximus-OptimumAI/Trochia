@@ -178,7 +178,15 @@ function lookupProvenance(
   provenance: Provenance,
   key: string,
 ): ProvenanceField | undefined {
-  return provenance[key];
+  // Provenance is now a discriminated union (Plan 02-03 / KNW-02c): a single
+  // ProvenanceField OR a ProvenanceField[] for unresolved multi-value entries.
+  // This Week-2 surface only renders single-entry shapes; Week-3's T9 routes
+  // array entries to the ConflictResolver via a separate code path. So array
+  // entries surface as `undefined` here — the card shows the field as
+  // "no source snippet captured" until the resolver lands.
+  const entry = provenance[key];
+  if (entry === undefined || Array.isArray(entry)) return undefined;
+  return entry;
 }
 
 function nowIso(): string {

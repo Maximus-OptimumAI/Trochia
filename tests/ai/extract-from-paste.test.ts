@@ -564,6 +564,9 @@ describe('extractFromPaste — per-fixture extraction', () => {
 
     // G. Every source_snippet really lives in the fixture
     for (const entry of Object.values(result.draft.provenance)) {
+      // Plan 02-03 / KNW-02c widened Provenance to a union; the 02-02 fixtures
+      // emit single-entry shapes only, so array entries are out of scope here.
+      if (Array.isArray(entry)) continue;
       expect(fixture).toContain(entry.source_snippet);
     }
 
@@ -593,6 +596,9 @@ describe('extractFromPaste — per-fixture extraction', () => {
     expect(result.draft.traction?.mrr).not.toBe(40250);
 
     for (const entry of Object.values(result.draft.provenance)) {
+      // Plan 02-03 / KNW-02c widened Provenance to a union; the 02-02 fixtures
+      // emit single-entry shapes only, so array entries are out of scope here.
+      if (Array.isArray(entry)) continue;
       expect(fixture).toContain(entry.source_snippet);
     }
   });
@@ -625,6 +631,9 @@ describe('extractFromPaste — per-fixture extraction', () => {
     expect(stringified).not.toContain('212-555-0143');
 
     for (const entry of Object.values(result.draft.provenance)) {
+      // Plan 02-03 / KNW-02c widened Provenance to a union; the 02-02 fixtures
+      // emit single-entry shapes only, so array entries are out of scope here.
+      if (Array.isArray(entry)) continue;
       expect(fixture).toContain(entry.source_snippet);
     }
   });
@@ -648,9 +657,17 @@ describe('extractFromPaste — per-fixture extraction', () => {
     expect(result.draft.incorporationStatus).toBeDefined();
     const incProv = result.draft.provenance.incorporationStatus;
     expect(incProv).toBeDefined();
-    expect(incProv!.confidence).toBeLessThanOrEqual(0.7); // low-confidence band
+    // Narrow off the Plan-02-03 union arm — this fixture emits a single-entry
+    // provenance shape (conflict resolver consumes array entries elsewhere).
+    expect(Array.isArray(incProv)).toBe(false);
+    if (incProv && !Array.isArray(incProv)) {
+      expect(incProv.confidence).toBeLessThanOrEqual(0.7); // low-confidence band
+    }
 
     for (const entry of Object.values(result.draft.provenance)) {
+      // Plan 02-03 / KNW-02c widened Provenance to a union; the 02-02 fixtures
+      // emit single-entry shapes only, so array entries are out of scope here.
+      if (Array.isArray(entry)) continue;
       expect(fixture).toContain(entry.source_snippet);
     }
   });
@@ -675,6 +692,9 @@ describe('extractFromPaste — per-fixture extraction', () => {
     expect(result.draft.traction?.runway).toBeDefined();
 
     for (const entry of Object.values(result.draft.provenance)) {
+      // Plan 02-03 / KNW-02c widened Provenance to a union; the 02-02 fixtures
+      // emit single-entry shapes only, so array entries are out of scope here.
+      if (Array.isArray(entry)) continue;
       expect(fixture).toContain(entry.source_snippet);
     }
   });
