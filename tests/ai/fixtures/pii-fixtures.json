@@ -638,33 +638,33 @@
     "expectedRedactions": [
       {
         "type": "email",
-        "count": 1,
+        "count": 2,
         "values": [
           "priya@partners.example"
         ]
       },
       {
         "type": "phone",
-        "count": 1,
+        "count": 2,
         "values": [
           "212-555-0800"
         ]
       },
       {
         "type": "wallet",
-        "count": 1,
+        "count": 2,
         "values": [
           "bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmv3"
         ]
       }
     ],
     "expectedRedactionsByType": {
-      "email": 1,
-      "phone": 1,
-      "wallet": 1,
+      "email": 2,
+      "phone": 2,
+      "wallet": 2,
       "ssn": 0
     },
-    "expectedRedactionsTotal": 3,
+    "expectedRedactionsTotal": 6,
     "expectedPreserved": [
       "650-555-0700"
     ],
@@ -673,7 +673,7 @@
       "212-555-0800",
       "bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmv3"
     ],
-    "description": "Three PII types in one source_snippet plus the same text mirrored in narrative.why_now. The founder phone (founder-self) must survive in BOTH locations; the unrelated email + phone + wallet must be redacted in BOTH. Pins the byType counter and the founder-self exemption across paths.",
+    "description": "Three PII types in one source_snippet plus the same text mirrored in narrative.why_now. The redactor walks BOTH narrative.why_now AND provenance.traction.mrr.source_snippet per spec §5, so unrelated email+phone+wallet each redact TWICE (once per path) — total 6, byType {email:2, phone:2, wallet:2}. The founder phone (founder-self) survives in BOTH locations. Pins the byType counter, the dual-walk contract, and the founder-self exemption across paths.",
     "rationale": "End-to-end multi-type case with founder-self preservation; tests the byType breakdown, the founder-self exemption, and the walk across both narrative and provenance paths."
   },
   {
