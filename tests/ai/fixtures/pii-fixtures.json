@@ -1,0 +1,439 @@
+{
+  "version": "1.0.0",
+  "authored": "2026-05-20",
+  "description": "15 PII fixtures for the unrelated-party PII redactor (Plan 02-03 / KNW-02d / T5). Each entry simulates a draft field (narrative / traction / provenance.source_snippet) containing PII that the redactor must scrub OR preserve depending on whether it belongs to the founder (team.founders[] / founderSelfPII) or an unrelated third party. Test-data discipline: every email uses RFC 2606 reserved TLDs (.example / .test / .invalid); every phone uses the 555 prefix (US filmography reserved range); every SSN-shaped token starts 000 (an area number never assigned by the SSA); wallet addresses are synthetic base58 strings, never known active addresses. Synthetic names only.",
+  "fixtures": [
+    {
+      "id": "PII-01",
+      "category": "email-only",
+      "scenario": "Single unrelated-party email in narrative.problem",
+      "narrativeBlob": "Our designer Jane Liu (jane@design.example) contributed the early sketches before we incorporated. She is no longer on the cap table.",
+      "founderSelfPII": { "emails": [], "phones": [] },
+      "draftInput": {
+        "narrative": {
+          "problem": "Our designer Jane Liu (jane@design.example) contributed the early sketches before we incorporated. She is no longer on the cap table."
+        },
+        "provenance": {}
+      },
+      "founders": [{ "name": "Sam Holt" }],
+      "expectedRedactions": [
+        { "type": "email", "count": 1, "values": ["jane@design.example"] }
+      ],
+      "expectedRedactionsByType": { "email": 1, "phone": 0, "wallet": 0, "ssn": 0 },
+      "expectedRedactionsTotal": 1,
+      "expectedPreserved": [],
+      "expectedReplaced": ["jane@design.example"],
+      "description": "Solo third-party email in a narrative field. Founder has no email set; nothing to preserve. Verifies the email regex matches a clean RFC-shape address inside parens.",
+      "rationale": "Baseline single-email third-party case for the email branch of the redactor."
+    },
+    {
+      "id": "PII-02",
+      "category": "email-only",
+      "scenario": "Founder-self email vs third-party email in the same narrative paragraph",
+      "narrativeBlob": "Reach me at sam@founders.example to schedule. Investor John Doe replied from john@vc.example with his diligence list.",
+      "founderSelfPII": { "emails": ["sam@founders.example"], "phones": [] },
+      "draftInput": {
+        "narrative": {
+          "why_us": "Reach me at sam@founders.example to schedule. Investor John Doe replied from john@vc.example with his diligence list."
+        },
+        "provenance": {}
+      },
+      "founders": [{ "name": "Sam Holt", "email": "sam@founders.example" }],
+      "expectedRedactions": [
+        { "type": "email", "count": 1, "values": ["john@vc.example"] }
+      ],
+      "expectedRedactionsByType": { "email": 1, "phone": 0, "wallet": 0, "ssn": 0 },
+      "expectedRedactionsTotal": 1,
+      "expectedPreserved": ["sam@founders.example"],
+      "expectedReplaced": ["john@vc.example"],
+      "description": "Founder self-email coexists with a third-party VC email in one paragraph. Branch test: the redactor's founder-self exemption set MUST preserve the founder's address while scrubbing the unrelated investor's.",
+      "rationale": "Proves the founder-self preservation branch on the email path."
+    },
+    {
+      "id": "PII-03",
+      "category": "email-only",
+      "scenario": "Multiple unrelated-party emails in one narrative.why_us blob",
+      "narrativeBlob": "Three angels are tracking the round: priya@partners.example, kevin@angel.test, and mark@notreal.invalid. All confirmed verbal commits.",
+      "founderSelfPII": { "emails": [], "phones": [] },
+      "draftInput": {
+        "narrative": {
+          "why_us": "Three angels are tracking the round: priya@partners.example, kevin@angel.test, and mark@notreal.invalid. All confirmed verbal commits."
+        },
+        "provenance": {}
+      },
+      "founders": [{ "name": "Sam Holt" }],
+      "expectedRedactions": [
+        {
+          "type": "email",
+          "count": 3,
+          "values": ["priya@partners.example", "kevin@angel.test", "mark@notreal.invalid"]
+        }
+      ],
+      "expectedRedactionsByType": { "email": 3, "phone": 0, "wallet": 0, "ssn": 0 },
+      "expectedRedactionsTotal": 3,
+      "expectedPreserved": [],
+      "expectedReplaced": [
+        "priya@partners.example",
+        "kevin@angel.test",
+        "mark@notreal.invalid"
+      ],
+      "description": "Three different third-party emails in one paragraph spanning all three RFC 2606 reserved TLDs (.example / .test / .invalid). Verifies the regex matches all three TLD shapes and counts every distinct match.",
+      "rationale": "Multi-email third-party case; exercises the TLD variants and the per-match counter."
+    },
+    {
+      "id": "PII-04",
+      "category": "email-only",
+      "scenario": "Email-shaped non-PII control: false-positive avoidance",
+      "narrativeBlob": "See notes@step-3 in the doc. Also see contact@onboarding for the welcome flow. These are anchor labels, not email addresses.",
+      "founderSelfPII": { "emails": ["sam@founders.example"], "phones": [] },
+      "draftInput": {
+        "narrative": {
+          "solution": "See notes@step-3 in the doc. Also see contact@onboarding for the welcome flow. These are anchor labels, not email addresses."
+        },
+        "provenance": {}
+      },
+      "founders": [{ "name": "Sam Holt", "email": "sam@founders.example" }],
+      "expectedRedactions": [
+        { "type": "email", "count": 0, "values": [] }
+      ],
+      "expectedRedactionsByType": { "email": 0, "phone": 0, "wallet": 0, "ssn": 0 },
+      "expectedRedactionsTotal": 0,
+      "expectedPreserved": ["notes@step-3", "contact@onboarding"],
+      "expectedReplaced": [],
+      "description": "Two strings with an @ character but no TLD — these are NOT valid emails. The redactor's email regex must anchor on a TLD (\\b[\\w.+-]+@[\\w-]+\\.[\\w-]{2,}\\b) to avoid this false positive.",
+      "rationale": "False-positive control for the email regex. Founder email is present in founderSelfPII for the gate but does not appear in the blob."
+    },
+    {
+      "id": "PII-05",
+      "category": "phone-only",
+      "scenario": "US phone variants — parens, dots, dashes",
+      "narrativeBlob": "Confirmed calls scheduled: (415) 555-0100 with the Lightspeed partner, 415.555.0101 with the Maveron analyst, 415-555-0102 with the Bond associate.",
+      "founderSelfPII": { "emails": [], "phones": [] },
+      "draftInput": {
+        "narrative": {
+          "why_now": "Confirmed calls scheduled: (415) 555-0100 with the Lightspeed partner, 415.555.0101 with the Maveron analyst, 415-555-0102 with the Bond associate."
+        },
+        "provenance": {}
+      },
+      "founders": [{ "name": "Sam Holt" }],
+      "expectedRedactions": [
+        {
+          "type": "phone",
+          "count": 3,
+          "values": ["(415) 555-0100", "415.555.0101", "415-555-0102"]
+        }
+      ],
+      "expectedRedactionsByType": { "email": 0, "phone": 3, "wallet": 0, "ssn": 0 },
+      "expectedRedactionsTotal": 3,
+      "expectedPreserved": [],
+      "expectedReplaced": ["(415) 555-0100", "415.555.0101", "415-555-0102"],
+      "description": "Three third-party phone numbers in three different US formats (parens-space-dash, dotted, all-dash). All in 555 reserved range. Verifies the phoneUS regex \\(?\\d{3}\\)?[-.\\s]\\d{3}[-.\\s]\\d{4}\\b accepts every common format.",
+      "rationale": "Exhaustive US phone-format coverage for the phone branch."
+    },
+    {
+      "id": "PII-06",
+      "category": "phone-only",
+      "scenario": "Founder-self phone preservation alongside two third-party phones",
+      "narrativeBlob": "Operator line: 415-555-0200 (mine; ring this for anything urgent). Investor lines: (212) 555-0300 and 650.555.0400 — do not share these outside the team.",
+      "founderSelfPII": { "emails": [], "phones": ["415-555-0200"] },
+      "draftInput": {
+        "narrative": {
+          "problem": "Operator line: 415-555-0200 (mine; ring this for anything urgent). Investor lines: (212) 555-0300 and 650.555.0400 — do not share these outside the team."
+        },
+        "provenance": {}
+      },
+      "founders": [{ "name": "Sam Holt", "phone": "415-555-0200" }],
+      "expectedRedactions": [
+        {
+          "type": "phone",
+          "count": 2,
+          "values": ["(212) 555-0300", "650.555.0400"]
+        }
+      ],
+      "expectedRedactionsByType": { "email": 0, "phone": 2, "wallet": 0, "ssn": 0 },
+      "expectedRedactionsTotal": 2,
+      "expectedPreserved": ["415-555-0200"],
+      "expectedReplaced": ["(212) 555-0300", "650.555.0400"],
+      "description": "Founder-self phone appears alongside two third-party phones. The redactor's exemption set MUST preserve the founder's number byte-for-byte while scrubbing the other two.",
+      "rationale": "Proves the founder-self preservation branch on the phone path."
+    },
+    {
+      "id": "PII-07",
+      "category": "phone-only",
+      "scenario": "Phone in provenance.source_snippet — founder-self phone preserved while a co-founder mentioned in the same snippet is treated as third-party (no email/phone on the co-founder's founders[] entry)",
+      "narrativeBlob": "",
+      "founderSelfPII": { "emails": [], "phones": ["415-555-0050"] },
+      "draftInput": {
+        "provenance": {
+          "team.founders": {
+            "source_snippet": "Sofia Park (CEO; her direct line is 415-555-0050). Reach the co-founder Hassan Bakr at (415) 555-0500 for engineering questions.",
+            "confidence": 0.82,
+            "extracted_at": "2026-05-19T10:00:00.000Z",
+            "last_updated": "2026-05-19T10:00:00.000Z",
+            "snooze_until": null
+          }
+        }
+      },
+      "founders": [{ "name": "Sofia Park", "phone": "415-555-0050" }],
+      "expectedRedactions": [
+        { "type": "phone", "count": 1, "values": ["(415) 555-0500"] }
+      ],
+      "expectedRedactionsByType": { "email": 0, "phone": 1, "wallet": 0, "ssn": 0 },
+      "expectedRedactionsTotal": 1,
+      "expectedPreserved": ["415-555-0050"],
+      "expectedReplaced": ["(415) 555-0500"],
+      "description": "Third-party phone embedded in a provenance source_snippet alongside the founder's own line. Verifies (a) the redactor walks provenance.*.source_snippet, AND (b) the founder-self exemption applies inside source_snippet content — Sofia's line is preserved, the co-founder's line (no founders[] entry for him here) is treated as third-party and scrubbed.",
+      "rationale": "Provenance-walk coverage on the phone path + founder-self preservation inside source_snippet."
+    },
+    {
+      "id": "PII-08",
+      "category": "ssn-like",
+      "scenario": "SSN-shaped token in narrative.solution",
+      "narrativeBlob": "Compliance audit ticket 000-12-3456 was closed last week. The token format mimics a US Social Security Number but no real number is used here.",
+      "founderSelfPII": { "emails": [], "phones": [] },
+      "draftInput": {
+        "narrative": {
+          "solution": "Compliance audit ticket 000-12-3456 was closed last week. The token format mimics a US Social Security Number but no real number is used here."
+        },
+        "provenance": {}
+      },
+      "founders": [{ "name": "Sam Holt" }],
+      "expectedRedactions": [
+        { "type": "ssn", "count": 1, "values": ["000-12-3456"] }
+      ],
+      "expectedRedactionsByType": { "email": 0, "phone": 0, "wallet": 0, "ssn": 1 },
+      "expectedRedactionsTotal": 1,
+      "expectedPreserved": [],
+      "expectedReplaced": ["000-12-3456"],
+      "description": "SSN-shaped token (000-XX-XXXX form; 000 is never assigned by the SSA) embedded as a ticket number. Verifies the ssn regex \\b\\d{3}-\\d{2}-\\d{4}\\b catches the shape regardless of label.",
+      "rationale": "SSN-shape coverage; deliberately uses the 000 area-number prefix to guarantee the token is not a real identifier."
+    },
+    {
+      "id": "PII-09",
+      "category": "ssn-like",
+      "scenario": "SSN-shaped token in provenance source_snippet with a near-miss control",
+      "narrativeBlob": "",
+      "founderSelfPII": { "emails": [], "phones": [] },
+      "draftInput": {
+        "provenance": {
+          "traction.runway": {
+            "source_snippet": "Q3 forecast id 000-99-7777; not the same shape as the burn-rate row 4-12-9 used in the model.",
+            "confidence": 0.75,
+            "extracted_at": "2026-05-19T11:00:00.000Z",
+            "last_updated": "2026-05-19T11:00:00.000Z",
+            "snooze_until": null
+          }
+        }
+      },
+      "founders": [{ "name": "Sam Holt" }],
+      "expectedRedactions": [
+        { "type": "ssn", "count": 1, "values": ["000-99-7777"] }
+      ],
+      "expectedRedactionsByType": { "email": 0, "phone": 0, "wallet": 0, "ssn": 1 },
+      "expectedRedactionsTotal": 1,
+      "expectedPreserved": ["4-12-9"],
+      "expectedReplaced": ["000-99-7777"],
+      "description": "Two dash-separated digit groups: one matches the SSN shape exactly (3-2-4 digits) and must be redacted; the other does not (1-2-1 digits) and must survive. Pins the regex's strict digit-count anchors.",
+      "rationale": "False-positive control on the SSN regex: short digit groups must not match the 3-2-4 shape."
+    },
+    {
+      "id": "PII-10",
+      "category": "btc-wallet",
+      "scenario": "BTC segwit (bc1) wallet in narrative.why_us",
+      "narrativeBlob": "Payment landed at bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq from the angel's treasury. The address is a known documentation example, not active funds.",
+      "founderSelfPII": { "emails": [], "phones": [] },
+      "draftInput": {
+        "narrative": {
+          "why_us": "Payment landed at bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq from the angel's treasury. The address is a known documentation example, not active funds."
+        },
+        "provenance": {}
+      },
+      "founders": [{ "name": "Sam Holt" }],
+      "expectedRedactions": [
+        {
+          "type": "wallet",
+          "count": 1,
+          "values": ["bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq"]
+        }
+      ],
+      "expectedRedactionsByType": { "email": 0, "phone": 0, "wallet": 1, "ssn": 0 },
+      "expectedRedactionsTotal": 1,
+      "expectedPreserved": [],
+      "expectedReplaced": ["bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq"],
+      "description": "BTC bech32 segwit address (bc1 prefix). Verifies the btcWallet regex \\b(?:bc1|[13])[a-zA-HJ-NP-Z0-9]{25,39}\\b catches the modern address format. The string used is the canonical BIP-173 test vector address; documented as a fixture, not an active wallet.",
+      "rationale": "BTC segwit coverage. Uses the BIP-173 example address to avoid any risk of touching a live wallet."
+    },
+    {
+      "id": "PII-11",
+      "category": "btc-wallet",
+      "scenario": "BTC legacy (P2PKH + P2SH) wallets across narrative + provenance",
+      "narrativeBlob": "Treasury rotation: legacy address 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa retired, multisig 3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy taking over.",
+      "founderSelfPII": { "emails": [], "phones": [] },
+      "draftInput": {
+        "narrative": {
+          "why_us": "Treasury rotation: legacy address 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa retired, multisig 3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy taking over."
+        },
+        "provenance": {}
+      },
+      "founders": [{ "name": "Sam Holt" }],
+      "expectedRedactions": [
+        {
+          "type": "wallet",
+          "count": 2,
+          "values": [
+            "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
+            "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy"
+          ]
+        }
+      ],
+      "expectedRedactionsByType": { "email": 0, "phone": 0, "wallet": 2, "ssn": 0 },
+      "expectedRedactionsTotal": 2,
+      "expectedPreserved": [],
+      "expectedReplaced": [
+        "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
+        "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy"
+      ],
+      "description": "Two legacy BTC addresses (P2PKH prefix 1, P2SH prefix 3) — both are the canonical Bitcoin Wiki documentation examples (Satoshi's first-block reward address and the BIP-16 example multisig). Verifies the regex matches the [13] branch.",
+      "rationale": "Legacy BTC coverage on both prefixes. Documentation-example addresses chosen to keep the fixture safe to publish."
+    },
+    {
+      "id": "PII-12",
+      "category": "sol-wallet",
+      "scenario": "Solana base58 address in narrative.problem",
+      "narrativeBlob": "Liquidity provider deposited from SoLpDgX3kqK7gsP4mQz8Hb2nV5cR9wT1jL6yE4xA7vBz on the day of the airdrop snapshot.",
+      "founderSelfPII": { "emails": [], "phones": [] },
+      "draftInput": {
+        "narrative": {
+          "problem": "Liquidity provider deposited from SoLpDgX3kqK7gsP4mQz8Hb2nV5cR9wT1jL6yE4xA7vBz on the day of the airdrop snapshot."
+        },
+        "provenance": {}
+      },
+      "founders": [{ "name": "Sam Holt" }],
+      "expectedRedactions": [
+        {
+          "type": "wallet",
+          "count": 1,
+          "values": ["SoLpDgX3kqK7gsP4mQz8Hb2nV5cR9wT1jL6yE4xA7vBz"]
+        }
+      ],
+      "expectedRedactionsByType": { "email": 0, "phone": 0, "wallet": 1, "ssn": 0 },
+      "expectedRedactionsTotal": 1,
+      "expectedPreserved": [],
+      "expectedReplaced": ["SoLpDgX3kqK7gsP4mQz8Hb2nV5cR9wT1jL6yE4xA7vBz"],
+      "description": "A 44-character base58 string in the Solana address shape. Synthetic — generated by hand from the Solana base58 alphabet, contains no leading/zero/I/O/l characters, not a known active address. Verifies the solWallet regex \\b[1-9A-HJ-NP-Za-km-z]{32,44}\\b catches the 44-char form.",
+      "rationale": "Solana coverage on the long (44-char) variant."
+    },
+    {
+      "id": "PII-13",
+      "category": "sol-wallet",
+      "scenario": "Solana base58 in provenance source_snippet, shorter (32-char) variant",
+      "narrativeBlob": "",
+      "founderSelfPII": { "emails": [], "phones": [] },
+      "draftInput": {
+        "provenance": {
+          "traction.growth": {
+            "source_snippet": "Cross-chain bridge contract: SoLpDgX3kqK7gsP4mQz8Hb2nV5cR9wT1jL — referenced in the August deck.",
+            "confidence": 0.7,
+            "extracted_at": "2026-05-19T12:00:00.000Z",
+            "last_updated": "2026-05-19T12:00:00.000Z",
+            "snooze_until": null
+          }
+        }
+      },
+      "founders": [{ "name": "Sam Holt" }],
+      "expectedRedactions": [
+        {
+          "type": "wallet",
+          "count": 1,
+          "values": ["SoLpDgX3kqK7gsP4mQz8Hb2nV5cR9wT1jL"]
+        }
+      ],
+      "expectedRedactionsByType": { "email": 0, "phone": 0, "wallet": 1, "ssn": 0 },
+      "expectedRedactionsTotal": 1,
+      "expectedPreserved": [],
+      "expectedReplaced": ["SoLpDgX3kqK7gsP4mQz8Hb2nV5cR9wT1jL"],
+      "description": "A 34-character synthetic Solana-shape base58 string in a provenance source_snippet. Verifies the regex catches the minimum-length boundary (≥32 chars) AND that the redactor walks provenance.*.source_snippet for wallet patterns.",
+      "rationale": "Solana coverage on the short variant + provenance-walk on the wallet path."
+    },
+    {
+      "id": "PII-14",
+      "category": "mixed",
+      "scenario": "Multi-type combo — email + phone + wallet in one source_snippet, founder-self phone preserved",
+      "narrativeBlob": "",
+      "founderSelfPII": { "emails": [], "phones": ["650-555-0700"] },
+      "draftInput": {
+        "narrative": {
+          "why_now": "Operator hotline 650-555-0700 (founder). Investor priya@partners.example texted from 212-555-0800 confirming the wire to bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmv3."
+        },
+        "provenance": {
+          "traction.mrr": {
+            "source_snippet": "Operator hotline 650-555-0700 (founder). Investor priya@partners.example texted from 212-555-0800 confirming the wire to bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmv3.",
+            "confidence": 0.88,
+            "extracted_at": "2026-05-19T13:00:00.000Z",
+            "last_updated": "2026-05-19T13:00:00.000Z",
+            "snooze_until": null
+          }
+        }
+      },
+      "founders": [{ "name": "Sam Holt", "phone": "650-555-0700" }],
+      "expectedRedactions": [
+        { "type": "email", "count": 1, "values": ["priya@partners.example"] },
+        { "type": "phone", "count": 1, "values": ["212-555-0800"] },
+        {
+          "type": "wallet",
+          "count": 1,
+          "values": ["bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmv3"]
+        }
+      ],
+      "expectedRedactionsByType": { "email": 1, "phone": 1, "wallet": 1, "ssn": 0 },
+      "expectedRedactionsTotal": 3,
+      "expectedPreserved": ["650-555-0700"],
+      "expectedReplaced": [
+        "priya@partners.example",
+        "212-555-0800",
+        "bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmv3"
+      ],
+      "description": "Three PII types in one source_snippet plus the same text mirrored in narrative.why_now. The founder phone (founder-self) must survive in BOTH locations; the unrelated email + phone + wallet must be redacted in BOTH. Pins the byType counter and the founder-self exemption across paths.",
+      "rationale": "End-to-end multi-type case with founder-self preservation; tests the byType breakdown, the founder-self exemption, and the walk across both narrative and provenance paths."
+    },
+    {
+      "id": "PII-15",
+      "category": "mixed",
+      "scenario": "Cross-reference to paste-mosaic-marketplace.txt — real-world precedent with 3 third-party emails + 3 third-party phones",
+      "narrativeBlobRef": "tests/ai/fixtures/paste-mosaic-marketplace.txt",
+      "founderSelfPII": { "emails": [], "phones": [] },
+      "draftInput": {
+        "_note": "The redactor's contract operates on extractor draft output (narrative.*, traction text, provenance source_snippet) — NOT on the raw paste. This fixture is a cross-reference: the redactor's caller (the extractor agent) reads the paste at paste-mosaic-marketplace.txt, emits a draft that quotes the Slack thread inside provenance source_snippets, and at THAT point the redactor walks the draft. T7's test loads the referenced file, runs the agent, and asserts the byType counts below against the resulting draft.",
+        "provenance": {
+          "_pending_extractor_output": "see narrativeBlobRef"
+        }
+      },
+      "founders": [
+        { "name": "Sofia Park" },
+        { "name": "Hassan Bakr" }
+      ],
+      "expectedRedactions": [
+        {
+          "type": "email",
+          "count": 3,
+          "values_note": "T7 reads the referenced file at test time and asserts the email values found there — the literal email strings are NOT inlined in this fixture file so the grep gate (every @-domain in .example/.test/.invalid) holds. The mosaic paste authored its addresses against the SLD-form RFC-2606 reserved domains (example.com / example.org / example.net), which the redactor's email regex must accept."
+        },
+        {
+          "type": "phone",
+          "count": 3,
+          "values": ["(555) 123-4567", "+1 415 555 0199", "212-555-0143"]
+        }
+      ],
+      "expectedRedactionsByType": { "email": 3, "phone": 3, "wallet": 0, "ssn": 0 },
+      "expectedRedactionsTotal": 6,
+      "expectedPreserved": [],
+      "expectedReplaced": [
+        "(555) 123-4567",
+        "+1 415 555 0199",
+        "212-555-0143"
+      ],
+      "description": "The mosaic-marketplace paste already carries 6 unrelated-party PII items in its embedded Slack thread (3 VC emails + 3 VC phones across lines 69 / 72 / 78). The two founders (Sofia Park / Hassan Bakr) have no contact info in the paste, so no founder-self preservation is exercised here — only the unrelated-party scrub. The expectedRedactions email values are intentionally NOT inlined in this fixture file (the referenced file authors them against the SLD-form RFC-2606 reserved domains, which would fail this file's grep gate that pins every email TLD to .example/.test/.invalid). The T7 test loads the referenced file at test time and asserts the email count and shape against the resulting redacted draft. The narrative blob is held by reference so this file does not duplicate the mosaic paste.",
+      "rationale": "Real-world precedent: the redactor's contract is anchored to the same paste the extractor unit tests already operate on. Proves end-to-end consistency between extractor + redactor."
+    }
+  ]
+}
