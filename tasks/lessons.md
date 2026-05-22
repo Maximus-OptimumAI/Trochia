@@ -115,3 +115,14 @@ Next: 6c (Install Cursor CLI to Windows PATH)
   manually insert the migration hash into __drizzle_migrations to mark
   applied. Future plans should split enum-only migrations into separate
   files. (Plan 02-03 T11 precursor, 2026-05-22.)
+
+- **Postgres ALTER TYPE ADD VALUE cannot run inside a transaction.**
+  drizzle-kit migrate wraps each migration in a transaction by default, so
+  enum-value additions fail silently — zero stdout output, journal updated
+  locally but no row in drizzle.__drizzle_migrations on the live DB.
+  Detection: query __drizzle_migrations directly — local journal lying
+  doesn't mean migration applied.
+  Fix: apply enum changes via postgres.unsafe() outside a transaction, then
+  manually insert the migration hash into __drizzle_migrations to mark
+  applied. Future plans should split enum-only migrations into separate
+  files. (Plan 02-03 T11 precursor, 2026-05-22.)
