@@ -53,3 +53,7 @@ next-env.d.ts
 .gstack/
 
 .vercel
+
+# drizzle-kit introspect output (not canonical schema)
+src/db/migrations/relations.ts
+src/db/migrations/schema.ts
