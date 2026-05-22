@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { Check, ChevronDown, Pencil, X } from 'lucide-react';
 
+import type { ProvenanceField } from '@/ai/schemas/business-memory.zod';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,6 +13,8 @@ import {
 } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+
+import { ConflictResolver } from './conflict-resolver';
 
 /**
  * Per-field Confirmation Card — Plan 02-02 / KNW-02b.
@@ -60,6 +63,13 @@ const COPY = {
   statusEdited: 'Edited',
   emptyValue: 'Not drafted',
   confidenceSuffix: 'confidence',
+  // CARRY-1 — terminal-state Undo affordances (BRAND.md operator voice;
+  // never 'Oops' / 'Sorry'). The labels read as actions, not apologies.
+  undoConfirm: 'Edit again',
+  undoReject: 'Restore',
+  // CARRY-2 — helper text speaks for itself; no 'Error:' prefix. Kept as a
+  // constant so future copy edits centralize here, not inline at the JSX.
+  errorPrefix: '',
 } as const;
 
 export type ConfirmationStatus = 'pending' | 'confirmed' | 'rejected' | 'edited';
@@ -84,6 +94,33 @@ export interface ConfirmationCardProps {
   onReject: () => void;
   /** Edit action fires when the founder commits an inline edit. */
   onEdit: (next: { value: ConfirmationValue; status: 'edited' }) => void;
+  /**
+   * Multi-candidate provenance array (KNW-02c). When present and ≥2 entries,
+   * the value-row slot renders <ConflictResolver/> in place of the single
+   * value display + inline-edit input. The resolver IS the editor in this
+   * mode — inline-edit UX is suppressed.
+   */
+  multiValueCandidates?: ProvenanceField[];
+  /** Fires when the founder picks a candidate or supplies a custom override. */
+  onResolveConflict?: (chosen: ProvenanceField) => void;
+  /** Per-field validation error (CARRY-2). Empty/undefined → no visual change. */
+  errorMessage?: string;
+  /**
+   * CARRY-1 — when true, terminal-state cards render an Undo affordance
+   * (`Edit again` on confirmed, `Restore` on rejected) in place of the
+   * disabled Confirm / Edit button. Parent toggles to false after submit
+   * completes so the audit trail is immutable post-persist.
+   */
+  canUndo?: boolean;
+  /** Fires when the founder clicks the terminal-state Undo affordance. */
+  onUndo?: () => void;
+  /** Forwarded to ConflictResolver's custom-override input. Default `text`. */
+  fallbackInputType?: 'text' | 'number';
+  /**
+   * Gates the Confirm button in conflict mode. Parent owns this state; flips
+   * true once `onResolveConflict` has fired for this field.
+   */
+  isConflictResolved?: boolean;
 }
 
 function StatusBadge({ status }: { status: ConfirmationStatus }) {
@@ -139,6 +176,13 @@ export function ConfirmationCard({
   onConfirm,
   onReject,
   onEdit,
+  multiValueCandidates,
+  onResolveConflict,
+  errorMessage,
+  canUndo,
+  onUndo,
+  fallbackInputType,
+  isConflictResolved,
 }: ConfirmationCardProps) {
   const [editing, setEditing] = React.useState(false);
   // Local edit buffer; the form's controlled value remains the source of truth
@@ -157,6 +201,17 @@ export function ConfirmationCard({
   const inputRef = React.useRef<HTMLInputElement>(null);
   const isRejected = status === 'rejected';
   const confidenceLabel = formatConfidence(confidence);
+  // Multi-candidate gate (KNW-02c). length ≥ 2 mirrors the schema's union
+  // arm guard; a 1-element array collapses to the scalar single-value path.
+  const hasConflict =
+    Array.isArray(multiValueCandidates) && multiValueCandidates.length >= 2;
+  // CARRY-2 — hasError gates the border swap, helper text, and aria link.
+  // Empty string and undefined both render as the unstyled baseline.
+  const hasError = typeof errorMessage === 'string' && errorMessage.length > 0;
+  const errorId = `${fieldName}-error`;
+  // CARRY-1 — terminal-state Undo affordance gates.
+  const showUndoConfirm = status === 'confirmed' && canUndo === true && !!onUndo;
+  const showUndoReject = status === 'rejected' && canUndo === true && !!onUndo;
 
   const startEdit = React.useCallback(() => {
     setEditing(true);
@@ -195,7 +250,12 @@ export function ConfirmationCard({
       data-field={fieldName}
       data-status={status}
       className={cn(
-        'relative flex flex-col gap-4 rounded-xl border border-stone bg-paper p-8 transition-colors duration-150',
+        'relative flex flex-col gap-4 rounded-xl border bg-paper p-8 transition-colors duration-150',
+        // CARRY-2 — border-danger only swaps in when an error is present;
+        // every other path stays on the baseline border-stone (byte-equivalent
+        // to the pre-T9 card for the no-error branch). Hover/focus rings stay
+        // identical across both branches.
+        hasError ? 'border-danger' : 'border-stone',
         'hover:border-ink/20 focus-within:border-ink/30',
         isRejected && 'opacity-70',
       )}
@@ -213,13 +273,34 @@ export function ConfirmationCard({
 
       {/* Value row */}
       <div className="flex flex-col gap-2">
-        {editing ? (
+        {hasConflict ? (
+          // KNW-02c — multi-candidate path. Resolver mounts in the value-row
+          // slot; the editor (Input) is intentionally NOT rendered here — the
+          // resolver IS the editor in this mode (its custom-override row
+          // handles the "type a different value" path that inline-edit would
+          // have served). draftValue still renders nowhere; the resolver
+          // surfaces each candidate's source-snippet as the founder's anchor.
+          <ConflictResolver
+            fieldKey={fieldName}
+            fieldLabel={fieldLabel}
+            candidates={multiValueCandidates as ProvenanceField[]}
+            // Defensive: hasConflict requires multiValueCandidates AND ≥2
+            // entries. The parent that emits multiValueCandidates MUST also
+            // wire onResolveConflict (the gate is invariant by construction).
+            // A no-op fallback keeps the component honest at the type layer
+            // without breaking the resolver's contract at runtime.
+            onResolve={onResolveConflict ?? (() => {})}
+            fallbackInputType={fallbackInputType}
+          />
+        ) : editing ? (
           <Input
             ref={inputRef}
             value={buffer}
             onChange={(e) => setBuffer(e.target.value)}
             onKeyDown={onInputKeyDown}
             aria-label={fieldLabel}
+            aria-describedby={hasError ? errorId : undefined}
+            aria-invalid={hasError || undefined}
             data-testid="confirmation-card-input"
           />
         ) : (
@@ -234,6 +315,22 @@ export function ConfirmationCard({
           >
             {isRejected && <span className="sr-only">Rejected: </span>}
             {renderReadValue(draftValue)}
+          </p>
+        )}
+
+        {/* CARRY-2 — per-field error helper. Renders below the value row
+            (and below the resolver, when present). The Input above carries
+            aria-describedby={errorId} so a SR-user editing the field hears
+            the error text alongside the input's accessible name. */}
+        {hasError && (
+          <p
+            id={errorId}
+            className="text-body-sm text-danger"
+            role="alert"
+            data-testid="confirmation-card-error"
+          >
+            {COPY.errorPrefix}
+            {errorMessage}
           </p>
         )}
 
@@ -314,28 +411,70 @@ export function ConfirmationCard({
               <X aria-hidden />
               {COPY.statusRejected}
             </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="compact"
-              onClick={startEdit}
-              disabled={status === 'rejected'}
-              aria-label={`${COPY.editAffordance} (${fieldLabel})`}
-            >
-              <Pencil aria-hidden />
-              {COPY.editAffordance}
-            </Button>
-            <Button
-              type="button"
-              variant="primary"
-              size="compact"
-              onClick={() => onConfirm({ value: draftValue, status: 'confirmed' })}
-              disabled={status === 'confirmed' || draftValue === null || draftValue === undefined}
-              aria-label={`${COPY.confirmAffordance} ${fieldLabel}`}
-            >
-              <Check aria-hidden />
-              {COPY.confirmAffordance}
-            </Button>
+            {showUndoReject ? (
+              // CARRY-1 — terminal rejected state with parent-granted Undo.
+              // Replaces the disabled Edit button; click restores the field
+              // to pending and re-emits the original draft value.
+              <Button
+                type="button"
+                variant="ghost"
+                size="compact"
+                onClick={onUndo}
+                aria-label={`Restore rejected field ${fieldLabel}`}
+                data-testid="confirmation-card-undo-reject"
+              >
+                {COPY.undoReject}
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="secondary"
+                size="compact"
+                onClick={startEdit}
+                disabled={status === 'rejected'}
+                aria-label={`${COPY.editAffordance} (${fieldLabel})`}
+              >
+                <Pencil aria-hidden />
+                {COPY.editAffordance}
+              </Button>
+            )}
+            {showUndoConfirm ? (
+              // CARRY-1 — terminal confirmed state with parent-granted Undo.
+              // Replaces the disabled Confirm button; click drops the field
+              // back to pending so the founder can re-edit. Parent clears
+              // any server-side confirmedAt stamp.
+              <Button
+                type="button"
+                variant="ghost"
+                size="compact"
+                onClick={onUndo}
+                aria-label={`Undo confirmation of ${fieldLabel}`}
+                data-testid="confirmation-card-undo-confirm"
+              >
+                {COPY.undoConfirm}
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="primary"
+                size="compact"
+                onClick={() => onConfirm({ value: draftValue, status: 'confirmed' })}
+                disabled={
+                  status === 'confirmed' ||
+                  draftValue === null ||
+                  draftValue === undefined ||
+                  // KNW-02c — conflict mode locks Confirm until the founder
+                  // has resolved (radio pick or custom-override Apply). The
+                  // parent toggles isConflictResolved=true when onResolveConflict
+                  // fires; the existing disabled paths remain in force above.
+                  (hasConflict && !isConflictResolved)
+                }
+                aria-label={`${COPY.confirmAffordance} ${fieldLabel}`}
+              >
+                <Check aria-hidden />
+                {COPY.confirmAffordance}
+              </Button>
+            )}
           </>
         )}
       </div>
