@@ -103,3 +103,15 @@ expected base and check still passed.
 **Symptom**: `<worktree_branch_check>` uses `git merge-base HEAD <expected> == <expected>`. Passes when worktree HEAD is an ancestor of expected.
 **Trigger**: Wave 4-B worktree HEAD was 19 commits behind expected; check still passed.
 **Fix**: Replace with `git rev-list --count <expected>..HEAD == 0` (HEAD at-or-after expected).
+
+## P4.5-POLISH-10: AppError lacks structured context field
+**Symptom**: T11 router regex-parses markerCount + categoryCount from
+err.message string. T6 sanitizer always emits "high-severity" literal in
+err.message regardless of whether classifier said 'high' or 'critical'.
+Audit row records severity: null — loses high-vs-critical distinction.
+**Trigger**: Plan 02-03 T11, 2026-05-22.
+**Fix**: Add context?: Record<string, unknown> field to AppError shape in
+src/lib/errors.ts. Refactor T6 to set structured context with severity,
+categoryCount, markerCount. Refactor T11 to read from err.context directly.
+**Priority**: Polish — markerCount + categoryCount captured correctly;
+only severity literal is lost. Audit fidelity degraded but not broken.
