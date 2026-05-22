@@ -420,7 +420,8 @@ d('Phase-2 paste flow — RLS integration (memoryRouter)', () => {
     expect(afterExtract[0].query).toBeNull();
     expect(afterExtract[0].answer).toBeNull();
 
-    // 1 confirm → +1 interaction row (also kind=paste_extract; latency null).
+    // 1 confirm → +1 interaction row (kind='paste_confirm' per Plan 02-03 T11;
+    // latency + trace null since no AI call on confirm path).
     await aCaller.memory.confirmDraft({
       confirmed: {
         ...buildDraft().draft,
@@ -432,20 +433,23 @@ d('Phase-2 paste flow — RLS integration (memoryRouter)', () => {
       select account_id, kind, model, langfuse_trace_id, latency_ms, query, answer
         from public.interaction
        where account_id = ${A.accountId}
-         and kind = 'paste_extract'
+         and kind in ('paste_extract', 'paste_confirm')
        order by created_at asc
     `);
     expect(afterConfirm.length).toBe(2);
-    // The confirm row carries null latency + null trace id (no AI call here).
+    // Extract row first (chronological).
+    expect(afterConfirm[0].kind).toBe('paste_extract');
+    // Confirm row second; carries null latency + null trace id (no AI call here).
+    expect(afterConfirm[1].kind).toBe('paste_confirm');
     expect(afterConfirm[1].latency_ms).toBeNull();
     expect(afterConfirm[1].langfuse_trace_id).toBeNull();
     expect(afterConfirm[1].model).toBe('claude-sonnet-4-6');
 
-    // Cross-tenant: tenant B has zero paste_extract rows in its view.
+    // Cross-tenant: tenant B has zero paste-related rows in its view.
     const bRls = tenantClient(B.claims);
     await bRls.rls(async (tx) => {
       const rows = await tx.execute<{ n: string }>(
-        sql`select count(*)::text as n from public.interaction where kind = 'paste_extract'`,
+        sql`select count(*)::text as n from public.interaction where kind in ('paste_extract', 'paste_confirm')`,
       );
       expect(Number(rows[0].n)).toBe(0);
     });
