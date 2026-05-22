@@ -91,14 +91,20 @@ export const pipelineStageEnum = pgEnum('pipeline_stage_t', [
 
 /**
  * The kind of interaction that produced an `interaction` row. Phase 2 writes
- * all four kinds. Phase 4+ extend by adding values via ALTER TYPE (we accept
+ * all five kinds. Phase 4+ extend by adding values via ALTER TYPE (we accept
  * that — interaction kinds genuinely grow as new modules ship; provenance
  * jsonb above does NOT, because business_memory column shape is part of the
  * read contract for every other module).
+ *
+ * `paste_extract` writes on the extractor pass (and on security-IR rejection
+ * audit rows; the metadata column carries the rejection reason). `paste_confirm`
+ * writes on confirmDraft success — kept distinct so eval samplers can split
+ * draft-vs-confirmed traffic without parsing answer payloads (Plan 02-03 / T11).
  */
 export const interactionKindEnum = pgEnum('interaction_kind_t', [
   'qa_sidebar',
   'paste_extract',
+  'paste_confirm',
   'file_import',
   'staleness_nudge',
 ]);
@@ -227,6 +233,12 @@ export type PipelineEntryInsert = typeof pipelineEntry.$inferInsert;
  * scrubs them out of structured logs, and the same set must be re-applied at
  * the application layer before write here. This is a downstream constraint;
  * the schema itself only carries text.
+ *
+ *   - metadata jsonb: structured audit signal (security-IR rejection metadata,
+ *     conflict-resolution audit). Nullable. Content boundary: NEVER includes raw
+ *     attack content, paste content, byType detail, or source_snippet beyond 200
+ *     chars. Application layer (Plan 02-03 / T11) is responsible for enforcing
+ *     the shape — the column itself accepts any JSON record.
  */
 export const interaction = pgTable(
   'interaction',
@@ -248,6 +260,10 @@ export const interaction = pgTable(
     model: text('model'), // e.g. 'claude-opus-4-7', 'claude-sonnet-4-6'
     langfuseTraceId: text('langfuse_trace_id'),
     latencyMs: integer('latency_ms'),
+    // Structured audit signal — security-IR rejection metadata,
+    // conflict-resolution audit. Content boundary documented in table header.
+    // Nullable; T11 (Plan 02-03) writes specific shapes, column accepts any.
+    metadata: jsonb('metadata').$type<Record<string, unknown> | null>(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
