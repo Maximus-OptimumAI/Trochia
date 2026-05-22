@@ -102,7 +102,7 @@ export interface ConfirmationCardProps {
    */
   multiValueCandidates?: ProvenanceField[];
   /** Fires when the founder picks a candidate or supplies a custom override. */
-  onResolveConflict?: (chosen: ProvenanceField) => void;
+  onResolveConflict?: (chosen: ProvenanceField, value: unknown) => void;
   /** Per-field validation error (CARRY-2). Empty/undefined → no visual change. */
   errorMessage?: string;
   /**

@@ -85,8 +85,23 @@ export interface ConflictResolverProps {
   fieldLabel: string;
   /** Pre-resolve candidates; ≥2 entries by construction (parent guarantees). */
   candidates: ProvenanceField[];
-  /** Fires with the resolved ProvenanceField (candidate or synthesized override). */
-  onResolve: (chosen: ProvenanceField) => void;
+  /**
+   * Fires with the resolved ProvenanceField (candidate or synthesized override)
+   * AND the derived scalar value for the form's primary field path.
+   *
+   * Two-channel contract (KNW-02c post-Wave-4-B):
+   *   - `chosen` is the canonical provenance entry (radio-pick: the chosen
+   *     candidate as-is; custom-override: the synthesized founder-override
+   *     ProvenanceField with `source_snippet === FOUNDER_OVERRIDE_SNIPPET`).
+   *   - `value` is the raw scalar the form's primary field should adopt
+   *     (radio-pick: extracted from the candidate's `source_snippet` via the
+   *     same logic that powers the radio label; custom-override: the
+   *     customBuffer-typed value).
+   *
+   * For 'number' fields, NaN parses surface as `undefined` — the form's
+   * validation surfaces the issue rather than persisting NaN.
+   */
+  onResolve: (chosen: ProvenanceField, value: unknown) => void;
   /** Input type for the custom-override row. Default `text`. */
   fallbackInputType?: 'text' | 'number';
   /** Pre-fill for the custom input. */
@@ -152,6 +167,43 @@ function extractDisplayValue(
   );
 }
 
+/**
+ * Extract the raw scalar value a candidate represents — distinct from
+ * `extractDisplayValue` which formats for display (Intl currency formatting
+ * returns "$24,750" as a string, not a usable number). This helper owns the
+ * data-path extraction:
+ *
+ *   - 'number' arm: same regex pluck as the display helper; strips
+ *     `[$£€,\s]`; returns `Number(...)`. NaN parses return `undefined` so the
+ *     form's validation surfaces the issue rather than persisting NaN.
+ *   - 'text' arm: the truncated snippet-head string (verbatim, no formatting).
+ *
+ * Returns `undefined` when no scalar can be derived (number arm with no
+ * numeric token, or NaN parse). Callers should pass `undefined` straight
+ * through to `form.setValue` — RHF treats undefined as "leave field empty"
+ * which surfaces under the resolver's own validation.
+ */
+function extractScalarValue(
+  candidate: ProvenanceField,
+  fallbackInputType: 'text' | 'number',
+): string | number | undefined {
+  if (fallbackInputType !== 'number') {
+    const head = candidate.source_snippet.split(/[\n\r]/)[0]?.trim() ?? '';
+    if (head.length === 0) return undefined;
+    return head.length > 120 ? `${head.slice(0, 117).trimEnd()}…` : head;
+  }
+  // Number arm — mirrors extractDisplayValue's regex pluck, but returns the
+  // raw Number instead of an Intl-formatted string. Currency/thousands
+  // separators are stripped before parsing.
+  const match = candidate.source_snippet.match(
+    /[$£€]?\s*-?\d{1,3}(?:[,\s]\d{3})+(?:\.\d+)?|[$£€]?\s*-?\d+(?:\.\d+)?/,
+  );
+  if (!match) return undefined;
+  const cleaned = match[0]!.replace(/[$£€,\s]/g, '');
+  const num = Number(cleaned);
+  return Number.isNaN(num) ? undefined : num;
+}
+
 function formatConfidence(c: number): string {
   // Two-decimal display matches ConfirmationCard. No traffic-light coloring.
   return `${c.toFixed(2)} ${COPY.confidenceSuffix}`;
@@ -196,9 +248,13 @@ export function ConflictResolver({
       const index = Number(stringValue);
       const candidate = safeCandidates[index];
       if (!candidate) return;
-      onResolve(candidate);
+      // Derives the raw scalar from the candidate's source_snippet using the
+      // same logic that powers the radio label display. For 'number' fields,
+      // NaN parses surface as `undefined` — the form's validation handles.
+      const derivedValue = extractScalarValue(candidate, fallbackInputType);
+      onResolve(candidate, derivedValue);
     },
-    [customBuffer, defaultCustomValue, onResolve, safeCandidates],
+    [customBuffer, defaultCustomValue, fallbackInputType, onResolve, safeCandidates],
   );
 
   const handleCustomApply = React.useCallback(() => {
@@ -207,12 +263,19 @@ export function ConflictResolver({
       setCustomInvalid(false);
       return;
     }
+    // Derives the raw scalar from the customBuffer. Number arm strips
+    // currency/whitespace before parsing and bails on NaN (existing guard);
+    // text arm passes the trimmed buffer verbatim.
+    let derivedValue: string | number;
     if (fallbackInputType === 'number') {
       const parsed = Number(trimmed.replace(/[$£€,\s]/g, ''));
       if (Number.isNaN(parsed)) {
         setCustomInvalid(true);
         return;
       }
+      derivedValue = parsed;
+    } else {
+      derivedValue = trimmed;
     }
     setCustomInvalid(false);
     setSelected(null);
@@ -231,7 +294,7 @@ export function ConflictResolver({
       last_updated: now,
       snooze_until: null,
     };
-    onResolve(synthesized);
+    onResolve(synthesized, derivedValue);
   }, [customBuffer, fallbackInputType, onResolve, safeCandidates]);
 
   const handleCustomKeyDown = (

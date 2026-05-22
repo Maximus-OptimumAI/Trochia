@@ -527,7 +527,7 @@ export function ConfirmationForm({
 
   /**
    * Resolve a multi-candidate provenance entry. The ConflictResolver delivers
-   * one of two shapes via its `onResolve(chosen)` callback:
+   * one of two shapes via its `onResolve(chosen, value)` callback:
    *
    *   - **Radio-pick:** `chosen` is a reference-equal element of the original
    *     `candidates[]` array. We locate the index by `===` reference identity
@@ -543,17 +543,18 @@ export function ConfirmationForm({
    *     layer recognizes the FOUNDER_OVERRIDE_SNIPPET sentinel as the
    *     non-extractor origin marker.
    *
-   * KNOWN CONTRACT GAP (surfaced to plan-checker, see return summary): the
-   * ProvenanceField shape does NOT carry the scalar value. Radio-pick leaves
-   * the form's primary scalar at the extractor's initial draft value (which
-   * is one of the candidates' implied values — typically the first). Custom
-   * override commits the founder-typed value into provenance metadata only
-   * and never propagates to the scalar form field. Both gaps are inside the
-   * resolver's contract, not this form's responsibility to backfill.
+   * Two-channel contract (post-Wave-4-B contract-gap fix): the resolver also
+   * surfaces the founder-selected scalar value alongside the chosen provenance
+   * entry. The value flows through `form.setValue(`payload.${fieldKey}`)` so
+   * the form's primary scalar field reflects the chosen candidate (radio-pick)
+   * or the founder-typed override (custom-override). Without this, the form's
+   * primary scalar stayed at the extractor's initial draft value while
+   * provenance collapsed to the chosen candidate — surfacing as a mismatched
+   * payload at confirmDraft time.
    */
   const handleResolveConflict = React.useCallback(
     (fieldKey: string, candidates: ProvenanceField[]) =>
-      (chosen: ProvenanceField) => {
+      (chosen: ProvenanceField, value: unknown) => {
         let collapsed: ProvenanceField;
         if (chosen.source_snippet === FOUNDER_OVERRIDE_SNIPPET) {
           // Custom-override path — no losers to archive; store verbatim.
@@ -572,6 +573,36 @@ export function ConfirmationForm({
             collapsed = chooseProvenance(candidates, chosenIndex);
           }
         }
+        // Updates the form's primary scalar value for this field. The
+        // `as never` cast mirrors the existing rhf workaround in
+        // `transitionFieldBackToPending` — react-hook-form's setValue is
+        // over-constrained for runtime-dynamic FieldPath, but the call is
+        // sound because fieldPath is built from the same schema the form
+        // was instantiated with.
+        form.setValue(`payload.${fieldKey}` as never, value as never, {
+          shouldValidate: true,
+          shouldDirty: true,
+        });
+        // Mirror the resolved scalar into the local stateMap so the pending
+        // field carries the chosen value forward into Confirm / Reject / Edit
+        // downstream. buildPayload reads from stateMap for terminal fields
+        // but pending fields surface the value via the card's draftValue
+        // prop, which sources from stateMap; without this mirror, the card
+        // would still render the extractor's first-guess scalar (the
+        // initialDraft pre-resolve value) until the founder clicked Confirm.
+        // The useEffect below re-syncs the rhf payload from buildPayload on
+        // every stateMap change, so the form.setValue call above is the
+        // belt-and-braces write while this mirror is the source of truth.
+        setStateMap((prev) => {
+          const existing = prev[fieldKey];
+          return {
+            ...prev,
+            [fieldKey]: {
+              value: value as ConfirmationValue,
+              status: existing?.status ?? 'pending',
+            },
+          };
+        });
         setResolvedProvenance((prev) => {
           const next = new Map(prev);
           next.set(fieldKey, collapsed);
@@ -583,7 +614,7 @@ export function ConfirmationForm({
           return next;
         });
       },
-    [],
+    [form],
   );
 
   /**
