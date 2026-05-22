@@ -1,14 +1,23 @@
 'use client';
 
 import * as React from 'react';
-import { useForm, Controller, type Control } from 'react-hook-form';
+import {
+  useForm,
+  Controller,
+  type Control,
+  type FieldErrors,
+} from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 import {
   businessMemoryConfirmedSchema,
+  chooseProvenance,
+  FOUNDER_OVERRIDE_SNIPPET,
+  isProvenanceArray,
   type BusinessMemoryConfirmed,
   type BusinessMemoryDraft,
   type Provenance,
+  type ProvenanceEntry,
   type ProvenanceField,
 } from '@/ai/schemas/business-memory.zod';
 import { Button } from '@/components/ui/button';
@@ -54,6 +63,49 @@ import {
  *   - Tokens-only Tailwind. No raw hex, no new fonts. Voice held: Trochia
  *     drafts / cites / tracks. No "we", "I", "happy", "love", "feel", "want",
  *     "help", "hope", or emoji in any visible string.
+ *
+ * ## Week-3 additions (Plan 02-03)
+ *
+ * Four surgical extensions land here in T10, all additive — every Plan 02-02
+ * field-rendering path stays byte-equivalent on the no-conflict / no-error
+ * branch:
+ *
+ *   1. **CARRY-2 — per-field error propagation.** The form walks
+ *      `form.formState.errors` via a dot/bracket-aware `pickError` helper and
+ *      forwards a per-card `errorMessage` prop to every ConfirmationCard.
+ *      The previously-static `errorBanner` ("Some fields are invalid…") is
+ *      replaced by an operator-voice dynamic-count banner — "1 field needs
+ *      attention" / "N fields need attention" — that only renders post-submit
+ *      to avoid pre-validation noise.
+ *
+ *   2. **Conflict-resolver gating.** Multi-candidate provenance entries
+ *      (`isProvenanceArray(provenance[fieldKey])`) flow into the card as
+ *      `multiValueCandidates` + `onResolveConflict`. The form tracks
+ *      resolution in a `resolvedMap` and the submit gate is EXTENDED — the
+ *      existing every-field-terminal predicate stays; ANDed with "every
+ *      conflict resolved." The summary line gains a "N conflicts unresolved"
+ *      tail while any remain. On resolve, `chooseProvenance` collapses the
+ *      array → single canonical entry + archives losers under
+ *      `rejected_alternatives`; the founder-override path receives a
+ *      synthesized entry directly from ConflictResolver (sentinel
+ *      `FOUNDER_OVERRIDE_SNIPPET` is recognized and stored verbatim, no
+ *      `chooseProvenance` collapse since there are no losers to archive).
+ *
+ *   3. **CARRY-1 — Undo from terminal states.** Confirmed and rejected cards
+ *      now receive `canUndo` + `onUndo`. The Undo handler transitions the
+ *      field's status back to `pending` and, for the rejected arm, restores
+ *      the original draft value from the form's `defaultValues` snapshot
+ *      (`pickByPath` mirrors `pickError`'s path-walking). Re-validation fires
+ *      via `form.trigger`.
+ *
+ *   4. **fallbackInputType wiring.** Numeric traction fields (`traction.mrr`,
+ *      `traction.arr`, `traction.valuation`, `traction.customers`,
+ *      `traction.burn`) pass `fallbackInputType="number"` down to the resolver
+ *      so the custom-override input renders as a number arm with NaN guard.
+ *
+ * Audit boundary: this component imports ONLY from `@/ai/schemas/**`. NEVER
+ * from `@/ai/agents/**`, `@/ai/client`, `@/server/*`, or `@anthropic-ai/sdk`.
+ * Grep-verifiable; Plan 02-03's check:imports enforces.
  */
 
 // ─── Operator-voice copy (the ONLY visible strings this form renders) ─────
@@ -68,7 +120,16 @@ const COPY = {
   submit: 'Save and continue',
   submitting: 'Saving…',
   submitDisabledHint: 'Confirm, edit, or reject every drafted field before saving.',
-  errorBanner: 'Some fields are invalid. Review the cards flagged below.',
+  // CARRY-2 — dynamic-count banner. Singular form renders the "1 field" arm;
+  // plural form takes the N≥2 arm. Operator voice; no "we found", no "Sorry",
+  // no apology. Renders only post-submit (form.formState.isSubmitted).
+  errorBannerOne: '1 field needs attention',
+  errorBannerMany: (n: number) => `${n} fields need attention`,
+  // Conflict-resolver gate — appended to the existing summary line when any
+  // multi-candidate field has not been resolved. "1 conflict unresolved" /
+  // "N conflicts unresolved" reads cleanly across N≥1.
+  conflictsRemaining: (n: number) =>
+    `${n} conflict${n === 1 ? '' : 's'} unresolved`,
 } as const;
 
 // ─── Field rendering metadata ─────────────────────────────────────────────
@@ -257,6 +318,56 @@ function deepClone<T>(input: T): T {
   return structuredClone(input);
 }
 
+/**
+ * Walk a dot/bracket-pathed key into a possibly-nested object, returning the
+ * leaf value if reachable or `undefined` otherwise. Used by:
+ *
+ *   - `pickError` — walks `form.formState.errors` and returns the `.message`
+ *     string at the leaf if rhf wrote a FieldError there.
+ *   - CARRY-1 Undo restore — walks `form.formState.defaultValues` to recover
+ *     the original draft value for a rejected field.
+ *
+ * Path examples: `companyName` → ['companyName']; `traction.mrr` →
+ * ['traction', 'mrr']; `team.founders[0].name` → ['team', 'founders', '0',
+ * 'name']. Bracket indices and dotted indices both normalize via the same
+ * split regex (mirrors `setByPath`'s segment handling).
+ */
+function splitPath(path: string): string[] {
+  return path.split(/[.[\]]+/).filter(Boolean);
+}
+
+function pickByPath(source: unknown, path: string): unknown {
+  const segments = splitPath(path);
+  let cursor: unknown = source;
+  for (const seg of segments) {
+    if (cursor == null || typeof cursor !== 'object') return undefined;
+    // Array index → numeric key works because JS arrays are records; the
+    // rhf errors tree also nests arrays as numeric-keyed objects.
+    cursor = (cursor as Record<string, unknown>)[seg];
+  }
+  return cursor;
+}
+
+/**
+ * Walk `form.formState.errors` at `path` and return the leaf `.message` if
+ * present. rhf places a `FieldError` at the leaf for primitive fields and
+ * nests deeper for arrays/objects; the walk handles both shapes. Pure
+ * function; the rhf `FieldErrors` type is the only react-hook-form internal
+ * crossing the boundary.
+ */
+function pickError(errors: FieldErrors, path: string): string | undefined {
+  const leaf = pickByPath(errors, path);
+  if (
+    leaf &&
+    typeof leaf === 'object' &&
+    'message' in leaf &&
+    typeof (leaf as { message?: unknown }).message === 'string'
+  ) {
+    return (leaf as { message: string }).message;
+  }
+  return undefined;
+}
+
 export function ConfirmationForm({
   initialDraft,
   onSubmit,
@@ -275,6 +386,25 @@ export function ConfirmationForm({
     return out;
   }, [fields]);
   const [stateMap, setStateMap] = React.useState<FieldStateMap>(initialStateMap);
+  // Conflict-resolution map (KNW-02c / T10). Tracks which multi-candidate
+  // fields the founder has resolved this session. Mirrors the `stateMap`
+  // pattern: separate from the rhf payload because the payload only carries
+  // the post-collapse provenance, not the pre-resolve gate state. Empty by
+  // default; entries are set true by `handleResolveConflict` and dropped
+  // back to false by `transitionFieldBackToPending` for resolved-then-undone
+  // fields.
+  const [resolvedMap, setResolvedMap] = React.useState<Map<string, boolean>>(
+    () => new Map(),
+  );
+  // Companion map: the COLLAPSED single-object provenance entry chosen by the
+  // founder for each resolved field. Read by `buildPayload` so the assembled
+  // BusinessMemoryConfirmed carries the post-resolve canonical entry (with
+  // `rejected_alternatives` audit trail) instead of the original pre-resolve
+  // ProvenanceField[] arm. Empty by default; entries are written by
+  // `handleResolveConflict` and dropped by `transitionFieldBackToPending`.
+  const [resolvedProvenance, setResolvedProvenance] = React.useState<
+    Map<string, ProvenanceField>
+  >(() => new Map());
   // Reset when the draft changes (e.g. a re-extract feeds a new initialDraft in).
   // React 19 "adjust state on prop change" pattern: track the last-seen draft
   // identity and resync during render — avoids the cascading-render useEffect
@@ -283,6 +413,10 @@ export function ConfirmationForm({
   if (lastSeenDraft !== initialDraft) {
     setLastSeenDraft(initialDraft);
     setStateMap(initialStateMap);
+    // Re-extract starts the conflict-resolution slate fresh — any prior
+    // resolution belongs to the previous draft and should not persist.
+    setResolvedMap(new Map());
+    setResolvedProvenance(new Map());
   }
 
   const form = useForm<FormShape>({
@@ -315,7 +449,62 @@ export function ConfirmationForm({
     return { confirmed, edited, rejected, pending };
   }, [fields, stateMap]);
 
-  const canSubmit = counts.pending === 0 && fields.length > 0 && !isSubmitting;
+  // Multi-candidate provenance map drawn from the initialDraft. Lives off the
+  // rhf payload because the payload's provenance arm is the post-resolve
+  // single-object shape; the pre-resolve array is the conflict-detection
+  // source. Frozen against re-extract by the lastSeenDraft sync above —
+  // every conflict-related count below derives from this constant per draft.
+  const provenanceArrayMap = React.useMemo(() => {
+    const out = new Map<string, ProvenanceField[]>();
+    const provenance = initialDraft.provenance ?? {};
+    for (const f of fields) {
+      const entry = provenance[f.key] as ProvenanceEntry | undefined;
+      if (entry !== undefined && isProvenanceArray(entry)) {
+        out.set(f.key, entry);
+      }
+    }
+    return out;
+  }, [initialDraft, fields]);
+
+  // CARRY-2 — per-card error count derived from rhf's errors tree. The
+  // payload sits under `payload.<fieldKey>` because of the resolver wrap
+  // above; pickError walks the dot/bracket path and returns the leaf
+  // .message. Only fields with a non-empty error contribute to the count.
+  const errorCount = React.useMemo(() => {
+    let n = 0;
+    for (const f of fields) {
+      if (pickError(form.formState.errors, `payload.${f.key}`) !== undefined) {
+        n++;
+      }
+    }
+    return n;
+  }, [fields, form.formState.errors]);
+
+  // Conflict-gate count — every multi-candidate field that the founder has
+  // not yet resolved this session contributes one. Resolved fields are those
+  // where `resolvedMap.get(fieldKey) === true`; absence and `false` both
+  // count as unresolved (the latter occurs after Undo re-arms a resolved
+  // multi-candidate field). Drives both the summary-line tail and the
+  // submit-gate AND clause below.
+  const conflictsRemaining = React.useMemo(() => {
+    let n = 0;
+    for (const [fieldKey] of provenanceArrayMap) {
+      if (resolvedMap.get(fieldKey) !== true) n++;
+    }
+    return n;
+  }, [provenanceArrayMap, resolvedMap]);
+
+  // Submit-gate predicate — EXTENDS the pre-T10 contract additively. The
+  // existing "all fields in terminal state + form non-empty + not currently
+  // submitting" predicate stays; conflictsRemaining === 0 is ANDed on. The
+  // original conditions remain the only thing that gates a no-conflict
+  // form, so Plan 02-02's behavior is preserved byte-equivalent on drafts
+  // with no multi-candidate provenance entries.
+  const canSubmit =
+    counts.pending === 0 &&
+    fields.length > 0 &&
+    !isSubmitting &&
+    conflictsRemaining === 0;
 
   const handleCardConfirm = (key: string, next: { value: ConfirmationValue }) => {
     setStateMap((prev) => ({
@@ -336,6 +525,136 @@ export function ConfirmationForm({
     }));
   };
 
+  /**
+   * Resolve a multi-candidate provenance entry. The ConflictResolver delivers
+   * one of two shapes via its `onResolve(chosen)` callback:
+   *
+   *   - **Radio-pick:** `chosen` is a reference-equal element of the original
+   *     `candidates[]` array. We locate the index by `===` reference identity
+   *     (the resolver passes the same object it received from its props) and
+   *     run `chooseProvenance(candidates, index)` to collapse the array →
+   *     single entry + archive losers under `rejected_alternatives`.
+   *
+   *   - **Custom override:** `chosen.source_snippet === FOUNDER_OVERRIDE_SNIPPET`.
+   *     The synthesized field is stored verbatim — there are no rejected
+   *     alternatives from the founder's perspective (the founder rejected ALL
+   *     candidates by typing a new value), and the schema's `chooseProvenance`
+   *     contract requires a winner from the candidates array. The audit
+   *     layer recognizes the FOUNDER_OVERRIDE_SNIPPET sentinel as the
+   *     non-extractor origin marker.
+   *
+   * KNOWN CONTRACT GAP (surfaced to plan-checker, see return summary): the
+   * ProvenanceField shape does NOT carry the scalar value. Radio-pick leaves
+   * the form's primary scalar at the extractor's initial draft value (which
+   * is one of the candidates' implied values — typically the first). Custom
+   * override commits the founder-typed value into provenance metadata only
+   * and never propagates to the scalar form field. Both gaps are inside the
+   * resolver's contract, not this form's responsibility to backfill.
+   */
+  const handleResolveConflict = React.useCallback(
+    (fieldKey: string, candidates: ProvenanceField[]) =>
+      (chosen: ProvenanceField) => {
+        let collapsed: ProvenanceField;
+        if (chosen.source_snippet === FOUNDER_OVERRIDE_SNIPPET) {
+          // Custom-override path — no losers to archive; store verbatim.
+          collapsed = chosen;
+        } else {
+          // Radio-pick path — locate index by reference identity. Resolver
+          // hands back the same candidate object it received from props.
+          const chosenIndex = candidates.findIndex((c) => c === chosen);
+          if (chosenIndex < 0) {
+            // Defensive — the resolver's contract guarantees reference
+            // identity. If a future refactor breaks that, fall back to
+            // storing the chosen entry as-is rather than throwing inside
+            // a callback (which would surface as an unhandled React error).
+            collapsed = chosen;
+          } else {
+            collapsed = chooseProvenance(candidates, chosenIndex);
+          }
+        }
+        setResolvedProvenance((prev) => {
+          const next = new Map(prev);
+          next.set(fieldKey, collapsed);
+          return next;
+        });
+        setResolvedMap((prev) => {
+          const next = new Map(prev);
+          next.set(fieldKey, true);
+          return next;
+        });
+      },
+    [],
+  );
+
+  /**
+   * CARRY-1 — drop a confirmed/rejected/edited card back to pending.
+   *
+   *   - Status returns to `'pending'` in the local stateMap.
+   *   - For rejected fields: the original draft value (captured at mount via
+   *     `defaultValues`) is restored into the form via `form.setValue`. The
+   *     defaultValues snapshot lives under `payload.<fieldKey>` due to the
+   *     resolver-wrap; pickByPath walks the dot/bracket path identically to
+   *     pickError.
+   *   - For resolved multi-candidate fields: the resolution map entry is
+   *     also dropped — the card re-renders the conflict UI and the submit
+   *     gate re-arms.
+   *   - rhf's per-field validation re-runs via `form.trigger`. The form's
+   *     server-side row stays untouched until the founder re-submits (this
+   *     is form-state-only state restoration).
+   */
+  const transitionFieldBackToPending = React.useCallback(
+    (key: string) => {
+      const prevStatus = stateMap[key]?.status;
+      const originalValue = pickByPath(
+        form.formState.defaultValues as unknown,
+        `payload.${key}`,
+      );
+      setStateMap((prev) => {
+        const f = fields.find((field) => field.key === key);
+        // Snap the local value back to the original draft so a subsequent
+        // re-edit starts from the same baseline the extractor surfaced.
+        const restoredValue =
+          prevStatus === 'rejected' && originalValue !== undefined
+            ? (originalValue as ConfirmationValue)
+            : (f?.value ?? prev[key]?.value ?? null);
+        return {
+          ...prev,
+          [key]: { value: restoredValue, status: 'pending' },
+        };
+      });
+      // For previously-rejected fields, write the restored value back into
+      // the rhf payload so the controlled card re-renders with the original
+      // draft — not the null the rejection wrote.
+      if (prevStatus === 'rejected' && originalValue !== undefined) {
+        form.setValue(`payload.${key}` as never, originalValue as never, {
+          shouldValidate: false,
+          shouldDirty: false,
+        });
+      }
+      // Drop the conflict-resolution gate so the card re-arms the resolver
+      // if this field was a multi-candidate one. The payload's provenance
+      // entry gets re-pointed at the original ProvenanceField[] arm on the
+      // next buildPayload sync (resolvedProvenance no longer carries it).
+      if (provenanceArrayMap.has(key)) {
+        setResolvedProvenance((prev) => {
+          if (!prev.has(key)) return prev;
+          const next = new Map(prev);
+          next.delete(key);
+          return next;
+        });
+        setResolvedMap((prev) => {
+          if (!prev.has(key)) return prev;
+          const next = new Map(prev);
+          next.delete(key);
+          return next;
+        });
+      }
+      // Re-run validation to clear any stale error rhf may have attached.
+      form.trigger(`payload.${key}` as never);
+    },
+    [stateMap, fields, form, provenanceArrayMap],
+  );
+
   const buildPayload = React.useCallback((): BusinessMemoryConfirmed => {
     // Start from the original draft; apply each card's terminal state into
     // the right path; bump provenance.last_updated for edited fields;
@@ -346,6 +665,15 @@ export function ConfirmationForm({
     });
     const provenance: Provenance = { ...(out.provenance ?? {}) };
     const now = nowIso();
+    // T10 — fold resolved multi-candidate provenance back into the payload
+    // FIRST. The downstream rejected/edited bumps below operate on the
+    // already-collapsed single-object entry. Without this fold, the payload's
+    // provenance arm would still carry the original ProvenanceField[] for
+    // resolved fields, which fails the post-confirm schema (the persisted
+    // shape is single-object only).
+    for (const [fieldKey, entry] of resolvedProvenance) {
+      provenance[fieldKey] = entry;
+    }
     for (const f of fields) {
       const s = stateMap[f.key];
       if (!s) continue;
@@ -353,7 +681,7 @@ export function ConfirmationForm({
         // Null out the value at its path.
         setByPath(out as unknown as Record<string, unknown>, f.key, null);
         const entry = provenance[f.key];
-        if (entry) {
+        if (entry && !isProvenanceArray(entry)) {
           provenance[f.key] = {
             ...entry,
             last_updated: now,
@@ -365,7 +693,7 @@ export function ConfirmationForm({
       } else if (s.status === 'edited') {
         setByPath(out as unknown as Record<string, unknown>, f.key, s.value);
         const entry = provenance[f.key];
-        if (entry) {
+        if (entry && !isProvenanceArray(entry)) {
           provenance[f.key] = { ...entry, last_updated: now };
         }
       } else if (s.status === 'confirmed') {
@@ -375,7 +703,7 @@ export function ConfirmationForm({
     }
     out.provenance = provenance;
     return out;
-  }, [initialDraft, fields, stateMap]);
+  }, [initialDraft, fields, stateMap, resolvedProvenance]);
 
   const handleSubmit = form.handleSubmit(async () => {
     const payload = buildPayload();
@@ -383,11 +711,14 @@ export function ConfirmationForm({
   });
 
   // Mirror the assembled payload into the rhf state on every status change so
-  // zodResolver validates the right shape on submit.
+  // zodResolver validates the right shape on submit. Depends on
+  // `resolvedProvenance` so a conflict-resolution write re-syncs the payload's
+  // collapsed provenance entry — without it, the rhf state would still carry
+  // the original ProvenanceField[] arm at submit time.
   React.useEffect(() => {
     const next = buildPayload();
     form.setValue('payload', next, { shouldValidate: false, shouldDirty: true });
-  }, [stateMap, buildPayload, form]);
+  }, [stateMap, resolvedProvenance, buildPayload, form]);
 
   return (
     <form
@@ -405,6 +736,30 @@ export function ConfirmationForm({
         {fields.map((f) => {
           const provenanceEntry = lookupProvenance(initialDraft.provenance ?? {}, f.key);
           const state = stateMap[f.key] ?? { value: f.value, status: 'pending' as const };
+          // T10 — per-card wiring. Pull the multi-candidate arm (if any),
+          // the per-field error from rhf's tree, and the CARRY-1 Undo
+          // affordance gate. Every prop below is OPTIONAL on the card —
+          // a draft with no conflicts + no errors + no submitted state
+          // renders byte-equivalent to the Plan 02-02 baseline.
+          const candidates = provenanceArrayMap.get(f.key);
+          const errorMessage = pickError(
+            form.formState.errors,
+            `payload.${f.key}`,
+          );
+          // CARRY-1 gate: terminal-state cards expose Undo. Edited fields
+          // also get Undo (the founder can step back to pending and re-edit
+          // from the original draft snapshot).
+          const canUndo =
+            state.status === 'confirmed' ||
+            state.status === 'rejected' ||
+            state.status === 'edited';
+          // Numeric arm for the resolver's custom-override input. Currency
+          // + count traction leaves use the number input + NaN guard; every
+          // other field stays on text.
+          const fallbackInputType: 'text' | 'number' =
+            /^traction\.(mrr|arr|valuation|customers|burn)$/.test(f.key)
+              ? 'number'
+              : 'text';
           return (
             <Controller
               key={f.key}
@@ -421,6 +776,17 @@ export function ConfirmationForm({
                   onConfirm={(next) => handleCardConfirm(f.key, next)}
                   onReject={() => handleCardReject(f.key)}
                   onEdit={(next) => handleCardEdit(f.key, next)}
+                  multiValueCandidates={candidates}
+                  onResolveConflict={
+                    candidates
+                      ? handleResolveConflict(f.key, candidates)
+                      : undefined
+                  }
+                  isConflictResolved={resolvedMap.get(f.key) === true}
+                  fallbackInputType={fallbackInputType}
+                  errorMessage={errorMessage}
+                  canUndo={canUndo}
+                  onUndo={() => transitionFieldBackToPending(f.key)}
                 />
               )}
             />
@@ -445,6 +811,21 @@ export function ConfirmationForm({
             {counts.pending}
           </span>{' '}
           {COPY.summaryPending}
+          {/* T10 — conflict-gate tail. Renders only when any multi-candidate
+              field remains unresolved; collapses cleanly when the gate
+              clears so a draft with no conflicts shows the Plan 02-02
+              summary line unchanged. */}
+          {conflictsRemaining > 0 && (
+            <>
+              <span aria-hidden> · </span>
+              <span
+                className="font-mono text-sm text-ink"
+                data-testid="confirmation-form-summary-conflicts"
+              >
+                {COPY.conflictsRemaining(conflictsRemaining)}
+              </span>
+            </>
+          )}
         </p>
         <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:gap-3">
           {!canSubmit && counts.pending > 0 && (
@@ -463,13 +844,20 @@ export function ConfirmationForm({
         </div>
       </div>
 
-      {form.formState.errors.payload && (
+      {/* CARRY-2 — dynamic-count error banner. Only renders post-submit
+          (form.formState.isSubmitted) to avoid pre-validation noise; the
+          singular form takes the N=1 arm, plural takes N≥2. The testid is
+          preserved verbatim from Plan 02-02 so the Playwright spec's
+          selector continues to resolve. */}
+      {form.formState.isSubmitted && errorCount > 0 && (
         <p
           className="text-body-sm text-danger"
           role="alert"
           data-testid="confirmation-form-error"
         >
-          {COPY.errorBanner}
+          {errorCount === 1
+            ? COPY.errorBannerOne
+            : COPY.errorBannerMany(errorCount)}
         </p>
       )}
     </form>
