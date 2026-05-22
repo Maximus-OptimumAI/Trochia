@@ -72,3 +72,34 @@ T7 used git stash inside worktree to investigate a pre-existing failure.
 **Improvement**: Document throwaway-WIP-branch pattern as the right way to
 investigate trunk-vs-worktree behavior differences. Add to gsd-executor skill.
 **Estimated effort**: 30 min (doc update, no code change)
+
+## P4.5-POLISH-08: Worktree isolation breach on Windows (Claude Code #3099 class)
+
+**Severity**: Internal process (recovery worked, atomicity broken)
+**Cause**: Parallel agents on Wave 4-B/4-C had Edit/Write calls land in main
+repo working tree instead of their worktrees. 4-B never recovered (salvaged
+via in-place commit); 4-C self-recovered via cp + git checkout.
+**Impact**: Cannot rely on worktree isolation as safety guarantee on Windows
+until upstream fix.
+**Workaround**: Sequential single-task execution until #3099 resolves, OR
+post-merge integrity check (manual diff of main vs worktree branches).
+
+## P4.5-POLISH-09: gsd-executor worktree branch-check safety hole
+
+**Severity**: Internal process
+**Cause**: `<worktree_branch_check>` uses `git merge-base HEAD <expected> ==
+<expected>`. This passes when worktree HEAD is an ANCESTOR of expected (because
+merge-base returns the older one). Wave 4-B worktree HEAD was 19 commits behind
+expected base and check still passed.
+**Fix**: Replace with `git rev-list --count <expected>..HEAD == 0`
+(HEAD must be at-or-after expected).
+
+## P4.5-POLISH-08: Worktree isolation breach on Windows (Claude Code #3099 class)
+**Symptom**: Parallel agents' Edit/Write calls silently land in main repo working tree instead of worktrees.
+**Trigger**: Plan 02-03 Wave 4-B/4-C, 2026-05-22.
+**Workaround**: Sequential single-task execution (Option 1) until upstream #3099 resolves.
+
+## P4.5-POLISH-09: gsd-executor worktree branch-check safety hole
+**Symptom**: `<worktree_branch_check>` uses `git merge-base HEAD <expected> == <expected>`. Passes when worktree HEAD is an ancestor of expected.
+**Trigger**: Wave 4-B worktree HEAD was 19 commits behind expected; check still passed.
+**Fix**: Replace with `git rev-list --count <expected>..HEAD == 0` (HEAD at-or-after expected).
