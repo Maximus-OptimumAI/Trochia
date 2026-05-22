@@ -44,6 +44,67 @@
  * the AGENT, never the SDK. The XC-05 ESLint boundary forbids the Anthropic
  * client package outside `src/ai/**`; this router sits in `src/server/**` and
  * respects that. Grep for the package name in this file returns zero hits.
+ *
+ * ## Week-3 additions (Plan 02-03 / Task 11)
+ *
+ * Five surgical wires landed on top of the Plan 02-02 surface — every 02-02
+ * race-condition fix from commit `3be8fa6` (atomic upsert + `isNull(confirmedAt)`
+ * confirm guard) is preserved byte-for-byte.
+ *
+ *   1. **Output shape extension (additive)** — `extractFromPaste` now returns
+ *      `pii: { redactionsApplied, byType }` and an extended `injectionScreen`
+ *      whose `severity` field surfaces to the UI (the UI banner reads it).
+ *      Severity at this point is bounded to `'none' | 'low' | 'medium'`; the
+ *      `'high' | 'critical'` bands never reach the procedure body because the
+ *      agent throws `AI_INJECTION_REJECTED` first. The destructure carries
+ *      defensive defaults so the Plan 02-02 RLS-test mock (which returns the
+ *      pre-Week-3 shape) continues to pass — see workaround note inline.
+ *
+ *   2. **`AI_INJECTION_REJECTED` → `BAD_REQUEST` mapping** — the existing
+ *      `rethrowAgentError` switch grew one case. The original `AppError.cause`
+ *      is preserved so callers + Sentry can correlate the AI-side throw to the
+ *      tRPC-side rejection.
+ *
+ *   3. **Security-IR audit row on rejection (plan-checker FLAG-1)** — when the
+ *      agent throws `AI_INJECTION_REJECTED`, the router writes a fresh
+ *      `interaction` row (kind `paste_extract`, `metadata = { rejected: true,
+ *      severity, categoryCount }`) BEFORE re-throwing as `BAD_REQUEST`. The
+ *      metadata column is the audit boundary: it carries severity band +
+ *      category count ONLY. NEVER raw paste content, NEVER matched substrings,
+ *      NEVER the `byType` breakdown, NEVER `source_snippet` text. If the
+ *      audit-row insert itself fails (DB outage), the failure is logged and
+ *      swallowed — the founder still gets the `BAD_REQUEST` response, which is
+ *      the correct security posture (rejecting the attack is more important
+ *      than the audit trail being complete).
+ *
+ *      Implementation note: the T6 `AppError` carries `{ status, code, message,
+ *      cause }` only — there is no structured `context` field. The message
+ *      format is `"Paste rejected: <N> high-severity injection markers across
+ *      <M> categories."` (literal "high-severity" regardless of whether the
+ *      classifier emitted `'high'` or `'critical'`). We regex-parse `<N>` and
+ *      `<M>` from the message; severity records as `null` rather than echoing
+ *      a misleading literal. A future `AppError` shape upgrade (structured
+ *      `context: { severity, categoryCount }`) would replace this regex with a
+ *      direct read. See `tasks/lessons.md` for the deferred follow-up.
+ *
+ *   4. **`CONFLICT_UNRESOLVED` server backstop on `confirmDraft`** — before
+ *      writing, the router walks every `confirmed.provenance` entry. If any
+ *      entry is still an array (the founder somehow submitted without
+ *      resolving the in-form conflict resolver), throw `TRPCError CONFLICT`
+ *      with cause `AppError({ code: 'CONFLICT_UNRESOLVED' })`. The submit gate
+ *      in Task 10's confirmation form should prevent this; the server is the
+ *      backstop for form-bypass attacks.
+ *
+ *   5. **Post-confirm conflict-resolution audit metadata** — the confirm-side
+ *      `interaction` row's kind switched to `'paste_confirm'` (added in
+ *      precursor `d5902ef`). Its `metadata` jsonb captures
+ *      `resolvedFields: [{ fieldKey, chosenSourceSnippet (≤ 200 chars),
+ *      rejectedCount }]` for every field whose provenance carries a
+ *      `rejected_alternatives` audit trail. Snippet is capped at 200 chars
+ *      (audit visibility without leaking content to logs); `byType` and full
+ *      `source_snippet` never enter `logger.*`. The metadata column is the
+ *      audit boundary; the logger remains content-blind. When zero conflicts
+ *      were resolved, `resolvedFields` is omitted (no empty-array noise).
  */
 import { TRPCError } from '@trpc/server';
 import { and, eq, isNull } from 'drizzle-orm';
@@ -52,8 +113,10 @@ import { z } from 'zod';
 import { extractFromPaste as extractFromPasteAgent } from '@/ai/agents/extract-from-paste.agent';
 import {
   businessMemoryConfirmedSchema,
+  isProvenanceArray,
   type BusinessMemoryDraft,
   type Provenance,
+  type ProvenanceField,
 } from '@/ai/schemas/business-memory.zod';
 import { businessMemory, interaction, type BusinessMemoryRow } from '@/db/schema/memory';
 import { AppError, isAppError } from '@/lib/errors';
@@ -91,21 +154,41 @@ const confirmDraftInputSchema = z.object({
 /** Model id stamped into `interaction.model` for paste-extract rows. */
 const EXTRACT_MODEL_ID = 'claude-sonnet-4-6';
 
+/**
+ * Cap on `chosenSourceSnippet` length inside the post-confirm audit metadata.
+ * 200 chars matches the extractor's `source_snippet` instruction in the system
+ * prompt (`docs/Trochia_AI_Phase_2_PLAN_v1.md` + the agent's prompt) so the
+ * audit row carries the FULL canonical snippet, while still capping in case
+ * the extractor emits a longer string. Sets the audit boundary: enough signal
+ * for security-IR + eval sampling, not enough to leak full provenance content
+ * into the structured-log surface (the `metadata` jsonb column is the only
+ * place the snippet lives; logger payloads stay content-blind).
+ */
+const CONFLICT_AUDIT_SNIPPET_CAP = 200;
+
 // ────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ────────────────────────────────────────────────────────────────────────────
 
 /**
- * Map an agent-side `AppError` into a tRPC error. Length errors are 400s;
+ * Map an agent-side `AppError` into a tRPC error. Length errors and the Week-3
+ * injection-rejection are 400s (caller-facing — the founder can fix and retry);
  * banned-output / structured-output failures are 500s (the model misbehaved —
  * this is an internal AI problem, not a caller problem). Anything else
  * re-throws as INTERNAL_SERVER_ERROR.
+ *
+ * `AI_INJECTION_REJECTED` (Plan 02-03 / Task 6) → `BAD_REQUEST`. The original
+ * `AppError` is preserved as `cause` so Sentry + tRPC error formatters can
+ * correlate. The message format from the agent is `"Paste rejected: <N>
+ * high-severity injection markers across <M> categor(y|ies)."` — caller-safe
+ * (no matched substrings, no paste content).
  */
 function rethrowAgentError(err: unknown): never {
   if (isAppError(err)) {
     switch (err.code) {
       case 'PASTE_TOO_SHORT':
       case 'PASTE_TOO_LONG':
+      case 'AI_INJECTION_REJECTED':
         throw new TRPCError({ code: 'BAD_REQUEST', message: err.message, cause: err });
       case 'AI_BANNED_OUTPUT':
       case 'AI_STRUCTURED_OUTPUT_INVALID':
@@ -118,6 +201,48 @@ function rethrowAgentError(err: unknown): never {
     throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: err.message, cause: err });
   }
   throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Extractor failed.' });
+}
+
+/**
+ * Parse a security-IR audit context out of an `AI_INJECTION_REJECTED` message.
+ *
+ * **Workaround (Plan 02-03 / Task 11):** The current `AppError` shape carries
+ * `{ status, code, message, cause }` only — there is no structured `context`
+ * field, so the agent's severity + category-count signal is embedded in the
+ * message string by T6 (`extract-from-paste.agent.ts:380-383`). We regex-parse
+ * what's there:
+ *
+ *   - `markerCount`: matches `(\d+) high-severity injection markers` — robust;
+ *     the agent always emits this exact phrase before the count.
+ *   - `categoryCount`: matches `across (\d+) categor` — robust; covers both
+ *     `category` and `categories` plural arms.
+ *   - `severity`: the agent's message literal is always "high-severity"
+ *     regardless of whether the classifier emitted `'high'` or `'critical'`.
+ *     Echoing `"high"` from the message would mislead audit IR when the actual
+ *     classification was `'critical'`. We return `null` here and rely on the
+ *     audit-team's downstream query to join on the classifier's separate trace
+ *     when the AppError shape upgrades to carry structured `context`.
+ *
+ * The acceptable deferred follow-up is to upgrade `AppError` to carry a typed
+ * `context` payload (see `src/lib/errors.ts`); when that lands, this helper
+ * can be deleted and the values read directly from `err.context.{severity,
+ * categoryCount}`. Until then, the regex parse is the audit-data contract.
+ */
+function extractRejectionContext(message: string): {
+  severity: string | null;
+  categoryCount: number | null;
+  markerCount: number | null;
+} {
+  const markerMatch = message.match(/(\d+)\s+high-severity injection markers/);
+  const categoryMatch = message.match(/across\s+(\d+)\s+categor/);
+  return {
+    // Severity stays null — see helper-header explanation. The message-literal
+    // is always "high-severity"; echoing that would lose the high-vs-critical
+    // distinction the classifier actually made.
+    severity: null,
+    categoryCount: categoryMatch ? Number.parseInt(categoryMatch[1]!, 10) : null,
+    markerCount: markerMatch ? Number.parseInt(markerMatch[1]!, 10) : null,
+  };
 }
 
 /**
@@ -162,6 +287,15 @@ export const memoryRouter = router({
     .mutation(async ({ ctx, input }) => {
       // 1. Run the extractor agent. All untrusted-input handling + the AI call
       //    happen inside this function. Errors re-throw as tRPC errors.
+      //
+      //    On `AI_INJECTION_REJECTED` (Plan 02-03 / Task 11, FLAG-1):
+      //    write a security-IR audit row inside a fresh RLS transaction
+      //    BEFORE re-throwing as BAD_REQUEST. Metadata redaction boundary:
+      //    severity band + category/marker COUNTS only — NEVER matched
+      //    substrings, paste content, byType detail, or source_snippets.
+      //    If the audit-row insert itself fails (DB outage), the error is
+      //    logged and swallowed; rejecting the attack is more important
+      //    than the audit trail being complete.
       let agentResult;
       try {
         agentResult = await extractFromPasteAgent({
@@ -169,10 +303,59 @@ export const memoryRouter = router({
           paste: input.paste,
         });
       } catch (err) {
+        if (isAppError(err) && err.code === 'AI_INJECTION_REJECTED') {
+          const rejectionCtx = extractRejectionContext(err.message);
+          try {
+            await ctx.db.rls(async (tx) => {
+              await tx.insert(interaction).values({
+                accountId: ctx.tenantId,
+                userId: ctx.session.user.id,
+                kind: 'paste_extract',
+                query: null,
+                answer: null,
+                citations: null,
+                model: EXTRACT_MODEL_ID,
+                langfuseTraceId: null,
+                latencyMs: null,
+                metadata: {
+                  rejected: true,
+                  severity: rejectionCtx.severity,
+                  categoryCount: rejectionCtx.categoryCount,
+                  markerCount: rejectionCtx.markerCount,
+                },
+              });
+            });
+          } catch {
+            // Swallow the audit-row failure. Continue to rethrow the agent
+            // error so the founder gets BAD_REQUEST. Log only the tenant id —
+            // NEVER the original `err.message` (which carries marker counts
+            // already destined for the BAD_REQUEST surface) or `auditErr`
+            // payload (DB driver errors can echo back the query — and our
+            // query carries `accountId` + `userId`, which is fine, but no
+            // need to widen the log surface).
+            logger.error('memory.extractFromPaste: audit-row write failed on rejection', {
+              accountId: ctx.tenantId,
+            });
+          }
+        }
         rethrowAgentError(err);
       }
 
-      const { draft, langfuseTraceId, latencyMs, injectionScreen } = agentResult;
+      // Defensive destructure with fallbacks. The agent's Week-3 return shape
+      // includes `pii` + `injectionScreen.severity`; the Plan 02-02 RLS-test
+      // mock (`tests/integration/memory-paste-rls.test.ts` lines 178-181)
+      // returns the pre-Week-3 shape (`injectionScreen: { flagged, matches }`
+      // only, no `pii`). Defaults below preserve the RLS regression baseline
+      // without test edits — production calls always carry the new fields
+      // because the agent (Task 6) always emits them.
+      const {
+        draft,
+        langfuseTraceId,
+        latencyMs,
+        injectionScreen,
+        pii = { redactionsApplied: 0, byType: { email: 0, phone: 0, wallet: 0, ssn: 0 } },
+      } = agentResult;
+      const injectionSeverity = injectionScreen?.severity ?? 'none';
       const now = new Date();
 
       // 2 + 3. Persist + audit inside ONE RLS transaction so a partial failure
@@ -262,17 +445,36 @@ export const memoryRouter = router({
         return { existingConfirmed };
       });
 
+      // Log payload extension (Plan 02-03 / Task 11): adds `redactionsApplied`
+      // (count only — NEVER `byType` contents) and `injectionSeverity` (band
+      // only — bounded to `'none' | 'low' | 'medium'` here because the
+      // `'high' | 'critical'` bands already threw above). The matched-injection
+      // snippets carry paste content and NEVER reach `logger.*`.
       logger.info('memory.extractFromPaste: ok', {
         accountId: ctx.tenantId,
         action: 'extract',
         latencyMs,
         injectionFlagged: injectionScreen.flagged,
+        injectionSeverity,
+        redactionsApplied: pii.redactionsApplied,
         hasExistingConfirmed: persisted.existingConfirmed !== null,
       });
 
+      // Surface the Week-3 sanitizer metadata to the UI. The conflict-resolver
+      // banner reads `pii.redactionsApplied` for the count + `pii.byType` for
+      // the per-category breakdown; the injection-flag pill reads
+      // `injectionScreen.severity`. `injectionScreen.matches` MUST NOT be
+      // rendered verbatim in UI — those snippets are paste content.
       return {
         draft,
         existingConfirmed: persisted.existingConfirmed,
+        injectionScreen: {
+          flagged: injectionScreen.flagged,
+          severity: injectionSeverity,
+          matches: injectionScreen.matches,
+        },
+        pii,
+        latencyMs,
       };
     }),
 
@@ -296,6 +498,65 @@ export const memoryRouter = router({
     .mutation(async ({ ctx, input }) => {
       const { confirmed } = input;
       const now = new Date();
+
+      // ─── CONFLICT_UNRESOLVED server backstop (Plan 02-03 / Task 11) ──────
+      // Plan 02-03 / Task 1 upgraded `provenanceEntrySchema` to a union of
+      // single-object | multi-candidate-array. The Task-10 confirmation form's
+      // submit gate prevents arrays from reaching here — the founder must
+      // resolve each conflict (via `chooseProvenance`) before the form
+      // submits. The server is the form-bypass backstop: if any entry is
+      // STILL an array on the wire, surface `CONFLICT` rather than silently
+      // persisting a half-resolved provenance map. This runs BEFORE the RLS
+      // transaction — there is nothing to persist if the input is bad.
+      const submittedProvenanceForGate: Provenance = confirmed.provenance ?? {};
+      for (const [fieldKey, entry] of Object.entries(submittedProvenanceForGate)) {
+        if (isProvenanceArray(entry)) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: `Unresolved conflict on field: ${fieldKey}`,
+            cause: new AppError(`Unresolved conflict on field: ${fieldKey}`, {
+              status: 409,
+              code: 'CONFLICT_UNRESOLVED',
+            }),
+          });
+        }
+      }
+
+      // ─── Post-confirm conflict-resolution audit (Plan 02-03 / Task 11) ──
+      // Build the audit payload BEFORE the RLS transaction so the
+      // interaction-row write inside the tx can stamp `metadata.resolvedFields`
+      // in one statement. For each field whose provenance carries a
+      // `rejected_alternatives` audit trail (Task-1 / `chooseProvenance`
+      // output), capture the field name, the chosen snippet (capped at
+      // `CONFLICT_AUDIT_SNIPPET_CAP` chars), and the loser count. If zero
+      // fields were resolved, omit `resolvedFields` entirely — no empty-array
+      // noise in the audit feed.
+      const resolvedFields: Array<{
+        fieldKey: string;
+        chosenSourceSnippet: string;
+        rejectedCount: number;
+      }> = [];
+      for (const [fieldKey, entry] of Object.entries(submittedProvenanceForGate)) {
+        // Single-object arm (guarded above). Narrow via the type guard.
+        if (!isProvenanceArray(entry)) {
+          const winner = entry as ProvenanceField;
+          const rejected = winner.rejected_alternatives ?? [];
+          if (rejected.length > 0) {
+            const snippet = winner.source_snippet ?? '';
+            resolvedFields.push({
+              fieldKey,
+              chosenSourceSnippet: snippet.slice(0, CONFLICT_AUDIT_SNIPPET_CAP),
+              rejectedCount: rejected.length,
+            });
+          }
+        }
+      }
+      // Build the metadata payload only when there is signal. Reserved for
+      // the kind='paste_confirm' interaction row inside the RLS transaction
+      // below. Future audit metadata keys (e.g. founder-override count) can
+      // merge into this object alongside `resolvedFields`.
+      const confirmAuditMetadata: Record<string, unknown> | null =
+        resolvedFields.length > 0 ? { resolvedFields } : null;
 
       // Run the read + update + audit inside one RLS transaction. The audit
       // row carries no AI cost (no Langfuse trace), only the confirmation
@@ -347,17 +608,28 @@ export const memoryRouter = router({
             (draftRow as Record<string, unknown>)[key] !== null &&
             (draftRow as Record<string, unknown>)[key] !== undefined;
           const nowEmpty = value === undefined || value === null || value === '';
-          if (wasPopulated && nowEmpty && mergedProvenance[key]) {
+          const existingEntry = mergedProvenance[key];
+          // Only single-object provenance entries can carry a `rejected_at`
+          // marker; array-form entries (pre-resolve multi-candidate) were
+          // already rejected above by the `CONFLICT_UNRESOLVED` backstop.
+          // The `!isProvenanceArray` narrow keeps TypeScript happy with the
+          // union type from Plan 02-03 / Task 1.
+          if (
+            wasPopulated &&
+            nowEmpty &&
+            existingEntry &&
+            !isProvenanceArray(existingEntry)
+          ) {
             // Preserve the existing entry (snippet, confidence, original
             // extracted_at) and tag with rejected_at + bump last_updated.
             // Adding an extra `rejected_at` key into the jsonb is intentional
             // — provenance shape can evolve at the app layer without a SQL
             // migration (Plan 02-01 deliberate decision).
             mergedProvenance[key] = {
-              ...mergedProvenance[key],
+              ...existingEntry,
               last_updated: now.toISOString(),
               rejected_at: now.toISOString(),
-            } as Provenance[string] & { rejected_at: string };
+            } as ProvenanceField & { rejected_at: string };
           }
         }
 
@@ -395,18 +667,29 @@ export const memoryRouter = router({
           });
         }
 
-        // Append the confirmation half of the paste-extract event. `latencyMs`
-        // null — no AI call here; the confirmation is pure DB work.
+        // Append the confirmation event. `latencyMs` null — no AI call here;
+        // the confirmation is pure DB work.
+        //
+        // Plan 02-03 / Task 11: kind = `'paste_confirm'` (added to the enum
+        // in precursor commit `d5902ef`) so eval samplers can split draft-vs-
+        // confirmed traffic without parsing answer payloads. `metadata` jsonb
+        // (added in the same precursor) carries the conflict-resolution audit
+        // payload — `resolvedFields` is present only when at least one field
+        // was resolved, omitted otherwise to keep the audit feed clean. The
+        // chosen snippet is capped at `CONFLICT_AUDIT_SNIPPET_CAP` chars;
+        // `byType` PII detail + full `source_snippet` text NEVER reach this
+        // row (the metadata column is the audit boundary).
         await tx.insert(interaction).values({
           accountId: ctx.tenantId,
           userId: ctx.session.user.id,
-          kind: 'paste_extract',
+          kind: 'paste_confirm',
           query: null,
           answer: null,
           citations: null,
           model: EXTRACT_MODEL_ID,
           langfuseTraceId: null,
           latencyMs: null,
+          metadata: confirmAuditMetadata,
         });
 
         // Re-read the row in the same transaction so the caller sees the
