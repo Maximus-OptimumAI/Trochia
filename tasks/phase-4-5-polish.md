@@ -130,3 +130,16 @@ confirmation-form.tsx.
 canonical chosen value + scalar are correct. T13 e2e currently asserts
 rejected_alternatives.length === 2; activation needs either this fix OR
 the assertion softened.
+
+## P4.5-POLISH-12: Codex T15 MEDIUM findings deferred from Phase 2 scope
+**Triggered**: Codex review T15, Plan 02-03, 2026-05-22.
+**Deferrals (rationale: attack surface not exposed in Phase 2 MVP)**:
+- M2: LLM03 tool-use injection markers — Phase 5 voice agent dependency
+- M3: LLM04 training-data/memory-poisoning markers — no memory-write surface in Phase 2
+- M4: LLM05 output-handling probes (<script>, SQL) — Phase 2 output is structured JSON via Zod, no free-form rendering
+- M5: Model-DoS regex patterns (already mitigated via MAX_PASTE_CHARS + EXTRACTOR_MAX_TOKENS caps; no further work needed)
+- M6: Multi-marker escalation false-positives on benign 'developer mode' phrasing — needs design partner data to assess frequency
+- L1: Founder-self exemption is global (founder email preserved in third-party prose) — behavior change requires UX call
+
+**Action**: Re-evaluate when Phase 5 voice/tool features ship. M5+L1 may stay
+permanent.
