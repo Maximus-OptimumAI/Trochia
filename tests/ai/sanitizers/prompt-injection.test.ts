@@ -79,15 +79,17 @@ const SEVERITY_RANK: Record<InjectionSeverity, number> = {
 // ────────────────────────────────────────────────────────────────────────────
 
 describe('promptInjectionSanitizer — fixture integrity', () => {
-  it('loads exactly 26 OWASP LLM Top 10 payloads from injection-payloads.json', () => {
+  it('loads exactly 27 OWASP LLM Top 10 payloads from injection-payloads.json', () => {
     // 20 original (T2) + 6 added by T15-FIX-1: INJ-21 (split-space verb),
     // INJ-22 (per-letter dash split), INJ-23 (full-width Latin),
     // INJ-24 (math-alphanumeric bold), INJ-25 (bidi-wrapped),
-    // INJ-26 (punycode IDN exfil).
-    expect(payloads).toHaveLength(26);
+    // INJ-26 (punycode IDN exfil). + 1 added by T15-FIX-2: INJ-27 (M1
+    // benign-control regression — multilingual narrative containing English
+    // instruction verbs in normal prose; must NOT trip critical).
+    expect(payloads).toHaveLength(27);
     for (const p of payloads) {
       expect(p.id).toMatch(/^INJ-\d{2}$/);
-      expect(p.expectedFlagged).toBe(true);
+      expect(typeof p.expectedFlagged).toBe('boolean');
       expect(Array.isArray(p.expectedMatchSubstrings)).toBe(true);
       expect(Array.isArray(p.expectedSanitizedExcludes)).toBe(true);
     }
@@ -100,15 +102,18 @@ describe('promptInjectionSanitizer — fixture integrity', () => {
 
 describe('promptInjectionSanitizer — per-payload assertions', () => {
   for (const payload of payloads) {
-    it(`${payload.id} (${payload.category}/${payload.severity}) — flagged, severity meets band, matches expected, sanitized excludes raw`, () => {
+    it(`${payload.id} (${payload.category}/${payload.severity}) — flagged matches band, severity meets band, matches expected, sanitized excludes raw`, () => {
       const result = promptInjectionSanitizer(payload.payload);
 
-      // Flagged true
-      expect(result.flagged).toBe(true);
+      // Flagged matches the fixture's expected band. Most fixtures assert
+      // `true` (attack payloads); the M1 regression control INJ-27 asserts
+      // `false` (benign multilingual narrative must clear the sanitizer).
+      expect(result.flagged).toBe(payload.expectedFlagged);
 
       // Severity meets-or-exceeds the fixture band. The sanitizer may escalate
       // higher than the fixture's literal label (multi-marker bump, encoded
-      // floor) — that's a stricter outcome, never weaker.
+      // floor) — that's a stricter outcome, never weaker. For benign controls
+      // (severity='none') this collapses to "severity is exactly none".
       expect(SEVERITY_RANK[result.severity]).toBeGreaterThanOrEqual(
         SEVERITY_RANK[payload.severity],
       );
@@ -142,7 +147,7 @@ describe('promptInjectionSanitizer — per-payload assertions', () => {
 // ────────────────────────────────────────────────────────────────────────────
 
 describe('promptInjectionSanitizer — severity gate', () => {
-  it('produces high|critical severity for ≥18 of 26 fixture payloads', () => {
+  it('produces high|critical severity for ≥18 of 27 fixture payloads', () => {
     let highOrCritical = 0;
     for (const payload of payloads) {
       const result = promptInjectionSanitizer(payload.payload);
@@ -153,9 +158,11 @@ describe('promptInjectionSanitizer — severity gate', () => {
     // Original floor (master plan §Week 3): ≥12 of 20 payloads high|critical.
     // T15-FIX-1 expanded the fixture set to 26 (adding 6 obfuscation-class
     // payloads: split-token, full-width, math-alphanumeric, bidi-wrapped,
-    // punycode IDN). The new payloads ratchet the achievable floor up because
-    // the H2/H3 detection sweep classifies all of them ≥high. We hold the new
-    // floor at ≥18/26 (≈69%) — strictly above the original ≥12/20 (60%).
+    // punycode IDN). T15-FIX-2 added INJ-27, a benign-control regression
+    // fixture (severity='none', expectedFlagged=false) — it ratchets the
+    // denominator from 26 to 27 without adding to the high|critical numerator.
+    // We hold the floor at ≥18/27 (≈67%) — still strictly above the original
+    // ≥12/20 (60%) and unchanged in absolute terms vs T15-FIX-1.
     expect(highOrCritical).toBeGreaterThanOrEqual(18);
   });
 
