@@ -115,3 +115,18 @@ src/lib/errors.ts. Refactor T6 to set structured context with severity,
 categoryCount, markerCount. Refactor T11 to read from err.context directly.
 **Priority**: Polish — markerCount + categoryCount captured correctly;
 only severity literal is lost. Audit fidelity degraded but not broken.
+
+## P4.5-POLISH-11: ConflictResolver override path doesn't archive rejected_alternatives
+**Symptom**: When founder picks custom override, handleResolveConflict in
+confirmation-form.tsx stores the override entry verbatim with no
+rejected_alternatives populated. Audit row loses the candidates the founder
+saw and rejected.
+**Trigger**: Plan 02-03 T13 e2e authoring, 2026-05-22 — surfaces at test
+activation time (Phase 4.5).
+**Fix**: Patch handleResolveConflict so override path also archives both
+extractor candidates as rejected_alternatives. Form-side change in
+confirmation-form.tsx.
+**Priority**: Polish — audit fidelity on override path is degraded but the
+canonical chosen value + scalar are correct. T13 e2e currently asserts
+rejected_alternatives.length === 2; activation needs either this fix OR
+the assertion softened.
