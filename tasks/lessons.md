@@ -237,3 +237,11 @@ Next: 6c (Install Cursor CLI to Windows PATH)
   surface, escalate to a re-dispatch via the operator. APPROVED-WITH-
   FIXES is NOT "merge with caveats" — the fixes ship before merge.
   (T15-FIX-1/FIX-2 + T16-FIX-1, 2026-05-23 → 2026-05-25.)
+
+- **Both /codex and /cso are mandatory for security_gate-flagged plans.**
+  Plan 02-03 declared security_gate: cso + codex_review_required: true in
+  frontmatter. /codex caught regex coverage gaps (3 HIGH + 4 MEDIUM); /cso
+  caught business-logic gaps that /codex didn't (M1 founder-self exemption,
+  M2 TOCTOU, M3 audit-swallow log). Both lenses matter — /codex is the
+  regex auditor, /cso is the data-flow + business-logic auditor. Don't skip
+  one because the other passed. (Plan 02-03 T15+T16, 2026-05-25.)
