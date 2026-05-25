@@ -538,7 +538,14 @@ describe('extractFromPaste — per-fixture extraction', () => {
     const { draft, fixture } = await buildDraftForAcmeFintech();
     mockRunAgent.mockResolvedValueOnce(draft);
 
-    const input: ExtractFromPasteInput = { accountId: 'acct-acme-001', paste: fixture };
+    const input: ExtractFromPasteInput = {
+      accountId: 'acct-acme-001',
+      paste: fixture,
+      // /cso T16-FIX-1 (M1): trusted founder identity replaces the prior
+      // LLM-derived `draft.team.founders` exemption source. Synthetic test
+      // email — never a real domain (tasks/constraints.md rule).
+      founderEmail: 'test-founder-acme@example.com',
+    };
     const result = await extractFromPaste(input);
 
     // A. Zod parse success
@@ -597,7 +604,11 @@ describe('extractFromPaste — per-fixture extraction', () => {
     const { draft, fixture } = await buildDraftForHelixSaas();
     mockRunAgent.mockResolvedValueOnce(draft);
 
-    const result = await extractFromPaste({ accountId: 'acct-helix-001', paste: fixture });
+    const result = await extractFromPaste({
+      accountId: 'acct-helix-001',
+      paste: fixture,
+      founderEmail: 'test-founder-helix@example.com',
+    });
 
     expect(businessMemoryDraftSchema.safeParse(result.draft).success).toBe(true);
     expect(countPopulatedFields(result.draft)).toBeGreaterThanOrEqual(8);
@@ -624,7 +635,11 @@ describe('extractFromPaste — per-fixture extraction', () => {
     const { draft, fixture } = await buildDraftForMosaicMarketplace();
     mockRunAgent.mockResolvedValueOnce(draft);
 
-    const result = await extractFromPaste({ accountId: 'acct-mosaic-001', paste: fixture });
+    const result = await extractFromPaste({
+      accountId: 'acct-mosaic-001',
+      paste: fixture,
+      founderEmail: 'test-founder-mosaic@example.com',
+    });
 
     expect(businessMemoryDraftSchema.safeParse(result.draft).success).toBe(true);
     expect(countPopulatedFields(result.draft)).toBeGreaterThanOrEqual(8);
@@ -659,7 +674,11 @@ describe('extractFromPaste — per-fixture extraction', () => {
     const { draft, fixture } = await buildDraftForTributaryHealthtech();
     mockRunAgent.mockResolvedValueOnce(draft);
 
-    const result = await extractFromPaste({ accountId: 'acct-tributary-001', paste: fixture });
+    const result = await extractFromPaste({
+      accountId: 'acct-tributary-001',
+      paste: fixture,
+      founderEmail: 'test-founder-tributary@example.com',
+    });
 
     expect(businessMemoryDraftSchema.safeParse(result.draft).success).toBe(true);
     expect(countPopulatedFields(result.draft)).toBeGreaterThanOrEqual(8);
@@ -693,7 +712,11 @@ describe('extractFromPaste — per-fixture extraction', () => {
     const { draft, fixture } = await buildDraftForVantaHardware();
     mockRunAgent.mockResolvedValueOnce(draft);
 
-    const result = await extractFromPaste({ accountId: 'acct-vanta-001', paste: fixture });
+    const result = await extractFromPaste({
+      accountId: 'acct-vanta-001',
+      paste: fixture,
+      founderEmail: 'test-founder-vanta@example.com',
+    });
 
     expect(businessMemoryDraftSchema.safeParse(result.draft).success).toBe(true);
     expect(countPopulatedFields(result.draft)).toBeGreaterThanOrEqual(8);
@@ -736,7 +759,11 @@ describe('extractFromPaste — injection sanitizer', () => {
 
     // The chokepoint MUST NOT be invoked when the sanitizer rejects.
     await expect(
-      extractFromPaste({ accountId: 'acct-injection-001', paste: poisonedPaste }),
+      extractFromPaste({
+        accountId: 'acct-injection-001',
+        paste: poisonedPaste,
+        founderEmail: 'test-founder-injection@example.com',
+      }),
     ).rejects.toMatchObject({ code: 'AI_INJECTION_REJECTED', status: 400 });
     expect(mockRunAgent).not.toHaveBeenCalled();
   });
@@ -755,6 +782,7 @@ describe('extractFromPaste — injection sanitizer', () => {
     const result = await extractFromPaste({
       accountId: 'acct-injection-low-001',
       paste: poisonedPaste,
+      founderEmail: 'test-founder-injection-low@example.com',
     });
 
     // Sanitizer fired but stayed below the reject threshold.
@@ -785,7 +813,11 @@ describe('extractFromPaste — length validation', () => {
   it('throws PASTE_TOO_SHORT for a paste under 500 chars', async () => {
     const shortPaste = 'We are building a thing for some founders.'.repeat(2); // ~84 chars
     await expect(
-      extractFromPaste({ accountId: 'acct-short-001', paste: shortPaste }),
+      extractFromPaste({
+        accountId: 'acct-short-001',
+        paste: shortPaste,
+        founderEmail: 'test-founder-short@example.com',
+      }),
     ).rejects.toMatchObject({ code: 'PASTE_TOO_SHORT' });
     // The chokepoint must NOT have been called.
     expect(mockRunAgent).not.toHaveBeenCalled();
@@ -794,7 +826,11 @@ describe('extractFromPaste — length validation', () => {
   it('throws PASTE_TOO_LONG for a paste over 40,000 chars', async () => {
     const longPaste = 'A'.repeat(40_001);
     await expect(
-      extractFromPaste({ accountId: 'acct-long-001', paste: longPaste }),
+      extractFromPaste({
+        accountId: 'acct-long-001',
+        paste: longPaste,
+        founderEmail: 'test-founder-long@example.com',
+      }),
     ).rejects.toMatchObject({ code: 'PASTE_TOO_LONG' });
     expect(mockRunAgent).not.toHaveBeenCalled();
   });
@@ -812,12 +848,16 @@ describe('extractFromPaste — length validation', () => {
 // ────────────────────────────────────────────────────────────────────────────
 
 describe('extractFromPaste — PII redactor wiring', () => {
-  it('preserves founder-self email while redacting third-party email from the same narrative', async () => {
-    // Mocked draft: `team.founders[0].email` is the founder-self channel the
-    // agent reads at `draft.team?.founders ?? []` and feeds into
-    // `redactUnrelatedPartyPII`. narrative.problem references BOTH the
-    // founder-self email AND a distinct third-party email — only the
-    // third-party form should be replaced with `[REDACTED-EMAIL]`.
+  it('preserves founder-self email (sourced from ctx) while redacting third-party email from the same narrative', async () => {
+    // /cso T16-FIX-1 (M1): the founder-self exemption now sources from the
+    // agent's `founderEmail` input (router passes `ctx.session.user.email`),
+    // NOT from `draft.team.founders[*].email` (LLM-derived, attacker-
+    // controllable). This test passes the SAME email through BOTH channels
+    // to keep the existing behavioral expectation intact: founder-self
+    // exemption preserves the founder's email; third-party email gets
+    // redacted. The negative test below (`treats draft.team.founders[*]
+    // .email as untrusted...`) proves the LLM-derived shape is no longer
+    // the exemption authority.
     const founderEmail = 'sam@startup.example';
     const thirdPartyEmail = 'jane@example.com';
     const fixture = await loadFixture('paste-vanta-hardware');
@@ -848,6 +888,9 @@ describe('extractFromPaste — PII redactor wiring', () => {
     const result = await extractFromPaste({
       accountId: 'acct-founder-self-001',
       paste: fixture,
+      // Trusted founder identity — matches the email used inside the
+      // narrative so the redactor preserves it.
+      founderEmail,
     });
 
     const stringified = JSON.stringify(result.draft);
@@ -869,9 +912,10 @@ describe('extractFromPaste — PII redactor wiring', () => {
     expect(result.pii.byType.ssn).toBe(0);
 
     // The founder entry on the returned draft is itself untouched — the
-    // redactor walks narrative + traction + provenance, NOT team.*.
+    // T15-FIX-1 team walker preserves email/phone keys verbatim.
     expect(result.draft.team?.founders?.[0]?.email).toBe(founderEmail);
   });
+
 
   it('PII metadata reflects exact byType counts from the extractor output', async () => {
     // Mocked draft with TWO unrelated-party emails in narrative.problem and
@@ -901,6 +945,9 @@ describe('extractFromPaste — PII redactor wiring', () => {
     const result = await extractFromPaste({
       accountId: 'acct-pii-metadata-001',
       paste: fixture,
+      // /cso T16-FIX-1 (M1): empty founderEmail → empty exemption set → all
+      // matched emails get redacted, which is exactly what this test asserts.
+      founderEmail: '',
     });
 
     // Two redactions, both email type.
@@ -956,14 +1003,22 @@ describe('extractFromPaste — banned-output defensive scan', () => {
     mockRunAgent.mockResolvedValueOnce(poisonedDraft);
 
     await expect(
-      extractFromPaste({ accountId: 'acct-poison-001', paste: fixture }),
+      extractFromPaste({
+        accountId: 'acct-poison-001',
+        paste: fixture,
+        founderEmail: 'test-founder-poison-001@example.com',
+      }),
     ).rejects.toBeInstanceOf(AppError);
     // Re-run the same setup to inspect the thrown code (Vitest re-issues the
     // promise on the second await; we reset + reconfigure the mock).
     mockRunAgent.mockReset();
     mockRunAgent.mockResolvedValueOnce(poisonedDraft);
     await expect(
-      extractFromPaste({ accountId: 'acct-poison-002', paste: fixture }),
+      extractFromPaste({
+        accountId: 'acct-poison-002',
+        paste: fixture,
+        founderEmail: 'test-founder-poison-002@example.com',
+      }),
     ).rejects.toMatchObject({ code: 'AI_BANNED_OUTPUT', status: 422 });
   });
 });

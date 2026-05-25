@@ -96,7 +96,12 @@ d('Phase-2 paste flow — RLS integration (memoryRouter)', () => {
   function callerFor(t: TestTenant): AppCaller {
     const rls = tenantClient(t.claims);
     const ctx = {
-      session: { user: { id: t.userId } },
+      // /cso T16-FIX-1 (M1): `session.user.email` added so the router can
+      // pass the trusted founder identity through to the agent (via
+      // `ctx.session.user.email ?? ''`). The agent is mocked in this suite
+      // — the value is transparent to behavior here — but the ctx shape
+      // must satisfy the router's new read at the type/runtime level.
+      session: { user: { id: t.userId, email: `test-${t.userId}@example.com` } },
       tenantId: t.accountId,
       region: 'us',
       db: { rls: rls.rls },

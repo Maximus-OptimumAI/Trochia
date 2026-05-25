@@ -193,7 +193,7 @@ describe('extractFromPaste — StablePrefix byte-stability + cache_control wirin
     const { extractFromPaste } = await import('@/ai/agents/extract-from-paste.agent');
     const paste = buildMarkedPaste('paste-acme-fintech.txt', PASTE_1_MARKER);
 
-    await extractFromPaste({ accountId: 'account-1', paste });
+    await extractFromPaste({ accountId: 'account-1', paste, founderEmail: 'test-founder-cache@example.com' });
 
     expect(capturedCalls).toHaveLength(1);
     const [call] = capturedCalls;
@@ -221,8 +221,8 @@ describe('extractFromPaste — StablePrefix byte-stability + cache_control wirin
     const paste1 = buildMarkedPaste('paste-acme-fintech.txt', PASTE_1_MARKER);
     const paste2 = buildMarkedPaste('paste-helix-saas.txt', PASTE_2_MARKER);
 
-    await extractFromPaste({ accountId: 'account-1', paste: paste1 });
-    await extractFromPaste({ accountId: 'account-1', paste: paste2 });
+    await extractFromPaste({ accountId: 'account-1', paste: paste1, founderEmail: 'test-founder-cache@example.com' });
+    await extractFromPaste({ accountId: 'account-1', paste: paste2, founderEmail: 'test-founder-cache@example.com' });
 
     expect(capturedCalls).toHaveLength(2);
     const [c1, c2] = capturedCalls;
@@ -243,8 +243,8 @@ describe('extractFromPaste — StablePrefix byte-stability + cache_control wirin
     const paste1 = buildMarkedPaste('paste-acme-fintech.txt', PASTE_1_MARKER);
     const paste2 = buildMarkedPaste('paste-helix-saas.txt', PASTE_2_MARKER);
 
-    await extractFromPaste({ accountId: 'account-1', paste: paste1 });
-    await extractFromPaste({ accountId: 'account-1', paste: paste2 });
+    await extractFromPaste({ accountId: 'account-1', paste: paste1, founderEmail: 'test-founder-cache@example.com' });
+    await extractFromPaste({ accountId: 'account-1', paste: paste2, founderEmail: 'test-founder-cache@example.com' });
 
     expect(capturedCalls).toHaveLength(2);
     // Per `pickModel('draft')` in src/ai/router.ts: SONNET_MODEL = 'claude-sonnet-4-6'.
@@ -259,8 +259,8 @@ describe('extractFromPaste — StablePrefix byte-stability + cache_control wirin
     const paste1 = buildMarkedPaste('paste-acme-fintech.txt', PASTE_1_MARKER);
     const paste2 = buildMarkedPaste('paste-helix-saas.txt', PASTE_2_MARKER);
 
-    await extractFromPaste({ accountId: 'account-1', paste: paste1 });
-    await extractFromPaste({ accountId: 'account-1', paste: paste2 });
+    await extractFromPaste({ accountId: 'account-1', paste: paste1, founderEmail: 'test-founder-cache@example.com' });
+    await extractFromPaste({ accountId: 'account-1', paste: paste2, founderEmail: 'test-founder-cache@example.com' });
 
     expect(capturedCalls).toHaveLength(2);
     const [c1, c2] = capturedCalls;
@@ -292,8 +292,8 @@ describe('extractFromPaste — StablePrefix byte-stability + cache_control wirin
     const paste1 = buildMarkedPaste('paste-acme-fintech.txt', PASTE_1_MARKER);
     const paste2 = buildMarkedPaste('paste-helix-saas.txt', PASTE_2_MARKER);
 
-    await extractFromPaste({ accountId: 'account-1', paste: paste1 });
-    await extractFromPaste({ accountId: 'account-1', paste: paste2 });
+    await extractFromPaste({ accountId: 'account-1', paste: paste1, founderEmail: 'test-founder-cache@example.com' });
+    await extractFromPaste({ accountId: 'account-1', paste: paste2, founderEmail: 'test-founder-cache@example.com' });
 
     expect(langfuseSpy).not.toBeNull();
     // trace() called at least once per runAgent invocation.
@@ -326,7 +326,7 @@ describe('extractFromPaste — StablePrefix byte-stability + cache_control wirin
     const { extractFromPaste } = await import('@/ai/agents/extract-from-paste.agent');
     const paste = buildMarkedPaste('paste-acme-fintech.txt', PASTE_1_MARKER);
 
-    const result = await extractFromPaste({ accountId: 'account-1', paste });
+    const result = await extractFromPaste({ accountId: 'account-1', paste, founderEmail: 'test-founder-cache@example.com' });
 
     // Latency capture works (the value is `Date.now()`-deltas around the
     // runAgent call; under MSW it's near-instant but the field MUST be a

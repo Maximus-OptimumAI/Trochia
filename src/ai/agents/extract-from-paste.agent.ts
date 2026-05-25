@@ -96,6 +96,25 @@
  *     and `redactionsApplied` (count only — NEVER the byType breakdown
  *     contents). `logger.warn` BEFORE the reject throw records the marker
  *     count + severity band; it NEVER logs the matched substrings.
+ *
+ * ## /cso T16-FIX-1 (M1) — founder-self exemption sourced from trusted ctx
+ *
+ * Prior to T16-FIX-1, Step 5 fed the PII redactor with
+ * `draft.team?.founders ?? []`. That `draft` is LLM-emitted from attacker-
+ * controlled paste — an attacker who crafts prose that makes Sonnet write
+ * `draft.team.founders[0].email = 'attacker@evil.com'` would gain a founder-
+ * self shield: every matching email elsewhere in narrative / provenance
+ * survives redaction. The agent's contract now requires `founderEmail: string`
+ * (a Supabase-verified auth email passed by the router from `ctx.session.user.
+ * email`). Step 5 builds the exemption from `[{ email: input.founderEmail }]`
+ * — the LLM-emitted founders list is no longer trusted as identity authority.
+ *
+ * Conservative default: if `founderEmail` is the empty string (signup edge
+ * case where the session has no email — Supabase guarantees email for password
+ * + magic-link auth, but the type is `string | undefined`), the exemption set
+ * is empty and EVERY email gets redacted. False-positive redaction of the
+ * founder's own email is acceptable; under-redaction of an attacker-injected
+ * email is not.
  */
 import { runAgent, type StablePrefix } from '@/ai/client';
 import {
@@ -275,6 +294,23 @@ export interface ExtractFromPasteInput {
   accountId: string;
   /** Untrusted founder text. Must be 500–40,000 chars (UI enforces words). */
   paste: string;
+  /**
+   * Founder's Supabase-verified auth email (`ctx.session.user.email`) — the
+   * TRUSTED identity source for the PII redactor's founder-self exemption.
+   *
+   * /cso T16-FIX-1 (M1): prior to this fix, the exemption set was built from
+   * `draft.team?.founders` — LLM-emitted from attacker-controlled paste.
+   * That was attacker-controllable: a paste crafted to make Sonnet write a
+   * malicious email into `draft.team.founders[0].email` would silently shield
+   * matching emails elsewhere from redaction. The router now passes the
+   * Supabase-verified email through this channel; the redactor exemption set
+   * is built from `[{ email: input.founderEmail }]` instead.
+   *
+   * Empty string is acceptable (signup edge case) — empty exemption set =
+   * every email gets redacted. Conservative default; over-redaction of the
+   * founder's own email is preferred over under-redaction of an injected one.
+   */
+  founderEmail: string;
 }
 
 /** Result returned by `extractFromPaste`. */
@@ -331,8 +367,9 @@ export interface ExtractFromPasteResult {
  *      the sanitized paste in `variableSuffix`. `taskClass: 'draft'` routes
  *      to Sonnet 4.6 per `ai/router.ts`.
  *   5. Redact unrelated-party PII from the draft (Plan 02-03 / KNW-02d):
- *      walks narrative + traction + provenance; founder-self exemption from
- *      `draft.team?.founders`. Returns a NEW deep-cloned draft.
+ *      walks narrative + traction + oneLiner + team + provenance; founder-
+ *      self exemption from `input.founderEmail` (ctx-derived, trusted —
+ *      /cso T16-FIX-1 M1). Returns a NEW deep-cloned draft.
  *   6. Defensive substring-scan of the stringified REDACTED draft against
  *      the project hard-banned list — throws `AI_BANNED_OUTPUT` on any hit.
  *   7. Log `{ accountId, pasteChars, latencyMs, injectionFlagged,
@@ -421,15 +458,27 @@ export async function extractFromPaste(
   const latencyMs = Date.now() - startMs;
 
   // 6. Redact unrelated-party PII from the draft (Plan 02-03 / KNW-02d). The
-  // redactor walks narrative.* + traction.{growth,runway} + every provenance
-  // source_snippet (single-object arm + array arm + rejected_alternatives),
-  // replacing email / phone / wallet / SSN matches with typed markers EXCEPT
-  // matches whose lowercase form is in the founder-self exemption set built
-  // from `draft.team.founders[*].{email, phone}`. The redactor returns a NEW
-  // deep-cloned draft — the original is left byte-identical for any caller
-  // audit-log path.
-  const foundersForExemption = draft.team?.founders ?? [];
-  const piiResult: PIIRedactionResult = redactUnrelatedPartyPII(draft, foundersForExemption);
+  // redactor walks narrative.* + traction.{growth,runway} + oneLiner + every
+  // team string leaf + every provenance source_snippet (single-object arm +
+  // array arm + rejected_alternatives), replacing email / phone / wallet /
+  // SSN matches with typed markers EXCEPT matches whose lowercase form is
+  // in the founder-self exemption set.
+  //
+  // /cso T16-FIX-1 (M1): founder-self exemption sources from `input.
+  // founderEmail` (Supabase-verified, passed by the router from ctx) — NOT
+  // from `draft.team.founders[*].email` (LLM-derived, attacker-controllable
+  // via crafted paste). The previous shape allowed an attacker to launder a
+  // malicious email through Sonnet into the exemption set; this shape pins
+  // the exemption to a single trusted identity from the auth layer.
+  //
+  // Empty `input.founderEmail` → empty exemption set → every email gets
+  // redacted. This is conservative-default safe; over-redaction of the
+  // founder's own email is preferred to under-redaction of an injected one.
+  // Phone is not currently surfaced through ctx, so phone exemption is empty
+  // (acceptable — the paste-flow does not collect founder phone on signup).
+  const piiResult: PIIRedactionResult = redactUnrelatedPartyPII(draft, [
+    { email: input.founderEmail },
+  ]);
   const redactedDraft = piiResult.draft;
 
   // 7. Defensive banned-output scan against the POST-REDACTION draft. The

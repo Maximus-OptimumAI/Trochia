@@ -105,6 +105,55 @@
  *      `source_snippet` never enter `logger.*`. The metadata column is the
  *      audit boundary; the logger remains content-blind. When zero conflicts
  *      were resolved, `resolvedFields` is omitted (no empty-array noise).
+ *
+ * ## /cso T16-FIX-1 (M1) — trusted founder identity threading
+ *
+ * The `extractFromPaste` mutation now passes `ctx.session.user.email ?? ''`
+ * as `founderEmail` into the agent. The agent feeds this single trusted email
+ * to the PII redactor's founder-self exemption — replacing the previous
+ * `draft.team?.founders ?? []` source, which was LLM-derived from attacker-
+ * controlled paste. The router is the trust boundary: Supabase Auth has
+ * already verified the email via `auth.getUser()` (see `src/server/context.
+ * ts` revalidation path); the LLM never gets a chance to invent it.
+ *
+ * Empty string fallback covers signup edge cases where the session shape
+ * carries `email: undefined`. The redactor treats an empty exemption set as
+ * "redact every email" — conservative; over-redaction beats under-redaction.
+ *
+ * ## /cso T16-FIX-1 (M2) — confirmDraft TOCTOU guard via lastUpdatedAt
+ *
+ * The `confirmDraft` SELECT-then-UPDATE block previously gated only on
+ * `isNull(confirmedAt)` (P2-3 atomic confirm guard). Between the SELECT (line
+ * 565-574) and the UPDATE (line 641-660), a concurrent `extractFromPaste`
+ * call could drift the `provenance` jsonb on the same row — and the
+ * UPDATE-WHERE predicate would still match. Result: the merged provenance
+ * stamps `rejected_at` markers onto snippets the founder never saw.
+ *
+ * Fix: capture `lastUpdatedAt` from the SELECT, include it in the
+ * UPDATE-WHERE predicate alongside `isNull(confirmedAt)`. If a concurrent
+ * extractor bumped `lastUpdatedAt`, the UPDATE matches zero rows and the
+ * existing CONFLICT branch fires — the founder reloads and re-confirms
+ * against the fresh provenance, instead of silently persisting phantom
+ * rejected_at markers.
+ *
+ * Chose the `lastUpdatedAt-in-WHERE` shape over `SELECT FOR UPDATE` because
+ * (a) it adds one column to the existing AND-chain rather than a new query-
+ * builder verb that Drizzle does not first-class support, and (b) it keeps
+ * the lock-free posture of the rest of this router. Both shapes solve the
+ * race; this one is the smaller diff.
+ *
+ * ## /cso T16-FIX-1 (M3) — audit-row swallow log widened
+ *
+ * The security-IR audit-row write inside the `extractFromPaste` catch (line
+ * 308-339) swallowed `auditErr` and logged only `accountId`. On DB transient
+ * outages this lost ALL forensic signal for that rejection event.
+ *
+ * Fix: the swallow log now carries the same redaction-boundary-safe fields
+ * that would have gone into `interaction.metadata` — `severity`,
+ * `categoryCount`, `markerCount`. Same boundary discipline as the metadata
+ * column itself: numeric counts + severity band only. NEVER `auditErr.
+ * message` (which can echo DB schema), NEVER matched substrings, NEVER paste
+ * content, NEVER `byType` detail.
  */
 import { TRPCError } from '@trpc/server';
 import { and, eq, isNull } from 'drizzle-orm';
@@ -301,6 +350,15 @@ export const memoryRouter = router({
         agentResult = await extractFromPasteAgent({
           accountId: ctx.tenantId,
           paste: input.paste,
+          // /cso T16-FIX-1 (M1): trusted founder identity for the PII
+          // redactor's founder-self exemption. `ctx.session.user.email` is
+          // Supabase-verified (the context layer revalidates via
+          // `auth.getUser()` — see src/server/context.ts). Fallback to empty
+          // string when the session shape carries `email: undefined`
+          // (signup edge case): the agent treats an empty exemption as
+          // "redact every email" — conservative over-redaction is preferred
+          // to under-redaction of an attacker-injected email.
+          founderEmail: ctx.session.user.email ?? '',
         });
       } catch (err) {
         if (isAppError(err) && err.code === 'AI_INJECTION_REJECTED') {
@@ -326,15 +384,26 @@ export const memoryRouter = router({
               });
             });
           } catch {
-            // Swallow the audit-row failure. Continue to rethrow the agent
-            // error so the founder gets BAD_REQUEST. Log only the tenant id —
-            // NEVER the original `err.message` (which carries marker counts
-            // already destined for the BAD_REQUEST surface) or `auditErr`
-            // payload (DB driver errors can echo back the query — and our
-            // query carries `accountId` + `userId`, which is fine, but no
-            // need to widen the log surface).
+            // /cso T16-FIX-1 (M3): widened swallow-log payload to preserve
+            // security-IR forensic signal when the audit-row write fails (DB
+            // transient outage, RLS misconfiguration, etc). The same
+            // redaction-boundary-safe fields that would have landed in
+            // `interaction.metadata` above are surfaced here: severity band
+            // + numeric counts ONLY.
+            //
+            // STILL NEVER logged: `auditErr` payload (DB driver errors can
+            // echo schema / query content); the original `err.message`
+            // (already carries marker counts destined for BAD_REQUEST surface
+            // — no need to duplicate); matched substrings or paste content
+            // (those are not in scope at this catch site, by design).
+            //
+            // The founder still gets BAD_REQUEST — rejecting the attack is
+            // more important than the audit trail being complete.
             logger.error('memory.extractFromPaste: audit-row write failed on rejection', {
               accountId: ctx.tenantId,
+              severity: rejectionCtx.severity,
+              categoryCount: rejectionCtx.categoryCount,
+              markerCount: rejectionCtx.markerCount,
             });
           }
         }
@@ -581,6 +650,15 @@ export const memoryRouter = router({
               'No Business Memory draft to confirm. Extract from a paste first, then confirm.',
           });
         }
+        // /cso T16-FIX-1 (M2): capture `lastUpdatedAt` at SELECT time. The
+        // UPDATE-WHERE predicate below re-asserts this exact value so a
+        // concurrent `extractFromPaste` that drifted the row between this
+        // SELECT and the UPDATE will cause the UPDATE to match zero rows —
+        // the existing CONFLICT branch then surfaces the race instead of
+        // silently merging founder edits onto a provenance jsonb the founder
+        // never saw (which would stamp phantom `rejected_at` markers onto
+        // snippets the extractor just rewrote).
+        const draftLastUpdatedAt = draftRow.lastUpdatedAt;
 
         // Compute the merged provenance:
         //   - Carry forward whatever the existing draft row stored.
@@ -638,6 +716,14 @@ export const memoryRouter = router({
         // silently overwrite the first. If 0 rows match (another tab won the
         // race), `returning()` is empty and we surface a CONFLICT error rather
         // than reporting a phantom-successful confirm to the caller.
+        //
+        // /cso T16-FIX-1 (M2) — TOCTOU guard: the UPDATE-WHERE predicate ALSO
+        // re-asserts `lastUpdatedAt = <value-from-SELECT>`. A concurrent
+        // `extractFromPaste` that drifted the provenance between the SELECT
+        // above and this UPDATE bumps `lastUpdatedAt`; the predicate no
+        // longer matches; CONFLICT surfaces. Without this guard, the merge
+        // overlay would stamp `rejected_at` markers onto snippets the
+        // founder never saw.
         const updated = await tx
           .update(businessMemory)
           .set({
@@ -656,14 +742,20 @@ export const memoryRouter = router({
             lastUpdatedAt: now,
             updatedAt: now,
           })
-          .where(and(eq(businessMemory.id, draftRow.id), isNull(businessMemory.confirmedAt)))
+          .where(
+            and(
+              eq(businessMemory.id, draftRow.id),
+              isNull(businessMemory.confirmedAt),
+              eq(businessMemory.lastUpdatedAt, draftLastUpdatedAt),
+            ),
+          )
           .returning({ id: businessMemory.id });
 
         if (updated.length === 0) {
           throw new TRPCError({
             code: 'CONFLICT',
             message:
-              'This Business Memory was confirmed in another session. Reload to see the current state.',
+              'This Business Memory was confirmed or re-extracted in another session. Reload to see the current state.',
           });
         }
 
