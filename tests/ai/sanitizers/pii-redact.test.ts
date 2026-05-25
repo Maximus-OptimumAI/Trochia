@@ -100,8 +100,10 @@ function clone<T>(value: T): T {
 // ────────────────────────────────────────────────────────────────────────────
 
 describe('redactUnrelatedPartyPII — fixture integrity', () => {
-  it('loads exactly 15 PII fixtures from pii-fixtures.json', () => {
-    expect(fixtures).toHaveLength(15);
+  it('loads exactly 17 PII fixtures from pii-fixtures.json', () => {
+    // 15 original (T3) + 2 added by T15-FIX-1: PII-16 (oneLiner walk),
+    // PII-17 (team.* walk with founder-self exemption preservation).
+    expect(fixtures).toHaveLength(17);
     for (const f of fixtures) {
       expect(f.id).toMatch(/^PII-\d{2}$/);
       expect(typeof f.expectedRedactionsTotal).toBe('number');

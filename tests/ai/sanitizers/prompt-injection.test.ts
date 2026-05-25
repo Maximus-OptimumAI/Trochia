@@ -79,8 +79,12 @@ const SEVERITY_RANK: Record<InjectionSeverity, number> = {
 // ────────────────────────────────────────────────────────────────────────────
 
 describe('promptInjectionSanitizer — fixture integrity', () => {
-  it('loads exactly 20 OWASP LLM Top 10 payloads from injection-payloads.json', () => {
-    expect(payloads).toHaveLength(20);
+  it('loads exactly 26 OWASP LLM Top 10 payloads from injection-payloads.json', () => {
+    // 20 original (T2) + 6 added by T15-FIX-1: INJ-21 (split-space verb),
+    // INJ-22 (per-letter dash split), INJ-23 (full-width Latin),
+    // INJ-24 (math-alphanumeric bold), INJ-25 (bidi-wrapped),
+    // INJ-26 (punycode IDN exfil).
+    expect(payloads).toHaveLength(26);
     for (const p of payloads) {
       expect(p.id).toMatch(/^INJ-\d{2}$/);
       expect(p.expectedFlagged).toBe(true);
@@ -138,7 +142,7 @@ describe('promptInjectionSanitizer — per-payload assertions', () => {
 // ────────────────────────────────────────────────────────────────────────────
 
 describe('promptInjectionSanitizer — severity gate', () => {
-  it('produces high|critical severity for ≥12 of 20 fixture payloads', () => {
+  it('produces high|critical severity for ≥18 of 26 fixture payloads', () => {
     let highOrCritical = 0;
     for (const payload of payloads) {
       const result = promptInjectionSanitizer(payload.payload);
@@ -146,11 +150,13 @@ describe('promptInjectionSanitizer — severity gate', () => {
         highOrCritical += 1;
       }
     }
-    // Per master plan §Week 3: "≥12 of 20 payloads classified high|critical."
-    // The Plan 02-03 ratified deviation (multi-marker bump generalized to ≥2
-    // matches regardless of category) keeps the floor intact; the test asserts
-    // the floor, not the rule mechanics.
-    expect(highOrCritical).toBeGreaterThanOrEqual(12);
+    // Original floor (master plan §Week 3): ≥12 of 20 payloads high|critical.
+    // T15-FIX-1 expanded the fixture set to 26 (adding 6 obfuscation-class
+    // payloads: split-token, full-width, math-alphanumeric, bidi-wrapped,
+    // punycode IDN). The new payloads ratchet the achievable floor up because
+    // the H2/H3 detection sweep classifies all of them ≥high. We hold the new
+    // floor at ≥18/26 (≈69%) — strictly above the original ≥12/20 (60%).
+    expect(highOrCritical).toBeGreaterThanOrEqual(18);
   });
 
   it('every fixture entry whose expected band is high|critical actually meets or exceeds that band', () => {

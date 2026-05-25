@@ -71,23 +71,59 @@
  *   Encoded-attack floor: any encoded-attack match pins minimum severity to
  *   `'critical'` regardless of count. Obfuscation effort (unicode swap, ZWSP
  *   splice, base64 decode-and-follow) is high-signal for adversarial intent.
+ *   Per M1 (T15-FIX-1), the encoded-attack category fires ONLY when both
+ *   a substitution AND a registry-pattern match are present in the normalized
+ *   text — Unicode lookalikes adjacent to an instruction verb without an
+ *   actual injection pattern no longer escalate to critical.
  *
- * ## Unicode normalization
+ * ## Unicode normalization (T15-FIX-1 H2 + M1)
  *
  *   Before regex matching, the sanitizer rewrites the text to neutralize the
- *   two most common bypass vectors:
+ *   common bypass vectors:
  *
- *   - U+2170 (ⅰ ROMAN NUMERAL SMALL ONE) → ASCII 'i'
- *   - U+0456 (і CYRILLIC SMALL LETTER BYELORUSSIAN-UKRAINIAN I) → ASCII 'i'
- *   - U+200B, U+200C, U+200D (zero-width space, ZWNJ, ZWJ) → stripped outright
+ *   - NFKC normalization → collapses full-width Latin (U+FF21-FF3A,
+ *     U+FF41-FF5A), math alphanumerics (U+1D400 range — bold/italic/sans-serif
+ *     stylings), small-form variants, ligatures (ﬁ → fi), and most lookalike
+ *     classes Unicode itself recognizes as compatibility-equivalent. This is
+ *     the broad sweep.
+ *   - Bidi controls stripped: U+202A LRE, U+202B RLE, U+202C PDF, U+202D LRO,
+ *     U+202E RLO, U+2066 LRI, U+2067 RLI, U+2068 FSI, U+2069 PDI. An attacker
+ *     can use these to visually reverse a payload while the underlying byte
+ *     sequence still carries the verb (the bidi-wrapped payload class).
+ *   - Combining marks stripped (\p{M}) — combining diacritical marks pasted
+ *     between letters bypass naive regex; the underlying base letters survive.
+ *   - Zero-width chars stripped: U+200B/C/D, U+FEFF (BOM), U+2060 (WJ).
+ *   - Hand-picked lookalikes (U+2170 → 'i', U+0456 → 'i', Cyrillic а/е/р/с/о)
+ *     stay in the map — NFKC does NOT cover these (they are not compatibility-
+ *     equivalent to ASCII; they are *visually* similar but linguistically
+ *     distinct codepoints).
  *
- *   Each substitution is RECORDED — if it lands within 50 chars of an
- *   instruction verb ("ignore", "disregard", "forget", "override"), the
- *   sanitizer emits an encoded-attack match against the ORIGINAL span (so the
- *   caller can see the obfuscation effort, not just the normalized form).
+ *   Whenever the normalization rewrites or removes ANY character, a
+ *   substitution event is recorded.
+ *
+ *   Encoded-attack emission rule (M1 — T15-FIX-1):
+ *   The sanitizer emits an encoded-attack match against a substitution site
+ *   ONLY when the normalized text ALSO produces a full registry pattern match.
+ *   Unicode lookalikes appearing in narrative prose that contains a benign
+ *   English instruction verb (e.g. Cyrillic prose containing "ignore churn
+ *   noise") no longer false-positive to critical — the substitutions exist,
+ *   but no surrounding pattern matched, so the obfuscation signal stands
+ *   down. The detection-only normalized text is used for matching; the
+ *   `matches[].snippet` field carries the ORIGINAL (pre-normalization)
+ *   substring so security IR sees what the attacker actually pasted.
  *
  *   The `sanitizedPaste` returned by this function uses the NORMALIZED text as
  *   its base — Sonnet sees ASCII even when the founder pasted unicode tricks.
+ *
+ * ## Split-token verb detection (T15-FIX-1 H3)
+ *
+ *   Beyond the literal-verb regex set, the sanitizer carries a small
+ *   obfuscated-verb registry that tolerates arbitrary whitespace / punctuation
+ *   / underscore separators between letters of a small set of instruction
+ *   verbs (ignore, disregard, forget, override, reveal, print, repeat,
+ *   pretend, act, jailbreak). Payloads like "ig nore previous instructions",
+ *   "ig\tnore", and "i-g-n-o-r-e" match. Verb category mirrors the literal
+ *   regex set's category for that verb.
  *
  * ## Sanitization
  *
@@ -438,10 +474,94 @@ const PATTERN_REGISTRY: ReadonlyArray<PatternDescriptor> = [
 ];
 
 // ────────────────────────────────────────────────────────────────────────────
-// Unicode normalization
+// Obfuscated-verb registry (T15-FIX-1 H3)
 // ────────────────────────────────────────────────────────────────────────────
 
-/** Codepoints that bypass naive ASCII regex. Mapped to their ASCII analog. */
+/**
+ * Verbs that split-token attacks commonly target. The pattern below allows
+ * arbitrary whitespace / punctuation / underscore between every adjacent
+ * pair of letters of the verb, catching forms like "ig nore", "ig\tnore",
+ * and "i-g-n-o-r-e". The category mirrors what the literal-verb regex set
+ * would emit for the same verb in plain form.
+ *
+ * Pattern shape per verb: `i[\s\W_]*g[\s\W_]*n[\s\W_]*o[\s\W_]*r[\s\W_]*e`.
+ * The character class `[\s\W_]*` (whitespace OR non-word-char OR underscore)
+ * tolerates separators ranging from a single space to a chain of dashes —
+ * but the `*` means the literal verb still matches when no separators are
+ * present (the literal-verb regex registry handles that case more
+ * specifically; the dedupe pass collapses overlaps).
+ *
+ * `\b` boundaries anchor at the verb start + end to prevent matching mid-word
+ * (e.g. "configure" should not match "for-g-e-t"-shaped overlap).
+ */
+interface ObfuscatedVerb {
+  verb: string;
+  category: InjectionCategory;
+  baseSeverity: Exclude<InjectionSeverity, 'none'>;
+}
+
+const OBFUSCATED_VERBS: ReadonlyArray<ObfuscatedVerb> = [
+  { verb: 'ignore', category: 'direct-override', baseSeverity: 'medium' },
+  { verb: 'disregard', category: 'direct-override', baseSeverity: 'medium' },
+  { verb: 'forget', category: 'direct-override', baseSeverity: 'medium' },
+  { verb: 'override', category: 'direct-override', baseSeverity: 'medium' },
+  { verb: 'reveal', category: 'system-prompt-extraction', baseSeverity: 'high' },
+  { verb: 'print', category: 'system-prompt-extraction', baseSeverity: 'high' },
+  { verb: 'repeat', category: 'system-prompt-extraction', baseSeverity: 'medium' },
+  { verb: 'pretend', category: 'role-injection', baseSeverity: 'high' },
+  { verb: 'jailbreak', category: 'jailbreak', baseSeverity: 'high' },
+];
+
+/**
+ * Build a global, case-insensitive regex for one verb. Letters of the verb
+ * are separated by `[\s\W_]*` (zero-or-more separators). A post-filter (in
+ * the match loop) skips the literal-verb form when no separators are
+ * present — the literal regex registry above owns that case more precisely.
+ *
+ * The `*` quantifier (rather than `+`) is required so a partially-obfuscated
+ * form like "ig nore" (one separator between i↔g, none between the rest)
+ * still matches. The post-filter discards only the truly-unobfuscated form
+ * (every letter pair contiguous).
+ *
+ * Word boundaries anchor at the verb start + end to prevent spurious mid-
+ * word matches.
+ */
+function buildObfuscatedVerbRegex(verb: string): RegExp {
+  const sep = '[\\s\\W_]*';
+  const letters = [...verb].join(sep);
+  return new RegExp(`\\b${letters}\\b`, 'gi');
+}
+
+/** True iff the matched span is the literal verb with no separators. */
+function isLiteralVerb(matched: string, verb: string): boolean {
+  return matched.toLowerCase().replace(/\s+/g, '') === verb && matched.length === verb.length;
+}
+
+interface ObfuscatedVerbDescriptor {
+  pattern: RegExp;
+  category: InjectionCategory;
+  baseSeverity: Exclude<InjectionSeverity, 'none'>;
+  verb: string;
+}
+
+const OBFUSCATED_VERB_PATTERNS: ReadonlyArray<ObfuscatedVerbDescriptor> = OBFUSCATED_VERBS.map(
+  (v) => ({
+    pattern: buildObfuscatedVerbRegex(v.verb),
+    category: v.category,
+    baseSeverity: v.baseSeverity,
+    verb: v.verb,
+  }),
+);
+
+// ────────────────────────────────────────────────────────────────────────────
+// Unicode normalization (H2 + M1 from T15-FIX-1)
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Hand-picked lookalike codepoints that NFKC does NOT collapse to ASCII
+ * (these are linguistically distinct codepoints that merely *look* like ASCII
+ * letters; NFKC preserves them). Mapped to their ASCII analog.
+ */
 const LOOKALIKE_TO_ASCII: ReadonlyMap<string, string> = new Map([
   ['ⅰ', 'i'], // ROMAN NUMERAL SMALL ONE
   ['і', 'i'], // CYRILLIC SMALL LETTER BYELORUSSIAN-UKRAINIAN I
@@ -458,36 +578,81 @@ const ZERO_WIDTH_CODEPOINTS: ReadonlySet<string> = new Set([
   '‌', // ZERO WIDTH NON-JOINER
   '‍', // ZERO WIDTH JOINER
   '﻿', // ZERO WIDTH NO-BREAK SPACE (BOM-like)
+  '⁠', // WORD JOINER
 ]);
+
+/**
+ * Bidirectional formatting controls. An attacker can use these to visually
+ * reverse a payload (RLO/PDF wrap) while the underlying byte sequence still
+ * carries the verb. Stripped from the detection-only copy.
+ */
+const BIDI_CONTROL_CODEPOINTS: ReadonlySet<string> = new Set([
+  '‪', // LEFT-TO-RIGHT EMBEDDING
+  '‫', // RIGHT-TO-LEFT EMBEDDING
+  '‬', // POP DIRECTIONAL FORMATTING
+  '‭', // LEFT-TO-RIGHT OVERRIDE
+  '‮', // RIGHT-TO-LEFT OVERRIDE
+  '⁦', // LEFT-TO-RIGHT ISOLATE
+  '⁧', // RIGHT-TO-LEFT ISOLATE
+  '⁨', // FIRST STRONG ISOLATE
+  '⁩', // POP DIRECTIONAL ISOLATE
+]);
+
+/**
+ * Combining-mark matcher — \p{M} catches every Unicode combining diacritic /
+ * spacing-mark / enclosing-mark. Pasted between letters of a verb, these
+ * preserve the visual shape while breaking naive regex. Stripped from the
+ * detection-only copy.
+ */
+const COMBINING_MARK_REGEX = /\p{M}/u;
 
 /** Instruction verbs that, when found near a normalization site, signal intent. */
 const INSTRUCTION_VERBS = ['ignore', 'disregard', 'forget', 'override', 'reveal', 'repeat'];
 
 interface NormalizationResult {
-  /** Text with lookalikes → ASCII and zero-width chars stripped. */
+  /** Text with NFKC + bidi/combining/zero-width strip + hand-picked lookalike map. */
   text: string;
   /**
    * One entry per character the normalizer rewrote or removed. `normalizedOffset`
    * is the position in the post-rewrite text where the substitution landed (for
-   * a ZWSP strip, that is the index of the character that now sits where the
-   * ZWSP used to). `originalOffset` is the position in the INPUT string of the
-   * original codepoint — used to surface the original (pre-normalization)
-   * snippet for audit purposes.
+   * a strip, that is the index of the character that now sits where the
+   * stripped one used to). `originalOffset` is the position in the INPUT
+   * string of the original codepoint — used to surface the original (pre-
+   * normalization) snippet for audit purposes.
    */
   substitutions: Array<{
-    kind: 'lookalike' | 'zero-width';
+    kind: 'lookalike' | 'zero-width' | 'bidi' | 'combining' | 'nfkc';
     normalizedOffset: number;
     originalOffset: number;
     original: string;
   }>;
 }
 
+/**
+ * Build the detection-only normalized text in a single character-aligned pass.
+ *
+ * The walker iterates the INPUT string codepoint-by-codepoint (via `for…of`,
+ * which yields whole codepoints — surrogate pairs included). For each
+ * codepoint:
+ *
+ *   1. Stripped if zero-width / bidi-control / combining-mark.
+ *   2. Substituted via the hand-picked lookalike map if applicable.
+ *   3. Otherwise NFKC-normalized. NFKC may collapse a single codepoint to
+ *      multiple ASCII chars (e.g. ﬁ → fi, or a full-width Latin char → one
+ *      ASCII char of the same width). When the post-NFKC form differs from
+ *      the input codepoint, a `kind: 'nfkc'` substitution is recorded.
+ *
+ * The substitution log drives the encoded-attack signal (M1): the sanitizer
+ * emits encoded-attack matches against substitution sites ONLY when the
+ * normalized text also produces a full registry pattern match.
+ */
 function normalizeUnicodeBypasses(input: string): NormalizationResult {
   const out: string[] = [];
   const substitutions: NormalizationResult['substitutions'] = [];
   let outOffset = 0;
   let inOffset = 0;
   for (const ch of input) {
+    // 1. Stripped classes — zero-width, bidi, combining.
     if (ZERO_WIDTH_CODEPOINTS.has(ch)) {
       substitutions.push({
         kind: 'zero-width',
@@ -498,6 +663,28 @@ function normalizeUnicodeBypasses(input: string): NormalizationResult {
       inOffset += ch.length;
       continue;
     }
+    if (BIDI_CONTROL_CODEPOINTS.has(ch)) {
+      substitutions.push({
+        kind: 'bidi',
+        normalizedOffset: outOffset,
+        originalOffset: inOffset,
+        original: ch,
+      });
+      inOffset += ch.length;
+      continue;
+    }
+    if (COMBINING_MARK_REGEX.test(ch)) {
+      substitutions.push({
+        kind: 'combining',
+        normalizedOffset: outOffset,
+        originalOffset: inOffset,
+        original: ch,
+      });
+      inOffset += ch.length;
+      continue;
+    }
+
+    // 2. Hand-picked lookalike — codepoints NFKC does not cover.
     const ascii = LOOKALIKE_TO_ASCII.get(ch);
     if (ascii !== undefined) {
       out.push(ascii);
@@ -511,6 +698,25 @@ function normalizeUnicodeBypasses(input: string): NormalizationResult {
       inOffset += ch.length;
       continue;
     }
+
+    // 3. NFKC — broad compatibility decomposition. Collapses full-width
+    //    Latin, math alphanumerics, ligatures, etc. into ASCII or
+    //    closely-equivalent forms.
+    const nfkc = ch.normalize('NFKC');
+    if (nfkc !== ch) {
+      out.push(nfkc);
+      substitutions.push({
+        kind: 'nfkc',
+        normalizedOffset: outOffset,
+        originalOffset: inOffset,
+        original: ch,
+      });
+      outOffset += nfkc.length;
+      inOffset += ch.length;
+      continue;
+    }
+
+    // 4. Pass-through.
     out.push(ch);
     outOffset += ch.length;
     inOffset += ch.length;
@@ -610,60 +816,17 @@ function buildSanitizedText(normalized: string, matches: RawMatch[]): string {
  * attacker's own embedded PII or banned strings.
  */
 export function promptInjectionSanitizer(text: string): InjectionSanitizerResult {
-  // 1. Normalize lookalike + zero-width characters so the regex set sees ASCII.
+  // 1. Normalize the input. NFKC + bidi/combining/zero-width strip + lookalike
+  //    map produce a detection-only copy. The `substitutions` log records
+  //    every codepoint the normalizer rewrote or removed — used downstream to
+  //    decide whether to emit encoded-attack matches (M1 gating).
   const { text: normalized, substitutions } = normalizeUnicodeBypasses(text);
 
   const rawMatches: RawMatch[] = [];
-  const seenEncodedWordStarts = new Set<number>();
 
-  // 2. Encoded-attack matches from unicode/ZWSP substitutions near verbs. The
-  //    snippet surfaces the ORIGINAL (pre-normalization) token so the audit
-  //    trail reflects what the founder pasted, not the cleaned text.
-  for (const sub of substitutions) {
-    if (!nearInstructionVerb(normalized, sub.normalizedOffset)) continue;
-
-    // Walk the ORIGINAL input outward from this substitution's site to grab
-    // the surrounding word — whitespace-bounded. The same logic works for
-    // both lookalike replacements (which sit at `originalOffset` in `text`)
-    // and zero-width strips (where the char USED to sit, between two visible
-    // glyphs of the same logical word).
-    const origWordStart = (() => {
-      let i = sub.originalOffset;
-      while (i > 0 && !/\s/.test(text[i - 1]!)) i--;
-      return i;
-    })();
-    const origWordEnd = (() => {
-      let i = sub.originalOffset + sub.original.length;
-      while (i < text.length && !/\s/.test(text[i]!)) i++;
-      return i;
-    })();
-    if (seenEncodedWordStarts.has(origWordStart)) continue;
-    seenEncodedWordStarts.add(origWordStart);
-
-    // For sanitization (replacement-in-normalized-text), recompute the word
-    // span in the NORMALIZED text since that's the string we splice.
-    const normWordStart = (() => {
-      let i = sub.normalizedOffset;
-      while (i > 0 && !/\s/.test(normalized[i - 1]!)) i--;
-      return i;
-    })();
-    const normWordEnd = (() => {
-      let i = sub.normalizedOffset;
-      while (i < normalized.length && !/\s/.test(normalized[i]!)) i++;
-      return i;
-    })();
-
-    rawMatches.push({
-      start: normWordStart,
-      end: normWordEnd,
-      snippet: text.slice(origWordStart, origWordEnd),
-      pattern: sub.kind === 'lookalike' ? 'unicode-lookalike' : 'zero-width-space',
-      category: 'encoded-attack',
-      baseSeverity: 'critical',
-    });
-  }
-
-  // 3. Regex registry against the normalized text.
+  // 2. Literal regex registry against the normalized text. Full-width Latin,
+  //    math alphanumerics, and bidi-wrapped variants reach this loop in
+  //    ASCII form thanks to NFKC + the strip steps.
   for (const { pattern, category, baseSeverity } of PATTERN_REGISTRY) {
     // Reset lastIndex defensively — registry regexes are /g flagged.
     pattern.lastIndex = 0;
@@ -681,10 +844,101 @@ export function promptInjectionSanitizer(text: string): InjectionSanitizerResult
     }
   }
 
-  // 4. Dedupe overlapping spans (earliest-wins) so we don't double-count.
+  // 3. Obfuscated-verb registry against the normalized text. Catches
+  //    split-token attacks like "ig nore" / "i-g-n-o-r-e" that the literal
+  //    regex set's word-bounded patterns cannot match. The literal-verb form
+  //    (no separators) is skipped — the literal regex registry owns it.
+  for (const { pattern, category, baseSeverity, verb } of OBFUSCATED_VERB_PATTERNS) {
+    pattern.lastIndex = 0;
+    for (const m of normalized.matchAll(pattern)) {
+      if (m.index === undefined) continue;
+      const snippet = m[0];
+      if (isLiteralVerb(snippet, verb)) continue;
+      rawMatches.push({
+        start: m.index,
+        end: m.index + snippet.length,
+        snippet,
+        pattern: `obfuscated-verb:${verb}`,
+        category,
+        baseSeverity,
+      });
+    }
+  }
+
+  // 4. Encoded-attack emission (M1 gating).
+  //    Emit encoded-attack matches against substitution sites ONLY when a
+  //    literal-pattern or obfuscated-verb match also fired in the normalized
+  //    text. Unicode lookalikes / combining marks / bidi controls / NFKC
+  //    rewrites on their own no longer escalate — international founder
+  //    narratives containing benign English instruction verbs near non-ASCII
+  //    prose stand down at severity 'none' / 'low'.
+  const nonEncodedMatchCount = rawMatches.length;
+  if (nonEncodedMatchCount > 0) {
+    const seenEncodedWordStarts = new Set<number>();
+    for (const sub of substitutions) {
+      if (!nearInstructionVerb(normalized, sub.normalizedOffset)) continue;
+
+      // Walk the ORIGINAL input outward from this substitution's site to grab
+      // the surrounding word — whitespace-bounded. The audit-trail snippet
+      // surfaces the ORIGINAL (pre-normalization) token so security IR sees
+      // what the founder actually pasted.
+      const origWordStart = (() => {
+        let i = sub.originalOffset;
+        while (i > 0 && !/\s/.test(text[i - 1]!)) i--;
+        return i;
+      })();
+      const origWordEnd = (() => {
+        let i = sub.originalOffset + sub.original.length;
+        while (i < text.length && !/\s/.test(text[i]!)) i++;
+        return i;
+      })();
+      if (seenEncodedWordStarts.has(origWordStart)) continue;
+      seenEncodedWordStarts.add(origWordStart);
+
+      // For sanitization (replacement-in-normalized-text), recompute the word
+      // span in the NORMALIZED text since that's the string we splice.
+      const normWordStart = (() => {
+        let i = sub.normalizedOffset;
+        while (i > 0 && !/\s/.test(normalized[i - 1]!)) i--;
+        return i;
+      })();
+      const normWordEnd = (() => {
+        let i = sub.normalizedOffset;
+        while (i < normalized.length && !/\s/.test(normalized[i]!)) i++;
+        return i;
+      })();
+
+      // Tag the pattern by the substitution kind for audit clarity.
+      const patternTag = (() => {
+        switch (sub.kind) {
+          case 'lookalike':
+            return 'unicode-lookalike';
+          case 'zero-width':
+            return 'zero-width-space';
+          case 'bidi':
+            return 'bidi-control';
+          case 'combining':
+            return 'combining-mark';
+          case 'nfkc':
+            return 'nfkc-compatibility';
+        }
+      })();
+
+      rawMatches.push({
+        start: normWordStart,
+        end: normWordEnd,
+        snippet: text.slice(origWordStart, origWordEnd),
+        pattern: patternTag,
+        category: 'encoded-attack',
+        baseSeverity: 'critical',
+      });
+    }
+  }
+
+  // 5. Dedupe overlapping spans (earliest-wins) so we don't double-count.
   const matches = dedupeOverlaps(rawMatches);
 
-  // 5. Severity rollup.
+  // 6. Severity rollup.
   let severity: InjectionSeverity = 'none';
   let encodedAttackSeen = false;
   for (const m of matches) {
@@ -701,7 +955,7 @@ export function promptInjectionSanitizer(text: string): InjectionSanitizerResult
     severity = maxSeverity(severity, 'critical');
   }
 
-  // 6. Build sanitizedPaste.
+  // 7. Build sanitizedPaste.
   const sanitizedPaste =
     matches.length === 0 && substitutions.length === 0
       ? text // byte-identical short-circuit

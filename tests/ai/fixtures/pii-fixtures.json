@@ -730,5 +730,105 @@
     ],
     "description": "The mosaic-marketplace paste already carries 6 unrelated-party PII items in its embedded Slack thread (3 VC emails + 3 VC phones across lines 69 / 72 / 78). The two founders (Sofia Park / Hassan Bakr) have no contact info in the paste, so no founder-self preservation is exercised here — only the unrelated-party scrub. The expectedRedactions email values are intentionally NOT inlined in this fixture file (the referenced file authors them against the SLD-form RFC-2606 reserved domains, which would fail this file's grep gate that pins every email TLD to .example/.test/.invalid). The T7 test loads the referenced file at test time and asserts the email count and shape against the resulting redacted draft. The narrative blob is held by reference so this file does not duplicate the mosaic paste.",
     "rationale": "Real-world precedent: the redactor's contract is anchored to the same paste the extractor unit tests already operate on. Proves end-to-end consistency between extractor + redactor."
+  },
+  {
+    "id": "PII-16",
+    "category": "oneLiner",
+    "scenario": "T15-FIX-1 H1 — third-party email embedded in draft.oneLiner",
+    "narrativeBlob": "",
+    "founderSelfPII": {
+      "emails": [
+        "sam@founders.example"
+      ],
+      "phones": []
+    },
+    "draftInput": {
+      "oneLiner": "Agentic operator for founders — reach james@acme-vc.example for partner intros.",
+      "provenance": {}
+    },
+    "founders": [
+      {
+        "name": "Sam Holt",
+        "email": "sam@founders.example"
+      }
+    ],
+    "expectedRedactionsByType": {
+      "email": 1,
+      "phone": 0,
+      "wallet": 0,
+      "ssn": 0
+    },
+    "expectedRedactionsTotal": 1,
+    "expectedPreserved": [
+      "Agentic operator for founders"
+    ],
+    "expectedReplaced": [
+      "james@acme-vc.example"
+    ],
+    "description": "Tests T15-FIX-1 H1: the walker now covers draft.oneLiner (previously excluded as a top-level scalar). An attacker-controlled paste could induce the extractor to emit a third-party investor email straight into oneLiner; the redactor must scrub it before persistence. Founder-self email is in the exemption set but does not appear in oneLiner, so only the unrelated-party email is redacted.",
+    "rationale": "Pins the H1 oneLiner walk path. Without the fix, this redaction returned 0 and the third-party email persisted to business_memory."
+  },
+  {
+    "id": "PII-17",
+    "category": "team",
+    "scenario": "T15-FIX-1 H1 — third-party PII in team.founders[*].linkedinUrl + advisor background",
+    "narrativeBlob": "",
+    "founderSelfPII": {
+      "emails": [
+        "sam@founders.example"
+      ],
+      "phones": [
+        "415-555-0010"
+      ]
+    },
+    "draftInput": {
+      "team": {
+        "founders": [
+          {
+            "name": "Sam Holt",
+            "email": "sam@founders.example",
+            "phone": "415-555-0010",
+            "linkedinUrl": "https://linkedin.com/in/sam-holt; secondary contact rachel@vc.example",
+            "background": "Former engineer at Acme; close mentor is mike@advisors.test (212-555-0099)."
+          }
+        ],
+        "advisors": [
+          {
+            "name": "Dr. Lin Wei",
+            "background": "Cap-table guru; reachable via lin@advisors.test or 650.555.0123 for diligence questions."
+          }
+        ]
+      },
+      "provenance": {}
+    },
+    "founders": [
+      {
+        "name": "Sam Holt",
+        "email": "sam@founders.example",
+        "phone": "415-555-0010"
+      }
+    ],
+    "expectedRedactionsByType": {
+      "email": 3,
+      "phone": 2,
+      "wallet": 0,
+      "ssn": 0
+    },
+    "expectedRedactionsTotal": 5,
+    "expectedPreserved": [
+      "sam@founders.example",
+      "415-555-0010",
+      "https://linkedin.com/in/sam-holt",
+      "Dr. Lin Wei"
+    ],
+    "expectedReplaced": [
+      "rachel@vc.example",
+      "mike@advisors.test",
+      "212-555-0099",
+      "lin@advisors.test",
+      "650.555.0123"
+    ],
+    "description": "Tests T15-FIX-1 H1: the walker now traverses team.* string leaves via bounded recursive descent. founders[0].linkedinUrl (with a tacked-on third-party email), founders[0].background (third-party email + phone), advisors[0].background (third-party email + phone) are all walked and redacted. Founder-self email + phone keys are preserved verbatim (the key-name skip prevents redaction of the exemption channels themselves). The LinkedIn URL prefix and the advisor's name survive — only the PII patterns are replaced.",
+    "rationale": "Pins the H1 team.* walk path with founder-self exemption preservation. Without the fix, all 5 unrelated-party PII items would have persisted to business_memory under team."
   }
 ]

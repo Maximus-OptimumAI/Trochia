@@ -56,7 +56,7 @@
  *
  * ## Walked paths
  *
- *   These are the ONLY paths the redactor touches:
+ *   These are the paths the redactor touches:
  *
  *     - draft.narrative.problem
  *     - draft.narrative.solution
@@ -64,6 +64,11 @@
  *     - draft.narrative.why_us
  *     - draft.traction.growth
  *     - draft.traction.runway
+ *     - draft.oneLiner (top-level marketing string — LLM-emitted; T15-FIX-1 H1)
+ *     - draft.team.* string leaves via bounded recursive traversal — every
+ *       string in founders[*], advisors[*], and any catchall key under team —
+ *       EXCEPT `email` and `phone` keys (those are the founder-self exemption
+ *       channel and stay preserved verbatim). T15-FIX-1 H1.
  *     - draft.provenance[fieldKey].source_snippet (single-object arm)
  *     - draft.provenance[fieldKey][i].source_snippet (array arm — every entry)
  *     - draft.provenance[fieldKey].rejected_alternatives[i].source_snippet
@@ -71,11 +76,13 @@
  *
  *   Paths the redactor EXPLICITLY DOES NOT touch:
  *
- *     - draft.companyName, oneLiner, sector, stage, geography,
- *       incorporationStatus, foundingDate (top-level scalars — founder-stated,
- *       founder-self by definition)
- *     - draft.team.* (founder-self exempt territory by design — anything the
- *       founder declares about their own team is theirs to disclose)
+ *     - draft.companyName, sector, stage, geography, incorporationStatus,
+ *       foundingDate (top-level scalars — founder-stated, founder-self by
+ *       definition; companyName carries trademark intent, the others are
+ *       short enums or ISO dates)
+ *     - draft.team.founders[*].email and draft.team.founders[*].phone
+ *       (founder-self exemption channels — used to BUILD the exemption set,
+ *       so redacting them would defeat the exemption itself)
  *     - draft.traction.{mrr, arr, currency, customers, valuation, burn}
  *       (numeric / 3-char currency code — not free-form text)
  *
@@ -372,6 +379,82 @@ function walkProvenance(
   }
 }
 
+/**
+ * Walk every string leaf inside `draft.team` (founders, advisors, catchall
+ * keys) and redact in place on the cloned draft. Founder-self exemption
+ * channels (`email` and `phone` keys at any nesting depth inside team) are
+ * preserved verbatim — those drive the exemption set itself and form the
+ * positive identity of the founder, so redacting them would corrupt the
+ * audit trail and is unnecessary (the exemption already prevents matched
+ * founder values from being rewritten elsewhere).
+ *
+ * Recursion is depth-bounded at 5 levels. The team schema is shallow in
+ * practice (team → founders[] → object → string fields, depth 4), so 5 is
+ * a generous ceiling that still rejects adversarial deeply-nested payloads
+ * before they can stack overflow.
+ *
+ * T15-FIX-1 H1: addresses Codex finding that LLM-emitted PII in
+ * team.founders[*].linkedinUrl / team.founders[*].background / team.advisors[*]
+ * and any catchall key escaped the previous narrow walker.
+ */
+function walkTeamStringLeaves(
+  draft: BusinessMemoryDraft,
+  exempt: ExemptionSet,
+  totals: Record<PIIType, number>,
+): void {
+  if (!draft.team) return;
+
+  const MAX_DEPTH = 5;
+
+  function recurse(node: unknown, depth: number): unknown {
+    if (depth > MAX_DEPTH) return node;
+    if (typeof node === 'string') {
+      if (node.length === 0) return node;
+      const { text, byType } = redactString(node, exempt);
+      accumulate(totals, byType);
+      return text;
+    }
+    if (Array.isArray(node)) {
+      for (let i = 0; i < node.length; i++) {
+        node[i] = recurse(node[i], depth + 1);
+      }
+      return node;
+    }
+    if (node && typeof node === 'object') {
+      const obj = node as Record<string, unknown>;
+      for (const key of Object.keys(obj)) {
+        // Founder-self exemption channels — preserve verbatim. The exemption
+        // set built from these values prevents the same literal from being
+        // redacted elsewhere; leaving them untouched here is consistent.
+        if (key === 'email' || key === 'phone') continue;
+        obj[key] = recurse(obj[key], depth + 1);
+      }
+      return node;
+    }
+    return node;
+  }
+
+  recurse(draft.team, 1);
+}
+
+/**
+ * Redact `draft.oneLiner` — top-level marketing string emitted by the LLM.
+ *
+ * T15-FIX-1 H1: addresses Codex finding that the previous walker excluded
+ * top-level scalars, allowing the extractor to emit PII straight into
+ * oneLiner unscrubbed.
+ */
+function walkOneLiner(
+  draft: BusinessMemoryDraft,
+  exempt: ExemptionSet,
+  totals: Record<PIIType, number>,
+): void {
+  if (typeof draft.oneLiner !== 'string' || draft.oneLiner.length === 0) return;
+  const { text, byType } = redactString(draft.oneLiner, exempt);
+  draft.oneLiner = text;
+  accumulate(totals, byType);
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Public API
 // ────────────────────────────────────────────────────────────────────────────
@@ -402,6 +485,8 @@ export function redactUnrelatedPartyPII(
 
   walkNarrativeAndTraction(cloned, exempt, totals);
   walkProvenance(cloned, exempt, totals);
+  walkOneLiner(cloned, exempt, totals);
+  walkTeamStringLeaves(cloned, exempt, totals);
 
   const redactionsApplied = totals.email + totals.phone + totals.wallet + totals.ssn;
   return { draft: cloned, redactionsApplied, byType: totals };
