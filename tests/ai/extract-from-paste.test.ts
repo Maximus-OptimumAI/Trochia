@@ -570,6 +570,23 @@ describe('extractFromPaste — per-fixture extraction', () => {
       expect(fixture).toContain(entry.source_snippet);
     }
 
+    // H. Plan 02-03 / KNW-02d additive return-shape — `pii` metadata block
+    // exists with the documented count + byType breakdown shape, and the
+    // injection screen reports a severity band string. The acme-fintech
+    // fixture carries no PII and no injection markers, so the counts are zero
+    // and severity is 'none' — but the SHAPE assertion holds for every block.
+    expect(result.pii).toBeDefined();
+    expect(typeof result.pii.redactionsApplied).toBe('number');
+    expect(result.pii.redactionsApplied).toBeGreaterThanOrEqual(0);
+    expect(result.pii.byType).toBeDefined();
+    expect(typeof result.pii.byType.email).toBe('number');
+    expect(typeof result.pii.byType.phone).toBe('number');
+    expect(typeof result.pii.byType.wallet).toBe('number');
+    expect(typeof result.pii.byType.ssn).toBe('number');
+    expect(['none', 'low', 'medium', 'high', 'critical']).toContain(
+      result.injectionScreen.severity,
+    );
+
     // Sanity: runAgent was called once with taskClass:'draft' (Sonnet route)
     expect(mockRunAgent).toHaveBeenCalledTimes(1);
     const opts = mockRunAgent.mock.calls[0]![0]!;
@@ -780,6 +797,129 @@ describe('extractFromPaste — length validation', () => {
       extractFromPaste({ accountId: 'acct-long-001', paste: longPaste }),
     ).rejects.toMatchObject({ code: 'PASTE_TOO_LONG' });
     expect(mockRunAgent).not.toHaveBeenCalled();
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// PII redactor wiring — founder-self exemption + byType propagation (KNW-02d)
+//
+// These two smokes assert the Step 5 wiring inside the agent: the redactor
+// runs on the post-`runAgent` draft, receives `draft.team?.founders` as the
+// exemption source, and the resulting `byType` counts surface verbatim on
+// `result.pii`. Sanitizer-level coverage of the redactor's pattern set lives
+// in `tests/ai/sanitizers/pii-redact.test.ts` (Task 7); these tests target
+// the agent's PLUMBING, not the regex set.
+// ────────────────────────────────────────────────────────────────────────────
+
+describe('extractFromPaste — PII redactor wiring', () => {
+  it('preserves founder-self email while redacting third-party email from the same narrative', async () => {
+    // Mocked draft: `team.founders[0].email` is the founder-self channel the
+    // agent reads at `draft.team?.founders ?? []` and feeds into
+    // `redactUnrelatedPartyPII`. narrative.problem references BOTH the
+    // founder-self email AND a distinct third-party email — only the
+    // third-party form should be replaced with `[REDACTED-EMAIL]`.
+    const founderEmail = 'sam@startup.example';
+    const thirdPartyEmail = 'jane@example.com';
+    const fixture = await loadFixture('paste-vanta-hardware');
+    const mockedDraft: BusinessMemoryDraft = {
+      companyName: 'Startup, Inc.',
+      oneLiner: 'A benign one-liner for the founder-self exemption smoke',
+      sector: 'Fintech',
+      stage: 'Seed',
+      geography: 'United States',
+      incorporationStatus: 'Delaware C-Corp',
+      foundingDate: '2025-01-01T00:00:00.000Z',
+      team: {
+        founders: [
+          { name: 'Sam Founder', role: 'CEO', email: founderEmail },
+        ],
+      },
+      narrative: {
+        problem:
+          `Reach the founder at ${founderEmail} for context; the original incident reporter was ${thirdPartyEmail}.`,
+      },
+      provenance: {
+        companyName: provEntry('benign source snippet for companyName', 0.9),
+        oneLiner: provEntry('benign source snippet for oneLiner', 0.85),
+      },
+    };
+    mockRunAgent.mockResolvedValueOnce(mockedDraft);
+
+    const result = await extractFromPaste({
+      accountId: 'acct-founder-self-001',
+      paste: fixture,
+    });
+
+    const stringified = JSON.stringify(result.draft);
+    // Founder-self email survives verbatim — the exemption set matched the
+    // lowercase+trim form against `narrative.problem`'s occurrence.
+    expect(stringified).toContain(founderEmail);
+    // Third-party email is replaced with the typed marker; no occurrence of
+    // the raw third-party local-part anywhere in the post-redaction draft.
+    expect(stringified).not.toContain(thirdPartyEmail);
+    expect(stringified).toContain('[REDACTED-EMAIL]');
+
+    // PII metadata reflects exactly ONE redaction (the third-party email).
+    // Founder-self email is skipped via `isExempt`, so it does NOT count.
+    expect(result.pii.redactionsApplied).toBe(1);
+    expect(result.pii.byType.email).toBe(1);
+    // No other PII categories were present in the mocked draft.
+    expect(result.pii.byType.phone).toBe(0);
+    expect(result.pii.byType.wallet).toBe(0);
+    expect(result.pii.byType.ssn).toBe(0);
+
+    // The founder entry on the returned draft is itself untouched — the
+    // redactor walks narrative + traction + provenance, NOT team.*.
+    expect(result.draft.team?.founders?.[0]?.email).toBe(founderEmail);
+  });
+
+  it('PII metadata reflects exact byType counts from the extractor output', async () => {
+    // Mocked draft with TWO unrelated-party emails in narrative.problem and
+    // no founders defined — every email match is redactable (no exemption).
+    // Asserts the agent's `pii: { redactionsApplied, byType }` shape carries
+    // the redactor's counts through unchanged.
+    const fixture = await loadFixture('paste-vanta-hardware');
+    const mockedDraft: BusinessMemoryDraft = {
+      companyName: 'Startup, Inc.',
+      oneLiner: 'A benign one-liner for the PII metadata smoke',
+      sector: 'Fintech',
+      stage: 'Seed',
+      geography: 'United States',
+      incorporationStatus: 'Delaware C-Corp',
+      foundingDate: '2025-01-01T00:00:00.000Z',
+      narrative: {
+        problem:
+          'Contact priya@partners.example and dev@external.example for follow-up on the integration spec.',
+      },
+      provenance: {
+        companyName: provEntry('benign source snippet for companyName', 0.9),
+        oneLiner: provEntry('benign source snippet for oneLiner', 0.85),
+      },
+    };
+    mockRunAgent.mockResolvedValueOnce(mockedDraft);
+
+    const result = await extractFromPaste({
+      accountId: 'acct-pii-metadata-001',
+      paste: fixture,
+    });
+
+    // Two redactions, both email type.
+    expect(result.pii.redactionsApplied).toBe(2);
+    expect(result.pii.byType.email).toBe(2);
+    // No other categories present.
+    expect(result.pii.byType.phone).toBe(0);
+    expect(result.pii.byType.wallet).toBe(0);
+    expect(result.pii.byType.ssn).toBe(0);
+
+    // Both raw emails are gone from the persisted draft; both occurrences
+    // collapsed to the typed marker.
+    const stringified = JSON.stringify(result.draft);
+    expect(stringified).not.toContain('priya@partners.example');
+    expect(stringified).not.toContain('dev@external.example');
+    // Two markers in narrative.problem — count occurrences to prove both
+    // replacements landed (string.split returns N+1 segments on N matches).
+    const markerCount = stringified.split('[REDACTED-EMAIL]').length - 1;
+    expect(markerCount).toBe(2);
   });
 });
 
