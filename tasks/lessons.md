@@ -126,3 +126,114 @@ Next: 6c (Install Cursor CLI to Windows PATH)
   manually insert the migration hash into __drizzle_migrations to mark
   applied. Future plans should split enum-only migrations into separate
   files. (Plan 02-03 T11 precursor, 2026-05-22.)
+
+---
+
+## Phase 2 Week 3 (Plan 02-03) — Sanitizers + Conflict Resolver + Security Gates
+
+- **Sanitizer regex coverage requires fixture-driven authoring + codex review — informal pattern lists miss attack variants.**
+  Plan 02-03 Task 2 authored 20 OWASP LLM Top 10 payloads as a JSON fixture
+  set with per-payload expected-severity + match-substrings + sanitized-
+  excludes BEFORE writing the sanitizer's regex registry at Task 4. The
+  fixture became the executable specification; the sanitizer was iterated
+  against it until 20/20 flagged at the right severity. Codex T15-FIX-1
+  closed H1 (severity-escalation bypass via single-marker high-base regex)
+  + H2 (PII-14 dual-walk regression in the fixture file). Lesson: every
+  future security sanitizer in Trochia (file upload Tier 2 KNW-03 Phase
+  2 Week 7, qa-rag Phase 2 Week 6) ships with a fixture set first,
+  regex second, and a /codex pass third. Informal "I'll add the patterns
+  as I think of them" authoring is the antipattern. (T2 + T4 + T15-FIX-1.)
+
+- **PII redaction founder-self exemption MUST source from trusted auth
+  identity (ctx.session.user.email), NOT from LLM-derived draft fields.**
+  Plan 02-03's original spec read founder-self identity from
+  draft.team.founders[*].email — a field populated by the LLM extractor
+  parsing attacker-controlled paste content. /cso M1 + /codex H3 both
+  flagged this independently as a high-severity bypass: an attacker could
+  paste content that causes the LLM to populate team.founders[0].email
+  with the attacker's own address, which then whitelists that address
+  from redaction. Fix at T16-FIX-1: the agent passes ctx.session.user.email
+  (the trusted post-auth identity from Supabase) as the founder-self
+  exemption seed; draft.team.founders remains informational only and
+  cannot grant exemption. Generalized rule: for any redaction or
+  filtering primitive whose decision depends on identity, source identity
+  from the trusted auth layer, NOT from the input being filtered.
+  (T6 spec → T16-FIX-1 fix, 2026-05-25.)
+
+- **Audit-row metadata redaction boundary: severity band + numeric counts only,
+  never matched substrings, never byType detail, never content fields beyond
+  capped 200-char snippets.**
+  Plan 02-03's security-IR audit row (kind='paste_extract' on injection
+  rejection) carries `{ rejected: true, severity, categoryCount }` and
+  NOTHING ELSE. The conflict-resolution audit row (kind='paste_confirm')
+  carries `{ fieldKey, chosenSourceSnippet: snippet.slice(0, 200), rejectedCount }`
+  per resolved field — chosen-snippet capped to 200 chars; never the
+  full snippet, never byType breakdown of PII, never injectionScreen.matches
+  contents (those are paste substrings — may themselves contain PII).
+  The cap is the audit-vs-PII-leak tradeoff. Generalized rule: when writing
+  security-IR audit rows, encode the question "is this attribute the kind of
+  thing that could itself BE the attack content?" — if yes, store severity
+  band or count only; if no, store with a tight cap. The interaction.metadata
+  jsonb column is the audit boundary; the logger remains content-blind.
+  (T11 spec + T16-FIX-1 audit-swallow fix.)
+
+- **Atomic-upsert pattern from 02-02 generalizes to every Phase 2+ tRPC
+  mutation touching one-row-per-tenant tables — default to
+  `INSERT ... ON CONFLICT (account_id) DO UPDATE WHERE <state-guard>`
+  + a TOCTOU guard via lastUpdatedAt-in-UPDATE-WHERE.**
+  Plan 02-02 3be8fa6 introduced the atomic-upsert + isNull(confirmedAt)
+  guard. Plan 02-03 T16-FIX-1 added the TOCTOU companion: lastUpdatedAt-in-
+  UPDATE-WHERE catches the narrow race where two concurrent confirm
+  requests both pass the read-side state check then race on UPDATE. The
+  pattern is now: (a) atomic upsert with setWhere = state predicate,
+  (b) version column (lastUpdatedAt) in UPDATE WHERE, (c) check returned
+  row count + throw clean CONFLICT if 0. Every Plan 02-04+ mutation
+  touching business_memory / embeddings / interaction / timeline_event
+  with a one-row-per-tenant or version-bumping shape inherits this.
+  (T16-FIX-1 TOCTOU upgrade, 2026-05-25.)
+
+- **Planner-inheritance error pattern: when a plan references a schema
+  artifact, verify the artifact actually shipped in the predecessor's
+  state before relying on it.**
+  Plan 02-03's T11 spec referenced an `interaction.metadata` jsonb column
+  as if Plan 02-01 had shipped it — but Plan 02-01 never did. Caught at
+  T11 dispatch when the audit-row insert failed with "column does not
+  exist". Resolved via a precursor migration d5902ef that additively
+  added the column + paste_extract / paste_confirm enum values BEFORE
+  T11's audit-row contract could land. Plan-checker discipline now
+  includes a verify-referenced-schema-exists step: every plan's <files>
+  + <interfaces> + acceptance-criteria mention of a column / table /
+  index must trace back to a shipped migration in a predecessor plan's
+  SUMMARY. (T11 dispatch, 2026-05-22.)
+
+- **Claude Code worktree-isolation bug #3099 on Windows — prefer
+  sequential single-agent dispatches until upstream fix lands.**
+  Plan 02-03 Wave 4-B/4-C on 2026-05-22 hit the bug class: parallel agents
+  spawned with `isolation="worktree"` had Edit/Write calls silently land
+  in the main repo working tree instead of their per-agent worktrees.
+  Wave 4-B never recovered cleanly (work salvaged via in-place commit
+  on main worktree); Wave 4-C self-recovered via cp + git checkout.
+  Atomicity broken in both cases — recovery worked but the worktree-as-
+  safety-guarantee invariant did not hold. Policy: sequential single-agent
+  dispatch on Windows until #3099 ships an upstream fix. The branch-check
+  safety hole (P4.5-POLISH-09) compounds this — `git merge-base HEAD
+  <expected> == <expected>` passes when HEAD is an ancestor of expected;
+  correct check is `git rev-list --count <expected>..HEAD == 0`.
+  (Wave 4-B/4-C, 2026-05-22; logged at P4.5-POLISH-08 + P4.5-POLISH-09.)
+
+- **APPROVED-WITH-FIXES from /codex or /cso is a real outcome — when
+  fixes are small (~10-50 lines) ship them as a follow-up FIX commit on
+  the same branch BEFORE /ship; don't merge with the verdict still
+  outstanding.**
+  Plan 02-03 hit two APPROVED-WITH-FIXES gates (T15 codex + T16 /cso).
+  Both surfaced HIGH or MEDIUM findings that were closable in single-
+  commit fix waves: T15-FIX-1 + T15-FIX-2 closed Codex H1/H2/H3/M1;
+  T16-FIX-1 closed /cso M1/M2/M3. Pattern: when the verdict says
+  APPROVED-WITH-FIXES, evaluate each finding's fix-size. If the cumulative
+  patch is small enough to land as 1-3 commits on the same branch
+  without re-architecting, ship the FIX commits + log the deferred
+  lower-severity findings to backlog (P4.5-POLISH-12 for Codex MEDIUMs,
+  P4.5-POLISH-13 for /cso LOWs). If the patch would re-architect the
+  surface, escalate to a re-dispatch via the operator. APPROVED-WITH-
+  FIXES is NOT "merge with caveats" — the fixes ship before merge.
+  (T15-FIX-1/FIX-2 + T16-FIX-1, 2026-05-23 → 2026-05-25.)
