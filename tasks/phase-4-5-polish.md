@@ -143,3 +143,16 @@ the assertion softened.
 
 **Action**: Re-evaluate when Phase 5 voice/tool features ship. M5+L1 may stay
 permanent.
+
+## P4.5-POLISH-13: /cso T16 LOW + INFO findings (deferred)
+**Triggered**: /cso T16 review, Plan 02-03, 2026-05-22.
+**Findings**:
+- L1: Long-base64 regex over-redacts API key snippets (Stripe sk_live_,
+  GitHub PATs, JWT segments). Demote severity from 'critical' to 'medium'
+  on the bare long-blob arm of prompt-injection.ts.
+- L2: Resolver scalar value channel is client-trusted; server-side Zod on
+  confirmDraft.input is the boundary. Add trust-boundary comment.
+- I2: Email regex doesn't require MX-shaped TLD; may over-redact
+  you@x.io style legitimate shorthand.
+**Priority**: Polish — none are exploitable; L1 is the highest of the three
+(false-positive rejection on legitimate API key documentation).
