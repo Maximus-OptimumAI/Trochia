@@ -245,3 +245,14 @@ Next: 6c (Install Cursor CLI to Windows PATH)
   M2 TOCTOU, M3 audit-swallow log). Both lenses matter — /codex is the
   regex auditor, /cso is the data-flow + business-logic auditor. Don't skip
   one because the other passed. (Plan 02-03 T15+T16, 2026-05-25.)
+
+- **Production schema migration for Phase 2 succeeded with both 0005 + 0006
+  applied via drizzle-kit migrate directly.** Unlike Test-CI (where 0006's
+  ALTER TYPE ADD VALUE silently failed inside transaction), prod accepted
+  the enum addition via the same drizzle-kit invocation. Possible factors:
+  Postgres 17.6 on prod vs Test-CI version, or pooler behavior. Discrepancy
+  noted but not investigated — both DBs now hold identical schema.
+  Smoke test against Vercel preview confirmed prod app reads/renders
+  without issue. OAuth callback cross-preview issue surfaced separately
+  (logged P4.5-POLISH-14, preview-only, prod unaffected).
+  Migration timestamp: 2026-05-25. (Phase 2 Plan 02-03 close.)

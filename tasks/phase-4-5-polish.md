@@ -156,3 +156,20 @@ permanent.
   you@x.io style legitimate shorthand.
 **Priority**: Polish — none are exploitable; L1 is the highest of the three
 (false-positive rejection on legitimate API key documentation).
+
+## P4.5-POLISH-14: OAuth callback redirects to wrong preview deployment
+**Symptom**: Initiating Google OAuth from Phase 2 preview URL
+(trochia-git-phase-2-knowle-*.vercel.app) redirects callback to Phase 1
+preview URL (trochia-git-phase-1-foundation-*.vercel.app) with
+?error=exchange_failed. User must sign in again on the destination URL.
+**Trigger**: Prod smoke test after Phase 2 schema migration, 2026-05-25.
+**Root cause hypothesis**: Supabase Auth allowed-redirect-URLs config has
+Phase 1 preview pattern but not Phase 2; OR the auth/callback Edge function
+hardcodes a redirect URL pattern that no longer matches active branch.
+**Impact**: Preview environments only. Production (single canonical URL)
+unaffected.
+**Fix path**: 
+  1. Check Supabase Auth → URL Configuration → Site URL + Redirect URLs
+  2. Add wildcard pattern for Vercel preview branches OR add Phase 2 URL explicitly
+  3. Verify auth/callback redirect logic doesn't hardcode Phase 1 path
+**Priority**: Polish — does not block production. Defer to Phase 4.5.
