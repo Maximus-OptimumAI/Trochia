@@ -1,6 +1,6 @@
 ---
 phase: 2
-cycles_completed: [1, 2]
+cycles_completed: [1, 2, 3]
 reviewers: [codex]
 plans_reviewed:
   - .planning/phases/02-knowledge-layer/02-04-PLAN.md
@@ -8,7 +8,10 @@ plans_closed_skipped:
   - .planning/phases/02-knowledge-layer/02-01-PLAN.md  # CLOSED 02-01-SUMMARY.md
   - .planning/phases/02-knowledge-layer/02-02-PLAN.md  # CLOSED 02-02-SUMMARY.md
   - .planning/phases/02-knowledge-layer/02-03-PLAN.md  # CLOSED 02-03-SUMMARY.md
-codex_model: default (gpt-5-codex unavailable on this ChatGPT account; CLI fell back to default)
+codex_model:
+  cycle_1: default (gpt-5-codex unavailable on this ChatGPT account; CLI fell back to default)
+  cycle_2: default (gpt-5-codex still unavailable; CLI fell back to default)
+  cycle_3: gpt-5.5 (Codex CLI v0.130.0 reported model 'gpt-5.5' for this run)
 cycle_1:
   reviewed_at: 2026-05-26T20:18:37Z
   findings: { critical: 4, high: 4, medium: 4, low: 2 }
@@ -18,6 +21,13 @@ cycle_2:
   findings: { critical: 0, high: 0, medium: 1, low: 1 }
   resolution_summary: "C1-C4 all RESOLVED; H1-H4 all RESOLVED; M1+M3+L1 RESOLVED; M2 + L2 PARTIALLY RESOLVED (lingering uuidv5 acceptance line + two prose-grep plan-checker checks). Zero new HIGHs."
   verdict: APPROVED for T01 dispatch
+cycle_3:
+  reviewed_at: 2026-05-27T17:30:00Z
+  head_at_review: 8b41d22
+  scope: "Verify M2 cleanup at commit 8b41d22 (rewrote two stale uuidv5 instructional lines → corpusSourceUuid). Confirm no regression. Surface any new HIGH/CRITICAL."
+  findings: { critical: 0, high: 0, medium: 0, low: 1 }
+  resolution_summary: "M2 cleanup CORRECTLY APPLIED at lines 1364 + 1581; both audited as CORRECTLY CLEANED. All other uuidv5/CORPUS_NAMESPACE grep hits are ACCEPTABLE-CONTEXT (canonical impl code, code comments, historical-context prose). Zero regressions. Zero new HIGH/CRITICAL. L2 (broad plan-checker #18 + #21) remains PARTIAL — 8b41d22 did not touch it; carries forward as cleanup during T05 implementation."
+  verdict: APPROVED for T01 dispatch (re-confirmed; risk LOW)
 ---
 
 # Cross-AI Plan Review — Phase 2 (Knowledge Layer), Cycle 1
@@ -295,3 +305,92 @@ Single reviewer cycle (Codex CLI, default model). All 4 cycle-1 CRITICAL finding
 ---
 
 *Cross-AI review cycle 2 — 2026-05-26. Single reviewer: Codex CLI (default model). Outcome: APPROVED for T01 dispatch with two minor cleanups recommended. Orchestrator may now proceed to `/plan-checker` then T01.*
+
+---
+
+# Cross-AI Plan Review — Phase 2 (Knowledge Layer), Cycle 3
+
+**Scope of this cycle:** Verify that commit `8b41d22` correctly closes the cycle-2 PARTIAL M2 finding (two lingering `uuidv5(slug, CORPUS_NAMESPACE)` / `uuidv5(slug, NAMESPACE_CORPUS)` instructional references in Plan 02-04 prose/acceptance). Confirm no regression introduced. Surface any newly-emerged HIGH or CRITICAL.
+
+**Reviewer:** Codex CLI v0.130.0 (model reported: `gpt-5.5`). Note: in cycles 1 + 2 the CLI fell back to default because `gpt-5-codex` was unauthorized on this ChatGPT account; in cycle 3 it served `gpt-5.5`. Recorded for traceability.
+
+**HEAD at review:** `8b41d22` (`docs(02-04): align corpus helper references with corpusSourceUuid impl`).
+
+**Diff under review (2 lines):**
+
+```
+-         - Generates a deterministic UUID from `slug` (e.g. `uuidv5(slug, NAMESPACE_CORPUS)`); this becomes `source_id`
++         - Generates a deterministic UUID from `slug` (e.g. `corpusSourceUuid(slug)`); this becomes `source_id`
+
+-    - Deterministic source_id per doc via uuidv5(slug, CORPUS_NAMESPACE)
++    - Deterministic source_id per doc via corpusSourceUuid(slug)
+```
+
+---
+
+## Codex Review — Cycle 3
+
+**Summary**
+
+Cycle 3 is clean. The M2 cleanup is correct and complete: the two stale executor-facing `uuidv5(...)` instructions were rewritten to `corpusSourceUuid(slug)`, and remaining `uuidv5` / namespace references are either implementation code, explanatory comments, or historical review context. No new blocker and no regression from commit `8b41d22`.
+
+**M2 cleanup verification**
+
+| Location | Status | Notes |
+|---|---|---|
+| Line 1364, T05 action prose | CORRECTLY CLEANED | Now says deterministic UUID via `corpusSourceUuid(slug)`; no executor-facing `uuidv5(...)` remains. |
+| Line 1581, T05 acceptance criteria | CORRECTLY CLEANED | Now says `Deterministic source_id per doc via corpusSourceUuid(slug)`. |
+| Lines 1384, 1386, 1389 | ACCEPTABLE-CONTEXT | Canonical implementation code for `CORPUS_NAMESPACE` and `corpusSourceUuid`; required for the zero-new-deps helper. |
+| Lines 1443, 1447 | ACCEPTABLE-CONTEXT | Code comments explaining the cycle-1 fix and why the helper replaces package-based UUID v5 usage. Not an instruction to call `uuidv5`. |
+| Lines 18, 185, 2106 | ACCEPTABLE-CONTEXT | Historical review / threat-model prose documenting the prior issue and its fix. Not directive. |
+
+**New concerns introduced by `8b41d22`**
+
+None.
+
+**Other newly-surfaced HIGH/CRITICAL findings**
+
+None.
+
+**L2 status**
+
+Still PARTIAL. Commit `8b41d22` only closes the stale `uuidv5` instructional references for M2. It does not materially narrow or improve broad plan-checker checks #18 and #21, so L2 remains acknowledged partial cleanup for T05.
+
+**Final verdict**
+
+APPROVED for T01. Risk level: LOW.
+
+---
+
+## Consensus Summary — Cycle 3
+
+Single reviewer cycle (Codex CLI, gpt-5.5). M2 PARTIAL from cycle 2 is now FULLY RESOLVED. Zero CRITICAL, zero HIGH, zero MEDIUM, one LOW carry-forward (L2 — plan-checker checks #18/#21 still broad; explicitly tracked as T05-implementation cleanup, not a planning blocker).
+
+### Resolution breakdown (cumulative across all 3 cycles)
+
+| Severity | Cycle 1 raised | After cycle 2 | After cycle 3 |
+|---|---|---|---|
+| CRITICAL | 4 | 0 open | 0 open |
+| HIGH | 4 | 0 open | 0 open |
+| MEDIUM | 4 | 1 PARTIAL (M2) | 0 open (M2 RESOLVED at 8b41d22) |
+| LOW | 2 | 1 PARTIAL (L2) | 1 PARTIAL (L2 — carries to T05) |
+
+### Newly raised in cycle 3
+
+None.
+
+### Divergent views
+
+N/A (single-reviewer cycle).
+
+---
+
+## Convergence Verdict — Cycle 3
+
+**APPROVED for T01 dispatch (re-confirmed).** All cycle-1 CRITICAL + HIGH findings remain RESOLVED. M2 MEDIUM closed by commit `8b41d22`. Only L2 LOW remains PARTIAL — it is a documentation/scoping cleanup for plan-checker checks #18 and #21, deliberately deferred to T05 implementation and not a T01 blocker. The convergence loop is fully closed.
+
+Next step: orchestrator runs `/plan-checker` then dispatches T01 of Plan 02-04.
+
+---
+
+*Cross-AI review cycle 3 — 2026-05-27. Single reviewer: Codex CLI v0.130.0 (gpt-5.5). Outcome: APPROVED for T01 dispatch. M2 RESOLVED; L2 carries forward as T05 cleanup (LOW, non-blocking). Convergence achieved.*
