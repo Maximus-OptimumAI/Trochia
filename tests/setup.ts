@@ -1,3 +1,11 @@
+// Load .env.local BEFORE any other import that reads process.env (e.g. modules
+// importing `@/lib/env` at module init). Explicit path — not the `dotenv/config`
+// shorthand, which would load `.env` (doesn't exist in this repo). Not
+// dotenv-flow either — explicit-over-magic; avoids the NODE_ENV cascade
+// footgun. See tasks/lessons.md "Sibling plan-checker rules" entry.
+import { config as loadEnv } from 'dotenv';
+loadEnv({ path: '.env.local' });
+
 /**
  * Global test setup.
  *

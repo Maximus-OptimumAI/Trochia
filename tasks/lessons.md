@@ -297,3 +297,76 @@ Next: 6c (Install Cursor CLI to Windows PATH)
   the comm output verbatim AND the per-script T_add/T_use resolution for
   every comm hit. (Phase 2 Plan 02-04 cycle-5 review; recorded in
   02-REVIEWS.md §"Permanent plan-checker rule (added cycle 5)".)
+
+- **2026-05-27 — Sibling plan-checker rules (extends cycle-5 npm-script
+  gate).** Plan 02-04 T01 pre-dispatch surfaced a new defect class on top
+  of the cycle-5 npm-script gate: the plan-doc imported helpers that do
+  not exist in the source it imported from (`withTenantContext`,
+  `makeTenantContext`, `TenantContext`, `tenantA.memoryRowId` — none
+  exist in `tests/db/test-db.ts`). Same root cause as pnpm/db:check/db:diff
+  escapes: plan-doc asserts something not verified against the repo.
+  Additionally found ~80% case overlap between the proposed new test file
+  and existing `tests/integration/rls-memory.test.ts`. Extend the
+  deterministic gate with TWO sibling rules, applied on every future
+  cycle review:
+
+  **Sibling rule A — Import resolution.**
+  For every `import { X, Y } from '@/<path>'` (or `'<rel/path>'`) in any
+  plan-doc task block:
+    1. Resolve the path to a real source file (alias `@` → `src/`;
+       relative paths from the test file's eventual location).
+    2. For each named import (X, Y, type Z), grep the source for a
+       matching `export` — named, re-export, or default. Type imports
+       must resolve to actual exported types.
+    3. If any import does not resolve to a real export → HARD FAIL,
+       blocks convergence.
+  Reviewer must paste the per-import resolution table for any task that
+  authors test files or imports from project-internal modules.
+
+  **Sibling rule B — Test scope dedup.**
+  For every proposed new test file in a plan task:
+    1. List existing test files under `tests/**` that touch the same
+       tables / concerns / external services (grep by table name,
+       module path, or service identifier).
+    2. For each proposed test case, grep the existing tests for cases
+       asserting the same invariant. Compute overlap as
+       `overlapping_cases / proposed_cases`.
+    3. Classify:
+       - `<50%` overlap → PASS (file is genuinely new)
+       - `≥50%` overlap → DOWNGRADE-TO-EXTEND (reviewer must flag:
+         drop the new file and extend existing, OR trim the new file
+         to non-duplicative cases only — like Plan 02-04 T01 trimmed
+         from 5 cases to 2)
+       - Effective duplicate (>90%) → HARD FAIL
+  Reviewer must report the overlap percentage + per-case mapping table
+  for any new test file proposed in the plan.
+
+  Both rules carry to ALL future Phase 2+ phases. Bake into the plan-
+  author skill: inspect existing test files + verify all imports against
+  the source + grep for case-overlap before drafting any task block.
+  (Phase 2 Plan 02-04 T01 pre-dispatch drift audit, 2026-05-27.)
+
+- **2026-05-27 — Repo-grounding pre-authoring requirement
+  (lessons-from-the-bills).** Plan 02-04 was patched FOUR times before
+  T01 ran: pnpm migration (cycle 4), db:check (cycle 4), db:diff (cycle
+  5), test infra/helpers/scope (T01 pre-dispatch). Every patch was a
+  plan-author skill failure to ground in the actual repo state. Future
+  plan authoring must, as a MANDATORY pre-drafting step:
+    1. Read the relevant existing test files end-to-end (not just grep
+       headers) — and cross-reference proposed new cases against them.
+    2. Verify every named import in any code sketch resolves to a real
+       export in the source it imports from (sibling rule A).
+    3. Verify every `npm run X` invocation resolves to a real script
+       in `package.json` (cycle-5 deterministic gate).
+    4. Verify env-loading: every test that depends on a runtime env var
+       must show how that env var is loaded for the test runner (vitest
+       does NOT auto-load `.env.local`; explicit `dotenv.config({ path:
+       '.env.local' })` in `tests/setup.ts` is the canonical path for
+       this project).
+    5. Verify shell idioms work on Windows (this project's primary dev
+       env): no POSIX `export $(grep | xargs)`, no `&&`-chained
+       commands assuming bash, no `$(...)` in PowerShell contexts.
+  These checks happen ONCE, before plan drafting — not after 5 cross-AI
+  review cycles. The plan-author skill template should ship with a
+  pre-drafting checklist that surfaces this work explicitly. (Phase 2
+  Plan 02-04 retrospective, 2026-05-27.)
