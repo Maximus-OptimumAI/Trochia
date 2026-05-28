@@ -370,3 +370,70 @@ Next: 6c (Install Cursor CLI to Windows PATH)
   review cycles. The plan-author skill template should ship with a
   pre-drafting checklist that surfaces this work explicitly. (Phase 2
   Plan 02-04 retrospective, 2026-05-27.)
+
+- **2026-05-27 — Three new sibling plan-checker rules (cycle-7 close).**
+  Cycle 6 caught 5 HIGH (import-resolution drift); cycle 6 hotfix landed
+  CLEAN but cycle 7's expanded audit immediately surfaced 3 NEW HIGH +
+  2 NEW MED in T04/T05 that cycles 1-6 missed because no gate checked:
+  (a) SDK call SIGNATURES, (b) Drizzle column-type-annotation
+  completeness, (c) implementation-vs-test-assertion cross-checks.
+  Pattern: every patch surfaces deeper drift. Took option-3
+  scope-reduce in cycle 7 (drop T05 corpus-sync; defer to
+  FOLLOWUP-CORPUS-SYNC-01 with all 6 gates applied at AUTHORING time).
+  Three new sibling gates carry forward to ALL future Phase 2+ plans:
+
+  **Gate 4 — External-library SIGNATURE consistency.**
+  For every SDK call in a plan task code sketch (`inngest.createFunction`,
+  `db.transaction`, Anthropic SDK methods, Voyage adapter, Drizzle ORM
+  query builders, MSW handlers, etc.):
+    1. Resolve the SDK method name to its type definition in
+       `node_modules/<pkg>/**/*.d.ts`.
+    2. Verify call shape — argument count, argument shapes, return type
+       usage.
+    3. Mismatch → HARD FAIL.
+  Reviewer pastes the per-call shape comparison for any task that uses
+  external SDK APIs. (Example caught: Inngest v4 `createFunction` is
+  2-arg form `(options-with-embedded-triggers, handler)` not 3-arg form
+  `(options, trigger, handler)` — surfaced cycle 7 HIGH 1 against
+  Plan 02-04 T04+T05.)
+
+  **Gate 5 — Drizzle column-type-annotation completeness.**
+  For every Drizzle column referenced in a code sketch:
+    1. If column is `jsonb()` / `json()`, verify `.$type<T>()`
+       annotation is present at the schema, OR an explicit cast is
+       present at every access site in the sketch.
+    2. No annotation AND no cast → HARD FAIL (will not compile under
+       `strict: true`).
+  Reviewer pastes the per-jsonb-access cast/annotation status for any
+  task that reads jsonb columns. (Example caught: cycle-7 H2 — T04
+  flatten site read `row.narrative?.problem` but `narrative` was typed
+  `unknown` because the Drizzle schema lacked `.$type<Narrative>()`.
+  Two paths: localized cast (cycle-7 chose this), or schema annotation
+  — schema annotation deferred to FOLLOWUP-DRIZZLE-TYPE-ANNOTATION-01
+  because src/db/schema/* is git-frozen during the embed-pipeline ship.)
+
+  **Gate 6 — Implementation-vs-assertion cross-check.**
+  For every test assertion involving a counted/quantified invariant
+  (e.g., `expect(spy.mock.calls.length).toBeLessThanOrEqual(N)`, batch
+  size N, retry count N, fan-out arity N, chunk count N):
+    1. Grep the implementation sketch in the SAME plan for the
+       relevant operation (loop, batch call, fan-out, retry).
+    2. Verify the implementation matches the assertion's count under
+       the assertion's input conditions.
+    3. Contradiction → HARD FAIL.
+  Reviewer pastes the per-quantified-assertion vs implementation
+  comparison for any task that has counted invariants. (Example caught:
+  cycle-7 H3 — T05 implementation looped `for (const doc of docs)
+  await voyage.embed(...)` (50 docs = 50 HTTP calls) while Case 7
+  asserted `httpCallSpy.mock.calls.length <= 7` under the 50-doc
+  budget. Survived 6 cycles because no review cross-read both halves of
+  T05 in a single pass.)
+
+  These gates carry to ALL future Phase 2+ phases AND bake into the
+  plan-author skill: verify SDK signatures, column-type annotations,
+  and implementation-vs-assertion counts BEFORE drafting any task block.
+  Future plans run all 6 gates at first cycle, not cycle 6+
+  retroactively. The cycle-7 scope-reduce of T05 → FOLLOWUP-CORPUS-SYNC-01
+  is the canonical example: re-authoring with gates 1-6 active from
+  word one beats grafting fixes onto a plan that's been patched 8 times.
+  (Phase 2 Plan 02-04 cycle-7 close, 2026-05-27.)
