@@ -1,6 +1,6 @@
 ---
 phase: 2
-cycles_completed: [1, 2, 3, 4, 5]
+cycles_completed: [1, 2, 3, 4, 5, 6]
 reviewers: [codex]
 plans_reviewed:
   - .planning/phases/02-knowledge-layer/02-04-PLAN.md
@@ -14,6 +14,7 @@ codex_model:
   cycle_3: gpt-5.5 (Codex CLI v0.130.0 reported model 'gpt-5.5' for this run)
   cycle_4: gpt-5.5 (Codex CLI v0.130.0; same model as cycle 3)
   cycle_5: gpt-5.5 (Codex CLI v0.130.0; same model as cycle 3 and 4)
+  cycle_6: gpt-5.5 (Codex CLI v0.130.0; same model as cycles 3-5)
 cycle_1:
   reviewed_at: 2026-05-26T20:18:37Z
   findings: { critical: 4, high: 4, medium: 4, low: 2 }
@@ -52,6 +53,40 @@ cycle_5:
     interpretation: "Acceptable forward-reference. The plan-doc references `eval:run` AND T07 step 7 (line 1836) explicitly adds `\"eval:run\": \"tsx src/ai/eval/runner.ts\"` to package.json scripts. files_modified §66 documents the package.json add. The script's first executable dependency (CI workflow, T07 step 10 local verify, T08 verify loop) all run AFTER T07 step 7. This is materially different from the `pnpm` / `db:check` / `db:diff` defects (cycles 4+5 fixes), which referenced nonexistent things WITHOUT any plan add-step. The executable assertion correctly surfaces the forward-reference; the human-judgment layer applies the add-step exception."
     classified_as: "LOW concern (not HIGH) per the DETERMINISTIC permanent plan-checker rule (see body §Permanent plan-checker rule (added cycle 5)): for `eval:run`, an add-step `\"eval:run\": \"tsx src/ai/eval/runner.ts\"` exists in T07 step 7 (line 1836), and the earliest invocation `npm run eval:run` lives in T07 step 10 (line 1893) — so T_add (7) <= T_use (7) → PASS, self-provisioned in time. No reviewer judgment required; the rule resolves the case deterministically by task index."
   verdict: APPROVED for T01 dispatch (re-confirmed; risk LOW; convergence series re-CLOSED after one-commit hotfix)
+cycle_6:
+  reviewed_at: 2026-05-28T20:10:00Z
+  head_at_review: 67eb82d
+  baseline: 941084a
+  scope: "Comprehensive pre-emptive audit across all 8 tasks (T01-T08), not just T01. Gates: (1) cycle-5 permanent comm-based npm-script check; (2) NEW import resolution across every task code sketch; (3) NEW test scope dedup across every proposed test file. Cycle triggered by founder mandate after pre-dispatch ratify-or-revert caught 5 T01 drift items that all 5 prior cycles missed — goal: surface remaining drift in T02-T08 BEFORE T01 dispatch."
+  findings: { critical: 0, high: 5, medium: 2, low: 0 }
+  high_breakdown:
+    - "Gate 2 / T02 line 527: `import { langfuse } from '@/lib/observability/langfuse'` is UNRESOLVED. No `src/lib/observability` directory exists. Real path is `src/lib/langfuse.ts` and the real exports are `getLangfuseClient()` + `isLangfuseConfigured()` — there is NO singleton named `langfuse`. T02 will fail to compile and all 9 voyage.adapter.test.ts cases that spy on the singleton (Cases 8 + 8b) will fail."
+    - "Gate 2 / T04 line 1001: `import { db } from '@/db/client'` is UNRESOLVED. `src/db/client.ts` exports `getServiceClient()`, `getRequestClient()`, `getRequestClientFromClaims()`, `closeServicePool()` + types — no direct `db` named export. Existing Inngest functions (ai-health-check.ts:31, purge-soft-deleted.ts:43, reconcile-stripe.ts:29) use `const db = getServiceClient()` pattern. T04 sketch will fail TypeScript compilation."
+    - "T02 AppError signature flip (6 call sites: plan lines 594, 598, 625, 635, 653, 696): plan uses `new AppError('VOYAGE_INPUT_EMPTY', 'voyage.embed called with zero texts')` — passing code as first arg and message string as opts. Real constructor at src/lib/errors.ts:12 is `constructor(message: string, opts: { status?, code?, cause? })`. Existing repo usage at extract-from-paste.agent.ts:387-390 passes `{ status, code }` as second arg. All 6 sites will fail TypeScript."
+    - "T04 narrative-field-name drift (HIGH; silent-failure class): plan line 1038-1042 flattens `row.narrative?.{mission,vision,differentiation,market}` — but the canonical narrative shape per `src/ai/schemas/business-memory.zod.ts:350-353` is `{ problem, solution, why_now, why_us }`, confirmed by DB jsonb comment at `src/db/schema/memory.ts:148`. The embed-memory function would silently produce empty text (all fields undefined) and either throw CHUNK_INPUT_EMPTY or fire EMBED_NOTHING_TO_EMBED — never actually embedding real memory content. Test data at plan :1299 uses `{ mission: 'New shorter mission only.' }` (same wrong key). Traction `growth`/`runway` ARE correct (verified at business-memory.zod.ts:336-337)."
+    - "T04 ctx.inngest invented (plan line 1252): `await ctx.inngest.send({...})`. The TRPCContext interface at `src/server/context.ts:27-39` lists only session, tenantId, region, db, account, supabase — no `inngest` field. Real Inngest client is module-level singleton; plan already correctly states this at lines 168-170 + 248 but then contradicts itself in the T04 sketch. confirmDraft step won't compile."
+  medium_breakdown:
+    - "Stale test-count summaries in the verification table (plan lines 2063, 2065, 2066): T02 acceptance says 9/9 but verify-table says 8/8; T04 says 10/10 but verify-table says 8/8; T05 says 7/7 but verify-table says 6/6. The cycle-1 fix that added Cases 8b/9/10/7 to T02/T04/T05 missed the corresponding numeric update in the verification table."
+    - "T02 Langfuse spy targets the unresolved singleton (Case 8 at plan :714, Case 8b at :735): `vi.spyOn(langfuse, 'trace')` — even after fixing the HIGH unresolved import, the test will need rework to spy on the function returned by `getLangfuseClient()` (or to mock the module)."
+  cumulative_closure_status:
+    closures_held: 16
+    closures_regressed: 0
+    notes: "All 16 cumulative cycle-1+2+3+4+5 closures HELD: env path src/lib/env.ts, Inngest registration in functions/index.ts, embedFn removal, DELETE-then-INSERT idempotency, TOCTOU lock scope, package.json in files_modified, next.config.ts corpus tracing, corpus path via import.meta.url, FOLLOWUP fan-out budget, Langfuse type-pin (CONTRACT held but IMPLEMENTATION blocked by wrong import — see HIGH finding above), uuidv5→corpusSourceUuid, eval fail-open handoff to 02-05, chunk tokenCount caveat, npm migration + packageManager pin, db:check script, db:diff→git-freeze. No regression introduced by cycle-6 commit 67eb82d."
+  gate_1_output:
+    comm_verbatim: "eval:run"
+    t_add: 7
+    t_use: 7
+    classification: "PASS (self-provisioned)"
+  gate_2_output:
+    unresolved_count: 2
+    unresolved_imports:
+      - "T02:527 `{ langfuse }` from `@/lib/observability/langfuse` — file does not exist; real is `src/lib/langfuse.ts` with `getLangfuseClient`"
+      - "T04:1001 `{ db }` from `@/db/client` — symbol not exported; real pattern is `const db = getServiceClient()`"
+  gate_3_output:
+    new_test_files_audited: 6
+    overlaps_found: 0
+    classification: "ZERO HARD FAIL, ZERO DOWNGRADE-TO-EXTEND. T01 trim from 5→2 cases successfully eliminates the rls-memory.test.ts duplication (0/2 overlap remaining)."
+  verdict: REPLAN-REQUIRED — 5 HIGH (2 Gate-2 unresolved imports + 3 T02/T04 implementation drifts confirmed by Codex with file:line evidence). T01 dispatch BLOCKED until replan addresses all 5 HIGH. Cycle-6 demonstrates that the new Gate 2 + Gate 3 successfully surfaced drift the 5-cycle convergence series missed.
 ---
 
 # Cross-AI Plan Review — Phase 2 (Knowledge Layer), Cycle 1
@@ -761,3 +796,203 @@ This rule is recorded as a permanent plan-checker requirement for all future Pha
 ---
 
 *Cross-AI review cycle 5 — 2026-05-28. Single reviewer: Codex CLI v0.130.0 (gpt-5.5). Outcome: APPROVED for T01 dispatch. Non-regression check for db:diff removal: CLEAN. 9 db:diff → git-freeze replacements verified semantically correct and form-consistent. FOLLOWUP-DBDIFF-01 deferral documented. Mandatory executable plan-checker assertion executed — `eval:run` surfaced and deterministically resolved as PASS (T_add=7, T_use=7) per the new permanent rule. Three new LOW findings (C5-L1 untracked-file gap ACCEPTED with lessons.md upgrade; C5-L2 plan-checker handling RESOLVED by deterministic rule; C5-L3 line-298 wording SKIPPED as cosmetic). Zero new CRITICAL/HIGH/MEDIUM. Convergence series re-CLOSED after one-commit hotfix.*
+
+---
+
+# Cross-AI Plan Review — Phase 2 (Knowledge Layer), Cycle 6
+
+**Scope of this cycle:** Plan 02-04 only (Plans 02-01/02/03 remain CLOSED). COMPREHENSIVE pre-emptive audit across ALL 8 tasks T01-T08, not just T01. Cycle triggered by founder mandate after pre-dispatch ratify-or-revert caught 5 T01 drift items that all 5 prior cycles missed. Goal: surface remaining drift in T02-T08 BEFORE T01 dispatch via two NEW gates (Gate 2 import resolution + Gate 3 test scope dedup) layered atop the permanent cycle-5 Gate 1 (comm-based npm-script existence).
+
+**Reviewer:** Codex CLI v0.130.0 (model reported: `gpt-5.5`; same model as cycles 3-5).
+
+**Baseline:** `941084a` (cycle-5 APPROVED commit)
+**HEAD at review:** `67eb82d` (`fix(02-04): T01 align with repo — real helpers, trimmed cases, env auto-load`)
+
+**Cycle-6 commit summary (diff under review):**
+- T01 task block fully rewritten: real helpers from `tests/db/test-db.ts` (`createTenant`, `tenantClient(claims).rls`, `getServiceClientForTests`, `cleanup`, `closeTestDb`, `migrateTestDb`, `HAS_TEST_DB`, `type TestTenant`); 2 cases instead of 5 (overlapping 4 cases delegated to `tests/integration/rls-memory.test.ts`)
+- `tests/setup.ts`: explicit `dotenv.config({ path: '.env.local' })` at top
+- `package.json`: added `dotenv ^17.4.2` to devDependencies
+- `.env.local`: `TEST_DATABASE_URL` uncommented (gitignored)
+- Frontmatter updated: `files_modified` adds `tests/setup.ts`; `must_haves.truths` rewritten for 2-case scope; `artifacts.embed-pipeline-rls.test.ts` provides rewritten; `success_metrics` 5/5→2/2; Risk #3 mitigation redirected to T04
+- `tasks/lessons.md`: Sibling plan-checker rules A (import resolution) + B (test scope dedup) recorded; repo-grounding pre-authoring requirement added
+
+---
+
+## Mandatory Executable Gates (cycle 6 — all 3 executed)
+
+### Gate 1 — npm-script existence (PERMANENT cycle-5 rule)
+
+```bash
+grep -oE 'npm run [a-zA-Z][a-zA-Z0-9:_-]*' .planning/phases/02-knowledge-layer/02-04-PLAN.md \
+  | sed 's/npm run //' | sort -u > /tmp/referenced.txt
+node -e "const p=require('./package.json');Object.keys(p.scripts||{}).sort().forEach(k=>console.log(k));" > /tmp/defined.txt
+comm -23 /tmp/referenced.txt /tmp/defined.txt
+```
+
+**Verbatim comm output (HEAD 67eb82d):**
+
+```
+eval:run
+```
+
+**Per-script T_add/T_use resolution:**
+
+| Script | Defined at | Earliest task-bound use | T_add | T_use | Classification |
+|---|---|---|---|---|---|
+| `eval:run` | plan line 1840 (T07 step 7): `"eval:run": "tsx src/ai/eval/runner.ts"` | plan line 1877 (T07 step 8 CI yaml: `run: npm run eval:run`) | 7 | 7 | **PASS** — T_add ≤ T_use, self-provisioned in time |
+
+**Defined scripts at HEAD 67eb82d (`package.json`):** build, check:banned, db:check, db:generate, db:push, dev, gate, gen:dpa-pdf, lint, postbuild, start, test, test:e2e, test:watch, typecheck
+
+**Referenced npm-run scripts in 02-04-PLAN.md:** check:banned, db:check, eval:run, lint, typecheck
+
+**Gate 1 verdict:** PASS. The single comm hit resolves deterministically via the permanent rule.
+
+### Gate 2 — Import resolution across ALL 8 tasks
+
+| Task | Plan lines | Import statement | Source file | Symbol | Status |
+|---|---|---|---|---|---|
+| T01 | 343-356 | `randomUUID` from `node:crypto`; `sql` from `drizzle-orm`; `afterAll, beforeAll, describe, expect, it` from `vitest`; `* as schema` from `@/db/schema`; `HAS_TEST_DB, cleanup, closeTestDb, createTenant, getServiceClientForTests, migrateTestDb, type TestTenant` from `../db/test-db` | tests/db/test-db.ts (lines 33, 51, 56, 60, 67, 130, 144) | all 7 named exports | **RESOLVED** |
+| T02 | 526 | `{ env }` from `@/lib/env` | src/lib/env.ts | env | **RESOLVED** |
+| **T02** | **527** | `{ langfuse }` from `@/lib/observability/langfuse` | DOES NOT EXIST | langfuse | **UNRESOLVED — HIGH.** No `src/lib/observability/` directory. Real path is `src/lib/langfuse.ts` and real exports are `getLangfuseClient()` (line 27) + `isLangfuseConfigured()` (line 20). No `langfuse` singleton named export anywhere in repo. All 9 voyage.adapter.test.ts cases (especially Cases 8 + 8b that spy on the singleton) inherit this failure. |
+| T02 | 528 | `{ AppError }` from `@/lib/errors` | src/lib/errors.ts:8 | AppError | **RESOLVED** |
+| T04 | 1000 | `{ inngest }` from `@/inngest/client` | src/inngest/client.ts:14 | inngest | **RESOLVED** |
+| **T04** | **1001** | `{ db }` from `@/db/client` | src/db/client.ts | db | **UNRESOLVED — HIGH.** Real exports are `getServiceClient()` (line 68), `getRequestClient()` (line 96), `getRequestClientFromClaims()` (line 117), `closeServicePool()` (line 139), plus types `DrizzleDb` + `RequestDb`. No direct `db` named export. Existing Inngest functions use `const db = getServiceClient()` pattern (ai-health-check.ts:31; purge-soft-deleted.ts:43; reconcile-stripe.ts:29). T04 sketch will fail TypeScript on first compile. |
+| T04 | 1002 | `{ embeddings }` from `@/db/schema/embeddings` | src/db/schema/embeddings.ts:98 | embeddings | **RESOLVED** |
+| T04 | 1003 | `{ businessMemory }` from `@/db/schema/memory` | src/db/schema/memory.ts:130 | businessMemory | **RESOLVED** |
+| T04 | 1004 | `{ voyage }` from `@/ai/integrations/voyage.adapter` | new in T02 | voyage | **RESOLVED** (forward-reference; created in T02) |
+| T04 | 1005 | `{ chunkText, DEFAULT_CHUNK_OPTIONS }` from `@/ai/chunking/chunk` | new in T03 | both | **RESOLVED** (forward-reference; created in T03) |
+| T04 | 1006-1007 | `{ eq, and }` from `drizzle-orm`; `* as Sentry` from `@sentry/nextjs` | npm packages | both | **RESOLVED** |
+| T04 | 1209-1220 | barrel imports mirroring existing src/inngest/functions/index.ts:7-17 | existing pattern | all | **RESOLVED** |
+| T05 | 1383 | `{ createHash }` from `node:crypto` | builtin | createHash | **RESOLVED** |
+| T05 | 1531 | `{ corpusSync }` from `./corpus-sync` | new in T05 | corpusSync | **RESOLVED** (self-provisioned) |
+| T07 | 1766 | `type { EvalCheck }` from `../types` | new in T07 | EvalCheck | **RESOLVED** (self-provisioned) |
+| T07 | 1789-1792 | `{ extractionFloor }`, `{ qaGrounding }`, `{ cacheHit }`, types | all new in T07 | all | **RESOLVED** (self-provisioned) |
+| T07 | 1793 | `{ writeFileSync, appendFileSync }` from `node:fs` | builtin | both | **RESOLVED** |
+
+**Gate 2 verdict:** **HARD FAIL.** 2 UNRESOLVED imports (HIGH severity). Both block T02 + T04 compilation. T01 alignment is clean.
+
+### Gate 3 — Test scope dedup across ALL new test files
+
+| Task | New test file | Existing files with overlap | Cases proposed | Overlapping cases | Overlap % | Classification |
+|---|---|---|---|---|---|---|
+| T01 | tests/integration/embed-pipeline-rls.test.ts | tests/integration/rls-memory.test.ts (8 cases / 272 lines: tenant isolation, dedup index rejection, rolling model_version coexistence, 768-dim rejection) | 2 (NEW-1 corpus per-tenant schema support; NEW-2 1024-dim positive) | 0 | 0/2 = 0% | **PASS** (cycle-6 trim from 5→2 successfully eliminated the 4 overlapping cases; cross-reference comment at plan line 312-321 documents the delegation) |
+| T02 | tests/ai/integrations/voyage.adapter.test.ts | none (no prior voyage tests in repo) | 9 (incl. Cases 8 + 8b for Langfuse whitelist) | 0 | 0% | **PASS** (but blocked downstream by Gate 2 HIGH on langfuse import) |
+| T03 | tests/ai/chunking/chunk.test.ts | none (no prior chunker) | 10 | 0 | 0% | **PASS** |
+| T04 | tests/inngest/functions/embed-memory.test.ts | none (Phase-1 ai-health-check.test.ts is a different surface) | 10 (incl. Cases 9 + 10 for registration + reconfirm-rewrite) | 0 | 0% | **PASS** (but blocked downstream by Gate 2 HIGH on db import + 3 implementation HIGHs) |
+| T05 | tests/inngest/functions/corpus-sync.test.ts | none | 7 (incl. Case 7 fan-out budget) | 0 | 0% | **PASS** |
+| T07 | tests/ai/eval/runner.test.ts | none (no prior eval harness) | 5 | 0 | 0% | **PASS** |
+
+**Gate 3 verdict:** PASS. Zero HARD FAIL, zero DOWNGRADE-TO-EXTEND classifications. The cycle-6 T01 trim successfully resolves the dedup defect that motivated this gate.
+
+---
+
+## Codex Review — Cycle 6
+
+**Summary:** Independent review at HEAD `67eb82d` confirms the orchestrator's pre-confirmed findings. Gate 1 PASSES, Gate 3 PASSES, but Gate 2 FAILS on two unresolved imports. The T02/T04 implementation sketches also contain three HIGH drift defects that would either fail TypeScript or silently embed no useful memory text. The new Gate 2 + Gate 3 successfully surfaced drift the 5-cycle convergence series missed.
+
+**Final verdict:** REPLAN-REQUIRED.
+
+### Orchestrator finding A verification — T02 AppError signature flip (HIGH)
+
+**CONFIRMED.** Plan uses flipped calls at `.planning/phases/02-knowledge-layer/02-04-PLAN.md:594, 598, 625, 635, 653, 696`. Real signature is `constructor(message: string, opts: { status?: number; code?: string; cause?: unknown } = {})` at `src/lib/errors.ts:12`; existing usage passes `{ status, code }` as the second argument at `src/ai/agents/extract-from-paste.agent.ts:389, 395, 419, 551`. All 6 plan-sketch sites will fail TypeScript.
+
+### Orchestrator finding B verification — T04 narrative-field-name drift (HIGH)
+
+**CONFIRMED.** Plan flattens nonexistent `mission`, `vision`, `differentiation`, `market` at `.planning/phases/02-knowledge-layer/02-04-PLAN.md:1038-1042` and test data repeats `mission` at `:1299`. Canonical schema fields are `problem`, `solution`, `why_now`, `why_us` at `src/ai/schemas/business-memory.zod.ts:350-353`; DB comment agrees at `src/db/schema/memory.ts:148`. Traction `growth` + `runway` ARE valid at `src/ai/schemas/business-memory.zod.ts:336-337` and `src/db/schema/memory.ts:147`. **Silent-failure class bug**: function "succeeds" but writes zero useful embeddings.
+
+### Orchestrator finding C verification — T04 ctx.inngest invented (HIGH)
+
+**CONFIRMED.** Plan uses `ctx.inngest.send` at `.planning/phases/02-knowledge-layer/02-04-PLAN.md:1252`. `TRPCContext` has only `session, tenantId, region, db, account, supabase` at `src/server/context.ts:27-39`; return objects at `:123, :133, :140, :145` do not include `inngest`. Real client is module-level `src/inngest/client.ts:14`. Plan already says use module import at `:168-170` + `:248` but contradicts itself in the T04 sketch.
+
+### Additional drift surfaced by Codex in T02-T08 sweep
+
+- **MEDIUM** — Stale test-count summaries in the verification table (plan lines 2063, 2065, 2066): T02 says 9/9 at `:756, :771` but verify-table says 8/8; T04 says 10/10 at `:1322` but verify-table says 8/8; T05 says 7/7 at `:1575` but verify-table says 6/6. The cycle-1 fix that added Cases 8b/9/10/7 to T02/T04/T05 missed the corresponding numeric updates in the verification table.
+- **MEDIUM** — T02 tests spy on the nonexistent singleton import (plan `:714, :735`): `vi.spyOn(langfuse, 'trace')` — even after fixing the HIGH unresolved import (`@/lib/observability/langfuse` → `@/lib/langfuse`), the tests will need rework to spy on the function returned by `getLangfuseClient()` (or to mock the module). Test infrastructure inherits the same defect class as the implementation.
+
+### Cumulative closure non-regression (16 prior closures)
+
+| Closure | Cycle-6 status | Notes |
+|---|---|---|
+| Env path = `src/lib/env.ts`, not `src/env.ts` | **HELD** | |
+| Inngest registration target = `src/inngest/functions/index.ts` | **HELD** | |
+| `embedFn` removal required from stubs + `allFunctions` | **HELD** | |
+| DELETE-then-INSERT for memory re-embed | **HELD** | |
+| TOCTOU lock scope limited to Step 3 transaction | **HELD** | |
+| `package.json` included in `files_modified` | **HELD** | |
+| `next.config.ts` included for corpus tracing | **HELD** | |
+| Corpus disk path uses `import.meta.url`, not `process.cwd()` | **HELD** | |
+| FOLLOWUP fan-out budget assertion present | **HELD** | |
+| Langfuse trace whitelist type-pin present | **HELD** (CONTRACT held; IMPLEMENTATION blocked by wrong import — see Gate 2 HIGH) | |
+| `uuidv5` replaced by `corpusSourceUuid` using `node:crypto` | **HELD** | |
+| Eval fail-open handoff to 02-05 present | **HELD** | |
+| Chunk tokenCount caveat/test coverage present | **HELD** | |
+| npm migration / packageManager pin present | **HELD** (`package.json:5`) | |
+| `db:check` present | **HELD** (`package.json:18`) | |
+| `db:diff` deferred to git freeze | **HELD** (plan `:2211, :305, :1977`) | |
+
+**Cumulative closure status:** 16/16 HELD. Zero regressions. Cycle-6 commit `67eb82d` introduces no new defects in T01 alignment; the 5 HIGH findings all live in T02 + T04 pre-existing drift that the new Gate 2 surfaced for the first time.
+
+---
+
+## Consensus Summary — Cycle 6
+
+Single reviewer cycle (Codex CLI v0.130.0, gpt-5.5). 5 HIGH (2 Gate-2 unresolved imports + 3 T02/T04 implementation drifts confirmed with file:line evidence). 2 MEDIUM (stale test-count summaries; T02 spy targets unresolved singleton). Zero CRITICAL, zero LOW. M2 status: still FULLY RESOLVED (held). L2 status: still PARTIAL, carries to T05 (unchanged from cycles 3-5).
+
+### Resolution breakdown (cumulative across all 6 cycles)
+
+| Severity | Cycle 1 raised | After cycle 2 | After cycle 3 | After cycle 4 | After cycle 5 | After cycle 6 |
+|---|---|---|---|---|---|---|
+| CRITICAL | 4 | 0 open | 0 open | 0 open | 0 open | 0 open |
+| HIGH | 4 | 0 open | 0 open | 0 open | 0 open | **5 open (NEW)** |
+| MEDIUM | 4 | 1 PARTIAL | 0 open | 0 open | 0 open | **2 open (NEW)** |
+| LOW | 2 | 1 PARTIAL | 1 PARTIAL → T05 | 1 PARTIAL → T05 | +3 (1 ACCEPTED, 1 RESOLVED, 1 SKIPPED) | 1 PARTIAL → T05 |
+
+### Newly raised in cycle 6
+
+5 HIGH:
+1. Gate 2 / T02:527 — `langfuse` import unresolved (`@/lib/observability/langfuse` does not exist; real is `@/lib/langfuse` with `getLangfuseClient`)
+2. Gate 2 / T04:1001 — `db` import unresolved (real pattern: `const db = getServiceClient()`)
+3. T02 AppError signature flip (6 sites) — first arg should be message, second arg should be `{ status, code }` object
+4. T04 narrative field-name drift — sketch uses `{ mission, vision, differentiation, market }`; schema is `{ problem, solution, why_now, why_us }` (silent-failure class)
+5. T04 `ctx.inngest.send` — TRPCContext has no `inngest` field; use module-level `import { inngest } from '@/inngest/client'`
+
+2 MEDIUM:
+1. Stale test-count summaries in verification table (T02 says 9/9 but table says 8/8; T04 says 10/10 but table says 8/8; T05 says 7/7 but table says 6/6)
+2. T02 test Langfuse spy targets the unresolved singleton — tests inherit the same defect class as the implementation
+
+### Divergent views
+
+N/A (single-reviewer cycle).
+
+### Notable observations
+
+- The new Gate 2 (import resolution across all 8 tasks) IMMEDIATELY surfaced 2 HIGH issues that the 5-cycle convergence series missed. This validates the sibling plan-checker rule A added in cycle 6.
+- The orchestrator's T04 narrative-field audit (finding B) is the most consequential of the 5 HIGHs: it is a silent-failure class bug. Even after fixing the import + AppError + ctx.inngest issues, the embed pipeline would compile and run "successfully" but produce ZERO real embeddings because every narrative field is undefined under the wrong key names.
+- Cycle-6 commit `67eb82d` itself (T01 alignment) is CLEAN — no regression introduced, dotenv loader works, T01 import resolution verified. The 5 HIGHs are pre-existing T02/T04 defects that survived all 5 prior cycles because reviewers focused on T01 dispatch readiness without comprehensive cross-task import auditing.
+- All 16 cumulative cycle-1+2+3+4+5 closures held — zero regression from the cycle-6 hotfix.
+
+---
+
+## Convergence Verdict — Cycle 6
+
+**REPLAN-REQUIRED.** The convergence series re-OPENS. T01 dispatch is BLOCKED until the 5 HIGH findings are addressed in a follow-up replan commit:
+
+1. T02 line 527 — fix langfuse import to use real `@/lib/langfuse` module + `getLangfuseClient()` call site (rewrite the trace block + Cases 8 + 8b in voyage.adapter.test.ts)
+2. T04 line 1001 — replace `import { db } from '@/db/client'` with `import { getServiceClient } from '@/db/client'` + bind `const db = getServiceClient()` inside the function body
+3. T02 AppError calls (6 sites) — flip to `new AppError(messageString, { code: 'VOYAGE_...' })`
+4. T04 narrative-field flatten — replace `mission/vision/differentiation/market` with canonical `problem/solution/why_now/why_us`; update test data at `:1299`
+5. T04 `ctx.inngest.send` — replace with module-level `inngest.send(...)` and add `import { inngest } from '@/inngest/client'` to memory router files_modified
+
+2 MEDIUM (non-blocking but should land in same commit):
+6. Update verification table at plan lines 2063, 2065, 2066 to match the per-task test counts (T02: 9/9, T04: 10/10, T05: 7/7)
+7. Update T02 test sketch to spy on `getLangfuseClient()` return value, not a singleton
+
+After replan, cycle 7 must re-run all 3 gates against the new HEAD and verify zero remaining unresolved imports + zero new field-name drift.
+
+This is the FIRST non-APPROVED cycle since cycle 1. The new Gate 2 + Gate 3 demonstrate their value by surfacing drift that 5 prior cycles' loose import-checking missed.
+
+Next step: orchestrator runs `/gsd:plan-phase 2 --reviews` to incorporate cycle-6 feedback, then re-runs `/gsd:review --phase 02 --codex` for cycle-7 convergence check.
+
+---
+
+*Cross-AI review cycle 6 — 2026-05-28. Single reviewer: Codex CLI v0.130.0 (gpt-5.5). Outcome: REPLAN-REQUIRED. 5 HIGH findings (2 Gate-2 unresolved imports + 3 T02/T04 implementation drifts). 2 MEDIUM findings. Zero CRITICAL. Zero LOW. All 16 cumulative cycle-1+2+3+4+5 closures HELD. Cycle-6 commit `67eb82d` (T01 alignment) itself is CLEAN — defects are pre-existing T02/T04 drift surfaced for the first time by the new comprehensive Gate 2 import-resolution sweep. Convergence series re-OPENS.*
