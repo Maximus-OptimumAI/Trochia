@@ -1,6 +1,6 @@
 ---
 phase: 2
-cycles_completed: [1, 2, 3, 4, 5, 6]
+cycles_completed: [1, 2, 3, 4, 5, 6, 7]
 reviewers: [codex]
 plans_reviewed:
   - .planning/phases/02-knowledge-layer/02-04-PLAN.md
@@ -15,6 +15,7 @@ codex_model:
   cycle_4: gpt-5.5 (Codex CLI v0.130.0; same model as cycle 3)
   cycle_5: gpt-5.5 (Codex CLI v0.130.0; same model as cycle 3 and 4)
   cycle_6: gpt-5.5 (Codex CLI v0.130.0; same model as cycles 3-5)
+  cycle_7: gpt-5.5 (Codex CLI v0.130.0; same model as cycles 3-6)
 cycle_1:
   reviewed_at: 2026-05-26T20:18:37Z
   findings: { critical: 4, high: 4, medium: 4, low: 2 }
@@ -87,6 +88,44 @@ cycle_6:
     overlaps_found: 0
     classification: "ZERO HARD FAIL, ZERO DOWNGRADE-TO-EXTEND. T01 trim from 5→2 cases successfully eliminates the rls-memory.test.ts duplication (0/2 overlap remaining)."
   verdict: REPLAN-REQUIRED — 5 HIGH (2 Gate-2 unresolved imports + 3 T02/T04 implementation drifts confirmed by Codex with file:line evidence). T01 dispatch BLOCKED until replan addresses all 5 HIGH. Cycle-6 demonstrates that the new Gate 2 + Gate 3 successfully surfaced drift the 5-cycle convergence series missed.
+cycle_7:
+  reviewed_at: 2026-05-28T21:25:00Z
+  head_at_review: 80b8896
+  baseline: c06d2cb
+  scope: "Regression check for cycle-6 hotfix (commit 80b8896 — 5 HIGH + 2 MED on T02/T04): re-runs all 3 gates against HEAD; verifies each named H/M landed; sweeps T02-T08 for NEW drift the patches might have introduced."
+  findings: { critical: 0, high: 3, medium: 2, low: 0 }
+  high_breakdown:
+    - "T04:1058 + T05:1487 — Inngest createFunction signature drift (NEW). Plan sketches use 3-arg form `createFunction(opts, trigger, handler)` but canonical repo pattern at `src/inngest/functions/purge-soft-deleted.ts:40-42` uses 2-arg form `createFunction({ ..., triggers: [...] }, handler)` with triggers embedded in the options object (Inngest v4 declared at `node_modules/inngest/components/Inngest.d.ts:518`). Both T04 (single event trigger) and T05 (cron + event triggers) will fail TypeScript compilation or drift from repo conventions."
+    - "T04:1097-1103 — Drizzle jsonb access without type annotation (NEW; consequence of H4 fix). Plan accesses `row.narrative?.problem`, `row.traction?.growth` etc. directly on `jsonb` columns. Drizzle's `jsonb()` default data type is `unknown` (per `node_modules/drizzle-orm/pg-core/columns/jsonb.d.ts:10`), so property access on `unknown` will not typecheck under `strict: true`. Schema at `src/db/schema/memory.ts:147-148` declares both columns as bare `jsonb(...)` with no `.$type<...>()` annotation. Fix: either add `.$type<Narrative>()` at schema definition OR cast in flatten site (`const narrative = row.narrative as Narrative | null | undefined`)."
+    - "T05:1538-1550 + T05:1626-1650 — Voyage batch budget contradiction (NEW). Code sketch in step 2 calls `voyage.embed` once PER DOC inside a `for (const doc of docs)` loop (50 docs → 50 HTTP calls). But Case 7 test at line 1646 asserts `expect(httpCallSpy.mock.calls.length).toBeLessThanOrEqual(7)` based on 50 chunks ÷ 8 per batch = 7 calls. The math only works if all doc chunks are FLATTENED across docs before batching. Cycle-1 FOLLOWUP-CORPUS budget pin survives in the test but the implementation sketch contradicts it. Test will fail at FOLLOWUP scale."
+  medium_breakdown:
+    - "T05:1574-1586 — `result` bound but unused after `onConflictDoNothing`. Plan declares `const result = await tx.insert(...).onConflictDoNothing({...})` then returns `rows.length`, discarding actual insert count. Idempotency test (second run inserts 0) cannot be measured correctly — it will report attempted rows, not inserted rows. Fix: chain `.returning({ id: embeddings.id })` and return `inserted.length`."
+    - "T05:1503-1554 — bare references to `fs`, `path`, `fileURLToPath`, `parseSimpleFrontmatter`, `crypto`, `db`, `accounts` without imports shown. H2 fix (cycle 6) added `getServiceClient` import to T04 ONLY; T05's identical db-client drift pattern was not patched. T05 sketch must add: `import { createHash } from 'node:crypto'; import { promises as fs } from 'node:fs'; import path from 'node:path'; import { fileURLToPath } from 'node:url'; import { getServiceClient, type DrizzleDb } from '@/db/client'; import { accounts } from '@/db/schema/tenancy';` and `parseSimpleFrontmatter` either inlined or imported."
+  cumulative_closure_status:
+    closures_held: 16
+    closures_regressed: 0
+    notes: "All 16 cumulative cycle-1+2+3+4+5+(6-fix) closures HELD. The 7 cycle-6 named fixes (H1-H5, M1-M2) ALL landed correctly per independent verification — see cycle_7_specific_verifications below. NO regression introduced. The 3 NEW HIGH + 2 NEW MED are pre-existing T04/T05 defects newly surfaced because: (a) Gate 2 audit in cycle 6 focused on import-RESOLUTION (which it found 2 broken in T02/T04), but did not audit (i) external library SIGNATURE drift in code sketches or (ii) Drizzle column TYPE annotations vs property-access strictness; (b) T05 was not in the cycle-6 patch scope (the H2 fix only touched T04's db import); (c) the Case 7 budget assertion was added in cycle-1 and the implementation sketch was added separately — the two never got cross-referenced in a single review pass until cycle 7."
+  gate_1_output:
+    comm_verbatim: "eval:run"
+    t_add: 7
+    t_use: 7
+    classification: "PASS (self-provisioned)"
+  gate_2_output:
+    unresolved_count: 0
+    notes: "All cycle-6 named import fixes (H1 langfuse, H2 db client, H5 inngest module-level) RESOLVED at HEAD. All 9 distinct `@/` imports across T01-T08 resolve to real source files OR to NEW files this plan creates (voyage.adapter.ts in T02, chunk.ts in T03 — internally-consistent within-plan creates)."
+  gate_3_output:
+    new_test_files_audited: 6
+    overlaps_found: 0
+    classification: "ZERO HARD FAIL, ZERO DOWNGRADE. T01's 2-case trim from cycle 6 holds (0/2 net overlap with rls-memory.test.ts). All 5 other NEW test files target NEW directories (tests/ai/integrations/, tests/ai/chunking/, tests/inngest/functions/, tests/ai/eval/) with no pre-existing peers → 0% overlap each."
+  cycle_7_specific_verifications:
+    h1_langfuse_module_path: "PASS — `@/lib/observability/langfuse` count = 0 (was 1+ in cycle 6); `getLangfuseClient` count = 10."
+    h2_db_client_symbol: "PASS — `import { db } from '@/db/client'` count = 0 in T04 (was 1 in cycle 6); `getServiceClient` count = 10. NOTE: T05 still has bare `db.transaction(...)` calls without the corresponding import — flagged as NEW MEDIUM 2."
+    h3_apperror_signature_flip: "PASS — `new AppError('SCREAMING_CASE',` count = 0; total `new AppError` count = 6 (all 6 sites flipped to message-first signature)."
+    h4_narrative_field_drift: "PASS — stale `narrative.{mission|vision|differentiation|market}` count = 0; canonical `narrative.{problem|solution|why_now|why_us}` count = 4. NEW HIGH 2 surfaced as side-effect (the field names are now correct but jsonb columns are typed `unknown` — TypeScript strict mode will reject property access)."
+    h5_ctx_inngest_phantom: "PASS — `ctx.inngest` count = 1 (single occurrence at line 1309 in a DO-NOT-USE-THIS-PATTERN explanatory note — NOT instructional code); `import { inngest } from '@/inngest/client'` count = 4. Pattern correctly switched to module-level import."
+    m1_test_count_summaries: "PASS — verification table T02 row says 10/10, T04 says 10/10, T05 says 7/7. Independent recount of `Case N` labels per task confirms: T02 = 10 distinct (Cases 1-7, 8, 8b, 8c), T03 = 10 (Cases 1-10), T04 = 10 (Cases 1-10), T05 = 7 (Cases 1-7)."
+    m2_langfuse_test_spy: "PASS — `vi.mock('@/lib/langfuse'` count = 1; `vi.spyOn(langfuse` count = 0. Test sketch correctly switched to module-mock pattern with beforeEach traceSpy binding."
+  verdict: REPLAN-REQUIRED — Cycle-6 patches landed cleanly (all 7 named fixes PASS independent verification) BUT 3 NEW HIGH + 2 NEW MED defects surfaced in T04/T05 from the same expanded audit lens that surfaced cycle-6's findings. Convergence NOT reached. T01 dispatch remains BLOCKED until a cycle-8 replan addresses: (1) Inngest createFunction 2-arg signature in T04 + T05; (2) Drizzle jsonb type annotation OR cast in T04 flatten site; (3) Voyage batch flattening across docs in T05 step 2 so Case 7 assertion holds; (4) `.returning()` chain + use inserted.length in T05 corpus-sync insert; (5) Add missing imports (fs, path, crypto, fileURLToPath, getServiceClient, accounts, parseSimpleFrontmatter) to T05 sketch.
 ---
 
 # Cross-AI Plan Review — Phase 2 (Knowledge Layer), Cycle 1
@@ -996,3 +1035,324 @@ Next step: orchestrator runs `/gsd:plan-phase 2 --reviews` to incorporate cycle-
 ---
 
 *Cross-AI review cycle 6 — 2026-05-28. Single reviewer: Codex CLI v0.130.0 (gpt-5.5). Outcome: REPLAN-REQUIRED. 5 HIGH findings (2 Gate-2 unresolved imports + 3 T02/T04 implementation drifts). 2 MEDIUM findings. Zero CRITICAL. Zero LOW. All 16 cumulative cycle-1+2+3+4+5 closures HELD. Cycle-6 commit `67eb82d` (T01 alignment) itself is CLEAN — defects are pre-existing T02/T04 drift surfaced for the first time by the new comprehensive Gate 2 import-resolution sweep. Convergence series re-OPENS.*
+
+---
+
+# Cross-AI Plan Review — Phase 2 (Knowledge Layer), Cycle 7
+
+**Scope of this cycle:** Plan 02-04 ONLY (Embed pipeline + curated corpus loader). Plans 02-01, 02-02, 02-03 remain CLOSED. Regression check for cycle-6 hotfix (commit `80b8896`) + sweep for NEW drift the patches might have introduced.
+
+**Baseline:** `c06d2cb` (cycle-6 review commit). **HEAD at review:** `80b8896`. **Diff:** 1 file (02-04-PLAN.md), +130/-53; NO source files modified.
+
+**Convergence purpose:** Verify the 5 HIGH + 2 MED cycle-6 fixes landed cleanly AND surface any NEW drift the patches might have introduced.
+
+---
+
+## Codex Review — Cycle 7
+
+### Reviewer methodology
+
+Codex executed the review with file-system access (PowerShell sandboxed read-only). It independently:
+
+1. Verified the plan file at 2365 lines (PowerShell `Measure-Object -Line` reported 2063, a known CRLF/LF quirk — the canonical wc -l count is 2365).
+2. Inspected `src/lib/langfuse.ts:27`, `src/lib/errors.ts:8`, `src/db/client.ts:45+68`, `src/inngest/client.ts:14`, `src/inngest/functions/purge-soft-deleted.ts:40-42`, `src/db/schema/memory.ts:147-148`, `src/ai/schemas/business-memory.zod.ts:330-355`, `node_modules/inngest/components/Inngest.d.ts:518`, `node_modules/drizzle-orm/pg-core/columns/jsonb.d.ts:10`.
+3. Ran grep verifications for each of the 7 cycle-6 fixes (H1-H5, M1, M2).
+4. Cross-referenced T05 corpus-sync code sketch against Case 7 test assertion.
+5. Audited Drizzle column type annotations vs property-access patterns under TypeScript strict mode.
+
+### Verdict
+
+> Cycle-7 patch landed cleanly for the seven named cycle-6 fixes: H1-H5 and M1-M2 are reflected in `.planning/phases/02-knowledge-layer/02-04-PLAN.md`, and the referenced repo symbols exist (`getLangfuseClient`, `getServiceClient`, `DrizzleDb`, `AppError(message, opts)`, canonical `narrative.{problem,solution,why_now,why_us}`, direct `inngest.send` pattern).
+>
+> I do **not** think convergence is reached. New or re-surfaced drift remains in T04/T05.
+
+### NEW Findings (cycle 7)
+
+#### HIGH 1 — Inngest createFunction signature drift (T04 + T05)
+
+**LOCATION:** `.planning/phases/02-knowledge-layer/02-04-PLAN.md:1058` (T04 `embedMemory`), `.planning/phases/02-knowledge-layer/02-04-PLAN.md:1487` (T05 `corpusSync`).
+
+**DEFECT:** Plan sketches use a 3-argument signature `createFunction(opts, trigger, handler)`, but this repo's installed Inngest v4 API uses 2-argument `createFunction({ ..., triggers: [...] }, handler)` with triggers embedded inside the options object.
+
+**EVIDENCE:**
+- Canonical repo pattern at `src/inngest/functions/purge-soft-deleted.ts:40-42`:
+  ```ts
+  inngest.createFunction(
+    { id: 'purge-soft-deleted', retries: 4, concurrency: { limit: 1 }, triggers: [{ cron: '0 3 * * *' }] },
+    async ({ step }) => {
+  ```
+- Inngest v4 type at `node_modules/inngest/components/Inngest.d.ts:518` declares `(options, handler)` — 2-arg.
+- Plan T04 lines 1058-1066: `inngest.createFunction({ id: 'embed-memory', ... }, { event: 'memory.confirmed' }, async (...) => ...)` — 3-arg.
+- Plan T05 lines 1487-1495: `inngest.createFunction({ id: 'corpus-sync', ... }, [{ cron: ... }, { event: ... }], async (...) => ...)` — 3-arg.
+
+**FIX:** Move trigger into options object:
+```ts
+export const embedMemory = inngest.createFunction(
+  {
+    id: 'embed-memory',
+    name: 'Embed confirmed business_memory into pgvector',
+    concurrency: { limit: 3, key: 'event.data.accountId' },
+    retries: 2,
+    triggers: [{ event: 'memory.confirmed' }],
+  },
+  async ({ event, step }) => { ... },
+);
+
+export const corpusSync = inngest.createFunction(
+  {
+    id: 'corpus-sync',
+    name: 'Sync curated corpus into pgvector (per-tenant fan-out)',
+    concurrency: { limit: 1 },
+    retries: 2,
+    triggers: [{ cron: '0 3 * * *' }, { event: 'corpus.sync.requested' }],
+  },
+  async ({ step }) => { ... },
+);
+```
+
+#### HIGH 2 — Drizzle jsonb access on `unknown` type (T04, side-effect of H4 fix)
+
+**LOCATION:** `.planning/phases/02-knowledge-layer/02-04-PLAN.md:1097-1103`, `src/db/schema/memory.ts:147-148`.
+
+**DEFECT:** Cycle-6 H4 fixed the field NAMES (`narrative.{problem, solution, why_now, why_us}` are now correct), but the sketch accesses these properties directly on `row.narrative` / `row.traction`, both of which are Drizzle `jsonb` columns typed as `unknown`. Property access on `unknown` does not compile under `strict: true`.
+
+**EVIDENCE:**
+- Plan flatten site at lines 1097-1103:
+  ```ts
+  row.narrative?.problem
+  row.traction?.growth
+  ```
+- Repo schema at `src/db/schema/memory.ts:147-148`:
+  ```ts
+  traction: jsonb('traction'),
+  narrative: jsonb('narrative'),
+  ```
+- Drizzle `jsonb()` default at `node_modules/drizzle-orm/pg-core/columns/jsonb.d.ts:10`: `data: unknown`.
+
+**FIX:** Either annotate columns with `.$type<Narrative>()` at schema definition (preferred — single source of truth) OR cast at flatten site:
+```ts
+import type { Narrative, Traction } from '@/ai/schemas/business-memory.zod';
+
+const narrative = row.narrative as Narrative | null | undefined;
+const traction = row.traction as Traction | null | undefined;
+
+const narrativeText = [
+  narrative?.problem,
+  narrative?.solution,
+  narrative?.why_now,
+  narrative?.why_us,
+  traction?.growth,
+  traction?.runway,
+]
+  .filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
+  .join('\n\n');
+```
+
+#### HIGH 3 — T05 Voyage batch budget contradiction (Case 7 fails at FOLLOWUP scale)
+
+**LOCATION:** `.planning/phases/02-knowledge-layer/02-04-PLAN.md:1538-1550` (implementation sketch), `.planning/phases/02-knowledge-layer/02-04-PLAN.md:1626-1650` (Case 7 budget assertion).
+
+**DEFECT:** Plan code sketch calls `voyage.embed` once per doc inside a for-loop. At FOLLOWUP-CORPUS-01 scale (50 docs), that produces 50 HTTP calls. But Case 7 asserts `≤ 7` HTTP calls based on the documented batch math (50 chunks ÷ 8 per batch = 7 ceil). Implementation and assertion contradict each other; Case 7 will fail.
+
+**EVIDENCE:**
+- Plan implementation (lines 1539-1550):
+  ```ts
+  for (const doc of docs) {
+    const chunks = chunkText(doc.body, DEFAULT_CHUNK_OPTIONS);
+    const result = await step.run(`voyage-corpus-${doc.slug}`, async () => {
+      return await voyage.embed({
+        texts: chunks.map((c) => c.text),
+        ...
+      });
+    });
+    embeddedDocs.push({ doc, chunks, vectors: result.embeddings, ... });
+  }
+  ```
+- Plan test assertion (line 1646):
+  ```ts
+  expect(httpCallSpy.mock.calls.length).toBeLessThanOrEqual(7);
+  ```
+- Plan documented math (line 1632): `FOLLOWUP-CORPUS-01 fan-out | 50 | 25 | 1 | ≤ 7 (50 chunks ÷ 8) | 1,250` — only achievable via cross-doc flat batching, not per-doc batching.
+
+**FIX:** Flatten all doc chunks first, batch the flattened list in slices of 8, call Voyage once per batch, then map vectors back to doc/chunk records before fan-out:
+```ts
+// step 2 — flat-batch embed across all docs
+type ChunkRef = { docIdx: number; chunkIdx: number; text: string; tokenCount: number };
+const allChunks: ChunkRef[] = docs.flatMap((doc, docIdx) =>
+  chunkText(doc.body, DEFAULT_CHUNK_OPTIONS).map((c, chunkIdx) => ({
+    docIdx, chunkIdx, text: c.text, tokenCount: c.tokenCount,
+  })),
+);
+
+const VOYAGE_BATCH = 8;
+const batches: ChunkRef[][] = [];
+for (let i = 0; i < allChunks.length; i += VOYAGE_BATCH) {
+  batches.push(allChunks.slice(i, i + VOYAGE_BATCH));
+}
+
+const vectorsByRef = new Map<string, number[]>();
+for (let b = 0; b < batches.length; b++) {
+  const batch = batches[b];
+  const result = await step.run(`voyage-corpus-batch-${b}`, async () => {
+    return await voyage.embed({
+      texts: batch.map((c) => c.text),
+      inputType: 'document',
+      trace: { accountId: 'corpus-shared', sourceType: 'corpus', sourceId: `batch-${b}` },
+    });
+  });
+  batch.forEach((ref, i) => vectorsByRef.set(`${ref.docIdx}:${ref.chunkIdx}`, result.embeddings[i]));
+}
+```
+
+#### MEDIUM 1 — `result` bound but unused; idempotency test cannot measure inserted count (T05)
+
+**LOCATION:** `.planning/phases/02-knowledge-layer/02-04-PLAN.md:1574-1586`.
+
+**DEFECT:** Sketch binds `const result = await tx.insert(...).onConflictDoNothing({...})` then returns `rows.length`, discarding `result`. The idempotency test asserts that a second corpus-sync run inserts 0 additional rows — but `rows.length` reports the number of rows attempted, not the number actually inserted after conflict resolution. The test can pass even if every row was a duplicate.
+
+**EVIDENCE:** Plan lines 1574-1586:
+```ts
+const result = await tx
+  .insert(embeddings)
+  .values(rows)
+  .onConflictDoNothing({ target: [...] });
+return rows.length;  // result ignored
+```
+
+**FIX:**
+```ts
+const inserted = await tx
+  .insert(embeddings)
+  .values(rows)
+  .onConflictDoNothing({ target: [...] })
+  .returning({ id: embeddings.id });
+return inserted.length;
+```
+
+#### MEDIUM 2 — T05 corpus-sync sketch uses undeclared symbols (db, accounts, fs, path, crypto, parseSimpleFrontmatter)
+
+**LOCATION:** `.planning/phases/02-knowledge-layer/02-04-PLAN.md:1503-1554`.
+
+**DEFECT:** Cycle-6 H2 added the canonical `getServiceClient` + `DrizzleDb` import to T04 ONLY. T05's identical db-client drift pattern was not patched. T05 also references `fs`, `path`, `fileURLToPath`, `crypto`, and `parseSimpleFrontmatter` without showing any imports or helper definitions. The plan's `<files>` section for T05 lists corpus-sync.ts as NEW but provides no import block — implementation guidance is incomplete.
+
+**EVIDENCE:** Plan lines 1503-1554:
+```ts
+const here = path.dirname(fileURLToPath(import.meta.url));
+const files = await fs.readdir(dir);
+const parsed = parseSimpleFrontmatter(raw);
+const sha = crypto.createHash('sha256').update(body).digest('hex');
+return await db.select({ id: accounts.id }).from(accounts);
+```
+Plan T05 import section: empty (verified via `grep "import" .planning/...PLAN.md | awk '$1>=1485 && $1<=1700'` — 0 import statements between lines 1485-1700).
+
+**FIX:** Add explicit import block to the T05 sketch (matching the cycle-6 H2 fix that was applied to T04):
+```ts
+import { createHash } from 'node:crypto';
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { getServiceClient, type DrizzleDb } from '@/db/client';
+import { accounts } from '@/db/schema/tenancy';
+import { embeddings } from '@/db/schema/embeddings';
+import { inngest } from '@/inngest/client';
+import { voyage } from '@/ai/integrations/voyage.adapter';
+import { chunkText, DEFAULT_CHUNK_OPTIONS } from '@/ai/chunking/chunk';
+import { corpusSourceUuid } from '@/lib/corpus-source-uuid';
+// ... plus parseSimpleFrontmatter — either define inline at top of file OR import from a helper
+
+const db: DrizzleDb = getServiceClient();
+const sha = createHash('sha256').update(body).digest('hex');
+```
+
+### Cycle-7 specific verifications (7 named cycle-6 fixes)
+
+| Fix | grep result | Status |
+|---|---|---|
+| H1: `@/lib/observability/langfuse` count | 0 (was ≥1 in cycle 6) | PASS |
+| H1: `getLangfuseClient` count | 10 | PASS |
+| H2: `import { db } from '@/db/client'` count | 0 (was 1 in cycle 6) | PASS |
+| H2: `getServiceClient` count | 10 | PASS |
+| H3: SCREAMING_CASE-first-arg AppError count | 0 | PASS |
+| H3: total `new AppError` count | 6 | PASS |
+| H4: stale `narrative.{mission|vision|differentiation|market}` count | 0 | PASS |
+| H4: canonical `narrative.{problem|solution|why_now|why_us}` count | 4 | PASS |
+| H5: `ctx.inngest` count | 1 (DO-NOT-USE explanatory note at line 1309 — non-instructional) | PASS |
+| H5: `import { inngest } from '@/inngest/client'` count | 4 | PASS |
+| M1: T02 case count (independent recount) | 10 distinct (Cases 1-7, 8, 8b, 8c) | PASS |
+| M1: T04 case count | 10 distinct (Cases 1-10) | PASS |
+| M1: T05 case count | 7 distinct (Cases 1-7) | PASS |
+| M2: `vi.mock('@/lib/langfuse'` count | 1 | PASS |
+| M2: `vi.spyOn(langfuse` count | 0 | PASS |
+
+### Cumulative non-regression status
+
+| Closure source | Status |
+|---|---|
+| Cycle 1+2 closures (C1-C4, H1-H4, M1-M3, L1) | HELD |
+| Cycle 3 uuidv5→corpusSourceUuid cleanup | HELD |
+| Cycle 4 pnpm→npm migration | HELD |
+| Cycle 5 db:diff→git-freeze | HELD |
+| Cycle 6 H1-H5 + M1+M2 (NEW closures, this cycle's subject) | HELD (all 7 verified above) |
+| **Total cumulative closures held** | **16 prior + 7 cycle-6 = 23, zero regressed** |
+
+---
+
+## Consensus Summary — Cycle 7
+
+### Agreed strengths
+
+N/A (single-reviewer cycle).
+
+### Newly raised in cycle 7
+
+**3 HIGH:**
+1. T04:1058 + T05:1487 — Inngest createFunction signature drift (3-arg vs canonical 2-arg-with-embedded-triggers).
+2. T04:1097-1103 — Drizzle jsonb access on `unknown` type (cycle-6 H4 fix consequence; need `.$type<>()` annotation or cast).
+3. T05:1538-1550 vs Case 7 — voyage.embed called per-doc but Case 7 asserts flat-batched ≤ 7 HTTP calls; implementation contradicts test.
+
+**2 MEDIUM:**
+1. T05:1574-1586 — `const result = await tx.insert(...).onConflictDoNothing()` binds but ignores result; idempotency test cannot measure actual inserted rows.
+2. T05:1503-1554 — corpus-sync sketch uses `fs`, `path`, `fileURLToPath`, `crypto`, `db`, `accounts`, `parseSimpleFrontmatter` without showing imports (H2 fix only patched T04).
+
+### Divergent views
+
+N/A (single-reviewer cycle).
+
+### Notable observations
+
+- **Cycle-7 hotfix landed cleanly.** All 7 cycle-6 named fixes (H1-H5, M1, M2) verified PASS via independent file/line/grep audit. The replan commit `80b8896` introduced ZERO regression on any of the 16 prior cycle-1+2+3+4+5 closures.
+- **NEW drift NOT introduced by the patches.** The 3 HIGH + 2 MED defects surfaced in cycle 7 are pre-existing T04/T05 implementation defects that survived all prior cycles because:
+  (a) cycle 6's Gate 2 focused on import-RESOLUTION (catching 2 broken imports) but did not audit external-library SIGNATURE drift in code sketches (HIGH 1) or Drizzle column type-annotation strictness (HIGH 2);
+  (b) T05 was outside cycle 6's patch scope (H2 only touched T04's db import; the identical pattern in T05 was not flagged because cycle-6 reviewers focused on T02/T04);
+  (c) the Case 7 budget assertion (cycle 1) and the T05 implementation sketch (cycle 1) were never cross-referenced in a single review pass until cycle 7's whole-T05 sweep (HIGH 3).
+- **Pattern: replan cycles surface NEW defects from EXPANDED audit lens.** Cycle 6's new Gate 2 found 5 HIGHs missed by 5 prior cycles. Cycle 7's whole-T04/T05 sweep finds 3 more HIGHs. Recommend cycle 8 include a deliberate "Inngest signature consistency" audit + "Drizzle column-type annotation completeness" audit + "T05 import block parity with T04" audit as standing gates.
+- **Convergence series re-OPENS.** This is the second non-APPROVED cycle in a row (cycles 6 + 7 both REPLAN-REQUIRED). T01 dispatch remains BLOCKED.
+
+---
+
+## Convergence Verdict — Cycle 7
+
+**REPLAN-REQUIRED.** The cycle-6 hotfix landed cleanly — all 7 named fixes verified PASS — but cycle 7 surfaces 3 NEW HIGH + 2 NEW MEDIUM defects in T04/T05 that were not in the cycle-6 fix scope.
+
+T01 dispatch remains BLOCKED until a cycle-8 replan commit addresses:
+
+1. **HIGH 1 — Inngest createFunction signature** — Rewrite T04 line 1058-1066 + T05 line 1487-1495 to use 2-arg form with `triggers` embedded in options object.
+2. **HIGH 2 — Drizzle jsonb type annotation** — Either add `.$type<Narrative>()` + `.$type<Traction>()` to `src/db/schema/memory.ts:147-148` schema declarations OR add explicit cast in T04 flatten site at line 1097.
+3. **HIGH 3 — T05 Voyage batch flattening** — Rewrite T05 step 2 (lines 1538-1550) to flatten chunks across all docs before batching at slice=8, so Case 7's `≤ 7 HTTP calls` budget is achievable.
+4. **MED 1 — T05 corpus-sync inserted-count measurement** — Chain `.returning({ id: embeddings.id })` and return `inserted.length` (line 1586).
+5. **MED 2 — T05 sketch import block** — Add explicit imports for `fs`, `path`, `fileURLToPath`, `crypto`, `getServiceClient`/`DrizzleDb`, `accounts`, `embeddings`, `voyage`, `chunkText`, `corpusSourceUuid` to the T05 sketch (and define or import `parseSimpleFrontmatter`).
+
+After replan, cycle 8 must:
+- Re-run Gate 1 (npm-script existence) — expected: `eval:run` only, T_add=T_use=7 → PASS.
+- Re-run Gate 2 (import resolution) — expected: 0 unresolved across T01-T08.
+- Re-run Gate 3 (test scope dedup) — expected: all <50% overlap.
+- Re-verify all 7 cycle-6 closures + 5 cycle-7 closures (12 named closures total).
+- Sweep T04 + T05 for any further drift the cycle-7 patches might introduce.
+- Add deliberate "Inngest signature consistency" + "Drizzle type annotation" + "T05 import block parity" audits as new standing gates.
+
+Next step: orchestrator runs `/gsd:plan-phase 2 --reviews` to incorporate cycle-7 feedback, then re-runs `/gsd:review --phase 02 --codex` for cycle-8 convergence check.
+
+---
+
+*Cross-AI review cycle 7 — 2026-05-28. Single reviewer: Codex CLI v0.130.0 (gpt-5.5). Outcome: REPLAN-REQUIRED. 3 NEW HIGH + 2 NEW MEDIUM findings (all in T04/T05). Zero CRITICAL. Zero LOW. All 16 prior cumulative closures HELD; all 7 cycle-6 hotfix closures (H1-H5, M1, M2) verified PASS via independent file/line/grep audit. Cycle-6 commit `80b8896` itself is CLEAN — defects are pre-existing T04/T05 drift surfaced for the first time by cycle-7's whole-task sweep (Inngest signature, Drizzle type annotation, T05 import-block parity). Convergence series remains OPEN. Recommend cycle 8 add three new standing gates.*
