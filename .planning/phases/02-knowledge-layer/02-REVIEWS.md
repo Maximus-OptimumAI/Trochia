@@ -1,6 +1,6 @@
 ---
 phase: 2
-cycles_completed: [1, 2, 3, 4]
+cycles_completed: [1, 2, 3, 4, 5]
 reviewers: [codex]
 plans_reviewed:
   - .planning/phases/02-knowledge-layer/02-04-PLAN.md
@@ -13,6 +13,7 @@ codex_model:
   cycle_2: default (gpt-5-codex still unavailable; CLI fell back to default)
   cycle_3: gpt-5.5 (Codex CLI v0.130.0 reported model 'gpt-5.5' for this run)
   cycle_4: gpt-5.5 (Codex CLI v0.130.0; same model as cycle 3)
+  cycle_5: gpt-5.5 (Codex CLI v0.130.0; same model as cycle 3 and 4)
 cycle_1:
   reviewed_at: 2026-05-26T20:18:37Z
   findings: { critical: 4, high: 4, medium: 4, low: 2 }
@@ -37,6 +38,20 @@ cycle_4:
   findings: { critical: 0, high: 0, medium: 0, low: 0 }
   resolution_summary: "Codex independently verified the diff against the live repo (HEAD-resolved git diff + rg checks + file reads). All 4 npm-migration checklist items CLEAN: (1) semantic preservation — `pnpm <script>` correctly rewritten to `npm run <script>`; chained `&&` order and exit propagation preserved; no malformed `npm typecheck`/`npm lint`/`npm eval:run` forms; (2) CI workflow consistency — `actions/setup-node@v4` + `cache: npm` + `npm ci` + `npm run eval:run` coherent with package-lock.json; no orphaned pnpm references; YAML structure intact; (3) `db:check` script correctness — `drizzle-kit check` (validates migration history) is the right subcommand; drizzle-kit@0.31.10 confirmed in devDependencies; (4) `packageManager` pin — `npm@11.12.1` is a published version (npm CLI v11 changelog confirmed); defensively correct for Corepack-aware tooling. All 13 cumulative cycle-1+2+3 closures held: Inngest registration path (functions/index.ts not client.ts), embedFn removal, src/lib/env.ts path, DELETE-then-INSERT idempotency, TOCTOU lock scope, package.json in files_modified, corpus disk path resolution, uuidv5→corpusSourceUuid cleanup all still present. Codex also noted bookkeeping edits to STATE.md and 02-REVIEWS.md at HEAD beyond the pasted diff — confirmed no npm drift in those files. M2 status: STILL FULLY RESOLVED. L2 status: still PARTIAL, carries to T05 (unchanged from cycle 3). Zero new HIGH, zero new CRITICAL, zero new MEDIUM, zero new LOW."
   verdict: APPROVED for T01 dispatch (re-confirmed; risk LOW; convergence series CLOSED)
+cycle_5:
+  reviewed_at: 2026-05-28T18:30:00Z
+  head_at_review: 222e802
+  baseline: 45885c5
+  scope: "Non-regression check for db:diff removal (commit 222e802): 9 plan-doc edits replacing `npm run db:diff` (a script that does not exist in package.json) with `git diff --quiet 29228e8 -- src/db/schema/` (deterministic git-baseline schema-lock guard covering memory.ts, timeline.ts, embeddings.ts). One additive FOLLOWUP-DBDIFF-01 entry punting the reusable db:diff tool to the first future plan that legitimately modifies schema. No package.json change in this commit."
+  findings: { critical: 0, high: 0, medium: 0, low: 3 }
+  resolution_summary: "Codex independently verified the cycle-5 diff at HEAD 222e802. All 9 db:diff → git-freeze replacements are semantically correct and form-consistent (bare form inside `<automated>` && chains, readable-failure wrapper with `|| { echo ...; exit 1; }` inside human-facing verification loops). Line 298 rationale (drizzle-kit has no `--dry-run` ⇒ git freeze is the right tool) is sound. Risk #10 mitigation is STRONGER than before: src/db/schema/memory.ts is inside the guarded path, so a `last_embedded_at`-on-business_memory column add would be caught at staging. FOLLOWUP-DBDIFF-01 correctly defers the reusable drift-detection tool without weakening the current plan's no-schema-change gate. Repo facts verified: `git rev-parse 29228e8` resolves to `29228e835244092cae869380bcf7218b39c68658`; `git diff --quiet 29228e8 -- src/db/schema/; echo $?` returns 0; `git ls-tree -r 29228e8 -- src/db/schema/` lists all 8 schema files at baseline (billing, embeddings, index, jobs, legal, memory, tenancy, timeline) — all current files match baseline blob hashes. All 14 cumulative cycle-1+2+3+4 closures held. M2 status: STILL FULLY RESOLVED. L2 status: still PARTIAL, carries to T05 (unchanged from cycle 3+4). Zero new HIGH, zero new CRITICAL, zero new MEDIUM, three new LOW findings (all minor: untracked-file gap in git freeze, plan-checker forward-reference handling, line-298 wording polish)."
+  executable_plan_checker_assertion:
+    permanent_rule: "Permanent plan-checker requirement for all Phase 2+ phases: comm-based npm-script existence check MUST be executed against post-commit HEAD on every cycle. Non-empty comm output triggers HIGH-severity review unless the plan itself contains a documented package.json add-step for the missing script BEFORE the script's first execution dependency."
+    method: "grep -oE 'npm run [a-zA-Z][a-zA-Z0-9:_-]*' .planning/phases/02-knowledge-layer/02-04-PLAN.md | sed 's/npm run //' | sort -u > /tmp/referenced.txt; node -e \"const p=require('./package.json');Object.keys(p.scripts||{}).sort().forEach(k=>console.log(k));\" > /tmp/defined.txt; comm -23 /tmp/referenced.txt /tmp/defined.txt"
+    comm_output_verbatim: "eval:run"
+    interpretation: "Acceptable forward-reference. The plan-doc references `eval:run` AND T07 step 7 (line 1836) explicitly adds `\"eval:run\": \"tsx src/ai/eval/runner.ts\"` to package.json scripts. files_modified §66 documents the package.json add. The script's first executable dependency (CI workflow, T07 step 10 local verify, T08 verify loop) all run AFTER T07 step 7. This is materially different from the `pnpm` / `db:check` / `db:diff` defects (cycles 4+5 fixes), which referenced nonexistent things WITHOUT any plan add-step. The executable assertion correctly surfaces the forward-reference; the human-judgment layer applies the add-step exception."
+    classified_as: "LOW concern (not HIGH) for THIS cycle due to documented add-step. Future plans must surface comm-output items as HIGH unless a same-plan add-step is verified."
+  verdict: APPROVED for T01 dispatch (re-confirmed; risk LOW; convergence series re-CLOSED after one-commit hotfix)
 ---
 
 # Cross-AI Plan Review — Phase 2 (Knowledge Layer), Cycle 1
@@ -506,3 +521,198 @@ Next step: orchestrator runs `/plan-checker` then dispatches T01 of Plan 02-04.
 ---
 
 *Cross-AI review cycle 4 — 2026-05-28. Single reviewer: Codex CLI v0.130.0 (gpt-5.5). Outcome: APPROVED for T01 dispatch. Non-regression check for pnpm→npm migration: CLEAN. db:check script gap closed. packageManager pinned to npm@11.12.1. Zero new findings at any severity. Convergence series CLOSED.*
+
+---
+
+# Cross-AI Plan Review — Phase 2 (Knowledge Layer), Cycle 5
+
+**Scope of this cycle:** Plan 02-04 (Week 4 — Embed pipeline + pgvector HNSW + Inngest + Voyage + curated corpus loader + eval scaffold). Single-commit hotfix to a phantom-script defect surfaced post-cycle-4-close.
+
+**Convergence purpose:** Verify that the `db:diff` removal (commit 222e802) is semantically correct, form-consistent, and does not regress any of the 14 cumulative cycle-1+2+3+4 closures. Re-validate convergence via the new permanent executable plan-checker assertion (comm-based npm-script existence check).
+
+**Scope reduction context:**
+- Plans 02-01, 02-02, 02-03 remain CLOSED with SUMMARY.md files; intentionally not re-reviewed (no diff touched them).
+- Cycle 5 reviews ONLY the cycle-5 diff: `git diff 45885c5..222e802 -- .planning/phases/02-knowledge-layer/02-04-PLAN.md` (19 lines changed across 9 hits + 1 new FOLLOWUP entry).
+- The cycle is triggered by founder discovery that `npm run db:diff` (referenced 9× in the plan) is not a defined script in package.json and has no add-step in any task. This survived 4 review cycles because reviewers treated the plan-doc as ground truth instead of cross-checking against package.json scripts.
+
+---
+
+## Mandatory Executable Plan-Checker Assertion (Cycle 5 — PERMANENT RULE)
+
+Per founder mandate, all Phase 2+ reviews MUST execute the comm-based npm-script existence check against post-commit HEAD and paste the raw output verbatim.
+
+**Command (executed at HEAD 222e802):**
+```bash
+grep -oE 'npm run [a-zA-Z][a-zA-Z0-9:_-]*' .planning/phases/02-knowledge-layer/02-04-PLAN.md \
+  | sed 's/npm run //' | sort -u > /tmp/referenced.txt
+node -e "const p=require('./package.json');Object.keys(p.scripts||{}).sort().forEach(k=>console.log(k));" > /tmp/defined.txt
+comm -23 /tmp/referenced.txt /tmp/defined.txt
+```
+
+**Verbatim stdout:**
+```
+eval:run
+```
+
+**Defined scripts at HEAD 222e802** (`package.json`):
+```
+build, check:banned, db:check, db:generate, db:push, dev, gate, gen:dpa-pdf, lint, postbuild, start, test, test:e2e, test:watch, typecheck
+```
+
+**Referenced npm-run scripts in 02-04-PLAN.md at HEAD 222e802:**
+```
+check:banned, db:check, eval:run, lint, typecheck
+```
+
+**Interpretation — `eval:run` finding is an acceptable forward-reference, NOT a phantom-script defect.**
+
+Critical distinction from cycle-4 `db:check` / cycle-5 `db:diff` defects:
+- `pnpm` (cycle 4 fix): referenced a package manager the repo doesn't use — NO add-step in any task.
+- `db:check` (cycle 4 fix): referenced script not added by plan — NO add-step.
+- `db:diff` (cycle 5 fix): referenced non-existent script — NO add-step.
+- `eval:run` (this cycle): plan references script AND **plan adds the script in T07 step 7 (line 1836)** with explicit add: `"eval:run": "tsx src/ai/eval/runner.ts"`. files_modified §66 lists `package.json` with note "add `eval:run` script in T07 (review-cycle-1 fix)". The script's first execution dependency (CI workflow at .github/workflows/eval.yml, T07 step 10 local verify, T08 verify loop) all occur AFTER T07 step 7.
+
+This is a valid plan-time forward-reference: the plan creates the script as part of its own implementation.
+
+**Classification:** LOW concern for cycle 5. The executable assertion correctly surfaces it; the human-judgment layer applies the documented add-step exception.
+
+**PERMANENT plan-checker rule (recorded for all future Phase 2+ phases):**
+> The comm-based npm-script existence check MUST be executed against post-commit HEAD on every review cycle. Non-empty comm output triggers HIGH-severity treatment unless the plan itself contains a documented `package.json` add-step for the missing script BEFORE the script's first execution dependency, AND `files_modified` lists `package.json` with explicit add-script intent. The plan-checker layer (not the reviewer's prose-reading) is the source of truth for script existence.
+
+---
+
+## Codex Review
+
+**Model:** Codex CLI v0.130.0 (gpt-5.5) — same model as cycles 3 and 4.
+
+### Summary
+
+APPROVED for T01 dispatch. The cycle-5 patch correctly removes the nonexistent `npm run db:diff` dependency and replaces it with a deterministic baseline schema freeze that is appropriate for a no-schema-change plan. The remaining `eval:run` checker output is an acceptable plan-time forward-reference because T07 explicitly adds the script to `package.json` before any later verification step depends on it.
+
+### Strengths
+
+- All executable `npm run db:diff` references are gone; the only remaining `db:diff` text is the deferred follow-up item, not a command dependency.
+- `git diff --quiet 29228e8 -- src/db/schema/` is consistently used where the plan needs a terse automated gate, while the readable failure wrapper is used in human-facing verification loops.
+- Line 298's rationale is sound: for this plan, freezing schema files against the known baseline is a better fit than inventing a fake Drizzle dry-run command.
+- Risk #10 is now stronger than before: `src/db/schema/memory.ts` is inside the guarded path, so a `last_embedded_at` column on `business_memory` would be caught if tracked/staged.
+- `FOLLOWUP-DBDIFF-01` correctly defers reusable drift tooling without weakening this plan's current no-schema-change gate.
+- Prior closure anchors still appear held: Inngest registration target, `embedFn` removal, `src/lib/env.ts`, DELETE-then-INSERT, package.json inclusion, corpus path handling, Langfuse pin, `corpusSourceUuid`, eval fail-open handoff, npm migration, `db:check`, and `packageManager` pin.
+
+### Concerns
+
+- **LOW — `02-04-PLAN.md` (all 9 git-freeze occurrences) — Untracked-new-file gap in schema freeze.** `git diff --quiet 29228e8 -- src/db/schema/` does not catch untracked new files under `src/db/schema/`. It catches tracked/staged schema drift and modifications, which fully covers the stated `last_embedded_at` risk (because that mutates an existing tracked file), but the §10 ship checklist item "zero new files under `src/db/migrations/**` or `src/db/schema/**`" is not enforced by `git diff` alone. A new untracked `last_embedded_observability.ts` file under `src/db/schema/` would slip past the freeze.
+
+- **LOW — Plan-checker forward-reference handling.** The plan-checker assertion is too blunt if interpreted as a strict hard-fail rule. `eval:run` is referenced before it exists at HEAD, but T07 explicitly modifies `package.json` to add `"eval:run": "tsx src/ai/eval/runner.ts"` before running it. That is a valid forward-reference in an implementation plan, unlike the prior `db:diff` issue.
+
+- **LOW — Line 298 wording polish.** The line-298 wording says the guard catches drift to "ANY Phase-2 locked table," but the command actually covers every file under `src/db/schema/`. This is stricter, not weaker, but the prose could say "all schema files, including the Phase-2 locked files" to avoid ambiguity.
+
+- **No CRITICAL/HIGH/MEDIUM regressions found in the cycle-5 diff.**
+
+### Suggestions
+
+1. Add an untracked-file check beside the schema freeze where the plan claims "zero new files":
+   ```bash
+   git diff --quiet 29228e8 -- src/db/schema/
+   test -z "$(git ls-files --others --exclude-standard src/db/schema/)"
+   ```
+2. Update the plan-checker logic to allow forward-referenced scripts only when the same plan has a `package.json` add-step before first required execution. For this plan, `eval:run` qualifies; `db:diff` did not.
+3. Optional wording polish: change "all Phase-2 schema files" to "all schema files under `src/db/schema/`, including memory.ts, timeline.ts, embeddings.ts."
+
+### Risk Assessment
+
+LOW for T01 dispatch. The patch fixes the substantive phantom-script defect and preserves the no-schema-change invariant. The only residual gap is untracked schema files, which is easy to tighten but not enough to require re-plan.
+
+### Verdict
+
+**APPROVED for T01 dispatch**
+
+---
+
+## Repo Facts Verified (HEAD 222e802)
+
+| Check | Result |
+|---|---|
+| `git rev-parse 29228e8` | `29228e835244092cae869380bcf7218b39c68658` (baseline exists) |
+| `git diff --quiet 29228e8 -- src/db/schema/; echo $?` | `0` (freeze passes right now) |
+| Baseline schema file count under `src/db/schema/` | 8 (billing, embeddings, index, jobs, legal, memory, tenancy, timeline) |
+| Current schema file count | 8 (identical to baseline) |
+| Phase-2 locked files (memory.ts, timeline.ts, embeddings.ts) | All present in baseline tree; all byte-identical at HEAD |
+| `npm run db:diff` occurrences in 02-04-PLAN.md | 0 (full removal confirmed) |
+| `db:diff` text occurrences in 02-04-PLAN.md | 1 (only in FOLLOWUP-DBDIFF-01 deferral entry) |
+| `git diff --quiet 29228e8 -- src/db/schema/` occurrences | 9 (matches the 9 expected hit sites) |
+| Bare form (inside `<automated>` && chains) | Used at line 467 |
+| Readable-failure wrapper (`\|\| { echo …; exit 1; }`) | Used at line 298 and line 1973 (human-facing verify loops) |
+| Prose form (description only) | Used at lines 128, 198, 472, 2058, 2120, 2229 |
+
+---
+
+## Consensus Summary — Cycle 5
+
+### Agreed strengths (single reviewer; codex)
+
+- 9 db:diff → git-freeze replacements are semantically correct and form-consistent.
+- Risk #10 mitigation is materially stronger (memory.ts now inside the guard, not just embeddings.ts).
+- FOLLOWUP-DBDIFF-01 correctly punts reusable tooling without weakening the current gate.
+- Line 298 rationale (drizzle-kit has no --dry-run) is technically sound.
+- All 14 cumulative prior closures held.
+
+### Agreed concerns (single reviewer; codex)
+
+| # | Severity | Concern | Location | Cycle status |
+|---|---|---|---|---|
+| C5-L1 | LOW | Untracked-new-file gap: git freeze doesn't catch new untracked `src/db/schema/*.ts` files | All 9 git-freeze sites | NEW — open; minor tightening recommended |
+| C5-L2 | LOW | Plan-checker forward-reference handling needs same-plan-add-step exception | Permanent plan-checker rule | NEW — open; rule documented in this cycle |
+| C5-L3 | LOW | Line 298 wording could be clearer about "all schema files" vs "Phase-2 schema files" | Line 298 | NEW — open; cosmetic |
+
+### Newly raised in cycle 5
+
+3 LOW findings (all listed above). Zero CRITICAL / HIGH / MEDIUM.
+
+### Status of prior cycle items
+
+| Item | Origin | Cycle-5 status |
+|---|---|---|
+| Inngest registration path (functions/index.ts) | C1 CRIT | Still RESOLVED |
+| `embedFn` stub removal | C1 CRIT | Still RESOLVED |
+| `src/lib/env.ts` path | C1 CRIT | Still RESOLVED |
+| DELETE-then-INSERT idempotency | C1 CRIT | Still RESOLVED |
+| TOCTOU lock scope correctly narrowed | C1 HIGH | Still RESOLVED |
+| `files_modified` includes package.json | C1 HIGH | Still RESOLVED |
+| Corpus disk path resolution | C1 HIGH | Still RESOLVED |
+| FOLLOWUP fan-out present | C1 HIGH | Still RESOLVED |
+| Langfuse type-pin | C1 MED | Still RESOLVED |
+| Corpus name UUID alignment (corpusSourceUuid) | C1 MED | Still RESOLVED |
+| Eval fail-open guard | C1 MED | Still RESOLVED |
+| Chunking token drift | C1 MED | Still RESOLVED |
+| Plan-checker checks #15-22 | C1 LOW | Partially RESOLVED (L2 still PARTIAL, carries to T05; unchanged) |
+| M2 line-1364 + line-1581 cleanup | C2 MED | FULLY RESOLVED (cycle 3 confirmed; cycle 4 + 5 held) |
+| L2 broad plan-checker scope | C2 LOW | PARTIAL (carries to T05 implementation; unchanged) |
+| npm migration (pnpm→npm) | C4 | Still RESOLVED |
+| db:check script in package.json | C4 | Still RESOLVED |
+| packageManager pin (npm@11.12.1) | C4 | Still RESOLVED |
+
+### Divergent views
+
+N/A (single-reviewer cycle).
+
+### Notable observations
+
+- Codex independently identified that the executable plan-checker assertion would surface `eval:run` and proactively analyzed it as an acceptable forward-reference WITHOUT being directly asked. This is the correct human-judgment layer over the blunt comm-based check.
+- Codex also flagged the untracked-file gap unprompted, demonstrating that the git-freeze approach (while better than the nonexistent `db:diff` script) still has a small surface area where a determined drift could slip through. The fix (`git ls-files --others --exclude-standard`) is trivial and additive — recommended for an observational follow-up rather than a re-plan trigger.
+- All 9 git-freeze form choices (bare vs readable-failure wrapper vs prose) were independently audited and judged appropriate to their context. Specifically: bare form inside `<automated>` && chains preserves exit propagation; the readable-failure wrapper inside human-facing verify loops provides actionable failure messages.
+
+---
+
+## Convergence Verdict — Cycle 5
+
+**APPROVED for T01 dispatch (re-confirmed; convergence series re-CLOSED after one-commit hotfix).** The db:diff removal is semantically clean, form-consistent across all 9 sites, and the new git-freeze guard is materially stronger than the nonexistent script it replaces (catches drift to memory.ts and timeline.ts in addition to embeddings.ts). The mandatory executable plan-checker assertion surfaced `eval:run` as an acceptable forward-reference (plan adds the script in T07 step 7; files_modified §66 documents the add). All 14 cumulative cycle-1+2+3+4 closures remain held.
+
+This is the fifth consecutive APPROVED cycle (cycle 4 was the closing-out cycle pre-hotfix; cycle 5 re-confirms after the db:diff fix). The convergence series is re-closed.
+
+Next step: orchestrator runs `/plan-checker` (now with the new permanent comm-based npm-script existence rule) then dispatches T01 of Plan 02-04.
+
+**Permanent plan-checker rule recorded** (carries to all future Phase 2+ phases): the comm-based npm-script existence check MUST be executed against post-commit HEAD on every review cycle; non-empty output triggers HIGH-severity treatment unless the plan itself documents a `package.json` add-step before the script's first execution dependency.
+
+---
+
+*Cross-AI review cycle 5 — 2026-05-28. Single reviewer: Codex CLI v0.130.0 (gpt-5.5). Outcome: APPROVED for T01 dispatch. Non-regression check for db:diff removal: CLEAN. 9 db:diff → git-freeze replacements verified semantically correct and form-consistent. FOLLOWUP-DBDIFF-01 deferral documented. Mandatory executable plan-checker assertion executed — eval:run surfaced as acceptable forward-reference. Three new LOW findings (untracked-file gap, plan-checker handling rule, line 298 wording). Zero new CRITICAL/HIGH/MEDIUM. Permanent comm-based plan-checker rule recorded. Convergence series re-CLOSED after one-commit hotfix.*
