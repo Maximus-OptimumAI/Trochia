@@ -1356,3 +1356,209 @@ Next step: orchestrator runs `/gsd:plan-phase 2 --reviews` to incorporate cycle-
 ---
 
 *Cross-AI review cycle 7 — 2026-05-28. Single reviewer: Codex CLI v0.130.0 (gpt-5.5). Outcome: REPLAN-REQUIRED. 3 NEW HIGH + 2 NEW MEDIUM findings (all in T04/T05). Zero CRITICAL. Zero LOW. All 16 prior cumulative closures HELD; all 7 cycle-6 hotfix closures (H1-H5, M1, M2) verified PASS via independent file/line/grep audit. Cycle-6 commit `80b8896` itself is CLEAN — defects are pre-existing T04/T05 drift surfaced for the first time by cycle-7's whole-task sweep (Inngest signature, Drizzle type annotation, T05 import-block parity). Convergence series remains OPEN. Recommend cycle 8 add three new standing gates.*
+
+---
+
+## Cycle 8 — Verify cycle-7 scope-reduce + 6-gate sweep (2026-05-28)
+
+**Trigger:** Cycle-7 closed REPLAN-REQUIRED with 3 HIGH + 2 MED (H1 Inngest signature, H2 Drizzle jsonb cast, H3 T05 Voyage batch flattening, M1 inserted-count, M2 T05 import block). Hotfix commit `f86c152` ("scope-reduce — drop T05 corpus-sync, fix T04 H1+H2") landed; only plan-doc + lessons changed (+172 / -287 lines), zero source changes. T05 (251 lines) fully deleted. Cycle-8 runs ALL 6 standing gates against post-commit HEAD + verifies the 3 cycle-7 fixes + sweeps for orphan T05 references.
+
+**Single reviewer:** Codex CLI v0.130.0 (gpt-5.5). HEAD = `f86c152` (Phase 2 branch).
+
+**Scope:** Plan 02-04 only. Plans 02-01/02/03 CLOSED.
+
+### Standing Gates 1-6 Outputs (verbatim)
+
+**GATE 1 — npm-script existence:**
+
+```
+=== REFERENCED (from 02-04-PLAN.md) ===
+build, check:banned, db:check, eval:run, lint, typecheck
+
+=== DEFINED (package.json) ===
+build, check:banned, db:check, db:generate, db:push, dev, gate,
+gen:dpa-pdf, lint, postbuild, start, test, test:e2e, test:watch, typecheck
+
+=== MISSING ===
+eval:run  (only one)
+
+=== T_add ===
+plan line 1704:  "eval:run": "tsx src/ai/eval/runner.ts"   (T07)
+
+=== T_use ===
+plan lines 158, 186, 1741, 1761, 1766, 1773, 1848, 1932, 1999  (all T07)
+
+T_add (T07) <= T_use (T07) -> PASS
+```
+
+**GATE 2 — Import resolution:**
+
+| Import | Resolves to | Status |
+|---|---|---|
+| T04 `{ getServiceClient, type DrizzleDb } from '@/db/client'` | `src/db/client.ts:45` (type), `:68` (fn) | OK |
+| T04 `{ inngest } from '@/inngest/client'` | `src/inngest/client.ts:14` | OK |
+| T04 `type { Narrative, Traction } from '@/ai/schemas/business-memory.zod'` | `:356` (Narrative), `:342` (Traction) | OK (NEW in cycle 7) |
+| T02 `{ getLangfuseClient } from '@/lib/langfuse'` | `src/lib/langfuse.ts:27` | OK |
+| T01 `{ HAS_TEST_DB, ... } from '../db/test-db'` | exports at `tests/db/test-db.ts:35,51,56,60,68,136,159` | OK |
+
+**All resolved -> PASS.**
+
+**GATE 3 — Test scope dedup (T05 removed):**
+
+| File | Task | Cases | Overlap with peers |
+|---|---|---|---|
+| `tests/integration/embed-pipeline-rls.test.ts` | T01 | 2 (NEW-1, NEW-2) | 0% — schema contract only |
+| `tests/ai/integrations/voyage.adapter.test.ts` | T02 | 10 | 0% — adapter-scoped |
+| `tests/ai/chunking/chunk.test.ts` | T03 | 10 | 0% — pure-fn scoped |
+| `tests/inngest/functions/embed-memory.test.ts` | T04 | 10 | 0% — TOCTOU/concurrency scoped |
+| `tests/ai/eval/runner.test.ts` | T07 | 5 | 0% — runner scoped |
+
+All <50% -> PASS. (T05 `tests/inngest/functions/corpus-sync.test.ts` deleted with task.)
+
+**GATE 4 — External-library SIGNATURE consistency (cycle-7 standing rule, applied first time):**
+
+| Call site | SDK signature source | Plan call shape | Verdict |
+|---|---|---|---|
+| T04 `inngest.createFunction({...with embedded triggers:[{event:...}]}, handler)` | `node_modules/inngest/components/Inngest.d.ts:518` -> `(options, handler) => InngestFunction<...>` | 2-arg form at plan line 1081-1088 with `triggers: [{ event: 'memory.confirmed' }]` embedded inside options object | OK matches canonical at `src/inngest/functions/purge-soft-deleted.ts:40-47` |
+| T02 `new AppError(msg, { code })` | `src/lib/errors.ts:8` -> `constructor(message: string, opts: { status?, code?, cause? } = {})` | 6 call sites at plan lines 607, 611, 638, 648, 666, 714 all `{ code: '...' }` | OK |
+| T02 `getLangfuseClient()?.trace({...})` | `src/lib/langfuse.ts:27` -> `Langfuse | null` | optional-chain at plan line 537 + null backstop test Case 8c | OK |
+| T04 `step.run(name, () => fn(...))` | Inngest step API | standard | OK |
+| T04 `db.select().from(...).where(and(eq(...), eq(...)))` | Drizzle query builder | standard | OK |
+
+**All PASS.**
+
+**GATE 5 — Drizzle jsonb type-annotation completeness (cycle-7 standing rule):**
+
+`src/db/schema/memory.ts:147-148` declares:
+```
+traction: jsonb('traction'),    // NO .$type<T>()
+narrative: jsonb('narrative'),  // NO .$type<T>()
+```
+
+T01 schema-lock (`git diff --quiet 29228e8 -- src/db/schema/`) freezes the schema — cannot add `.$type<>()` in this plan. Localized cast required at every access site.
+
+Plan T04 line 1127-1128 (the only access site in this plan):
+```
+const narrative = row.narrative as Narrative | null;
+const traction = row.traction as Traction | null;
+```
+Then accesses `narrative?.problem`, `traction?.growth`, etc. via the typed locals. `confirmedAt` is `timestamp({ withTimezone: true })`, not jsonb — no cast needed.
+
+**PASS — H2 cycle-7 fix correctly localized. Schema-level annotation deferred to FOLLOWUP-DRIZZLE-TYPE-ANNOTATION-01 per the git-frozen schema guard.**
+
+**GATE 6 — Implementation-vs-assertion cross-check (cycle-7 standing rule):**
+
+| Plan assertion | Plan implementation | Match? |
+|---|---|---|
+| T04 Case 7: `embedMemory.fn.opts.concurrency === { limit: 3, key: 'event.data.accountId' }` | plan line 1085 has identical | OK |
+| T04 Case 8: `embedMemory.fn.opts.retries === 2` | plan line 1086 has `retries: 2` | OK |
+| T02 Case 4: 9 texts throws `VOYAGE_BATCH_OVERSIZED` BEFORE any HTTP call | plan line 609 has `if (input.texts.length > 8) throw new AppError(..., { code: 'VOYAGE_BATCH_OVERSIZED' })` | OK |
+| T03 chunker assertions | plan T03 implementation block | OK |
+| T07 eval-runner assertions | plan T07 implementation block | OK |
+
+(T05's flat-batching budget assertion — the cycle-7 HIGH 3 — is gone with T05.) **All PASS.**
+
+### Cycle-7 Fix Verifications
+
+| Cycle-7 fix | Verification command + result | Verdict |
+|---|---|---|
+| H1 — 2-arg `inngest.createFunction(opts, handler)` with embedded `triggers` | `grep -n "triggers: \["` -> 1 match at plan line 1087 inside `createFunction` options | PASS |
+| H2 — `as Narrative \| null` / `as Traction \| null` cast at flatten | `grep -n "as Narrative \| null"` -> 1 match line 1127; `as Traction \| null` -> 1 match line 1128 | PASS |
+| T05 scope-drop | `grep -nE "^\s*<name>Task"` -> only Tasks 1, 2, 3, 4, 6, 7, 8 (no Task 5); explicit removal marker at plan line 1454-1456 | PASS (with caveats — see "Codex orphan-sweep" below) |
+| Schema-lock | `git diff --quiet 29228e8 -- src/db/schema/` -> exit 0 | PASS |
+
+### Cumulative Closure Status (cycles 1-7 = 21 prior closures)
+
+All 21 prior closures (16 from cycles 1-5 + 5 from cycle-6 H/M fixes verified clean in cycle 7) **HELD** in cycle-8 sweep. Spot-check breakdown:
+- Cycle-1 CRITICAL/HIGH closures (env path, Inngest registration, embedFn removal, DELETE-then-INSERT, TOCTOU lock-scope, package.json in files_modified, Langfuse whitelist, uuidv5 zero-deps) — all referenced and intact.
+- Cycle-6 hotfix closures (H1 langfuse null-safe, H2 voyage adapter trace stub, H3 chunker overflow, H4 embed-memory test mocks, H5 RLS test trim, M1 fixture, M2 langfuse mock) — all intact.
+- Cycle-7 H1 + H2 fixes — verified PASS as above.
+
+### Codex Findings (NEW in cycle 8)
+
+**Codex Verdict: DOWNGRADE**
+
+Codex agreed with all 6 gate conclusions but found that the scope-reduce did not land cleanly. Three orphan references to corpus-sync / `next.config.ts` work survived the cycle-7 patch and create active contradictions.
+
+#### MED 1 — T08 corpus bundle smoke test is an active close-gate but its dependency was deferred (plan lines 1852-1862)
+
+T08 verification Step 5b "Production-build corpus-presence smoke test (cycle-1 fix HIGH #7)" is an ACTIVE close-gate that runs:
+```
+find .next -type f -name "*.md" -path "*data/corpus*" | wc -l   # expects >= 5
+find .next -type f -name "MANIFEST.json" -path "*data/corpus*" | wc -l   # expects >= 1
+```
+...and on zero matches instructs: "fail the verification loop and fix `next.config.ts` before /codex + /cso dispatch."
+
+But cycle-7 explicitly deferred `next.config.ts` `outputFileTracingIncludes` to FOLLOWUP-CORPUS-SYNC-01 (frontmatter line 45 + plan-checker row 21). The corpus files land in `data/corpus/` (T06) but Next.js without the `outputFileTracingIncludes` config will not trace `.md` files into `.next/standalone`. T08 Step 5b will **always fail**, blocking close.
+
+Two valid resolutions, pick one:
+- (a) Remove T08 Step 5b entirely (defer with the corpus-sync FOLLOWUP).
+- (b) Convert Step 5b into a `# DEFERRED in cycle-8 — corpus bundle tracing moved to FOLLOWUP-CORPUS-SYNC-01 with the corpus-sync runtime that actually reads these files. T06 still lands the seed docs in git but they are intentionally inert in this plan's bundle.` comment block.
+
+Severity rationale: this is a live close-gate contradiction that will fail Plan 02-04 close unconditionally. Catch-during-T08 is too late — better to scrub now during the plan-doc cycle.
+
+#### LOW 1 — Stale corpus-sync concurrency contract in interfaces text (plan line 276)
+
+The `<interfaces>` block still states the corpus-sync concurrency contract as if active:
+> Corpus-sync uses concurrency: { limit: 1 } (singleton; nightly cron + manual).
+
+This is a documentary line, not an executable step, but it contradicts the FOLLOWUP deferral. Add `(deferred to FOLLOWUP-CORPUS-SYNC-01)` parenthetical or drop the sentence.
+
+#### LOW 2 — Threat-model assertion-reference drift (plan line 1964)
+
+T-02-04-04 mitigation row says "integration test Case 5 pins this" — but:
+- T01's RLS integration test was trimmed in cycle-6 to 2 cases (NEW-1 + NEW-2). No Case 5 exists there.
+- The actual TOCTOU coverage is T04 `embed-memory.test.ts` Case 3.
+
+Fix: rewrite to "T04 `embed-memory.test.ts` Case 3 pins this" or equivalent. Non-blocking — the test coverage exists, the citation just points at the wrong file.
+
+### T01-T08 Sweep Summary
+
+| Task | Cycle-8 status | Drift / new concerns |
+|---|---|---|
+| T01 | INTACT | 2-case trim (NEW-1, NEW-2) held. Imports resolve. No new drift. |
+| T02 | INTACT | 10 cases, 6 AppError sites all match signature, Langfuse null-safe path covered. |
+| T03 | INTACT | Pure-fn chunker, no drift. |
+| T04 | FIXED | H1 + H2 cycle-7 fixes both landed cleanly. Concurrency + retries assertions match impl. |
+| T05 | REMOVED | Task body gone; orphan references in T08 + interfaces + threat model are cycle-8 MED + 2xLOW. |
+| T06 | INTACT (now inert) | 5 seed docs land but unread at runtime in this plan. T08 Step 5b assumes runtime trace path — see MED 1. |
+| T07 | INTACT | eval:run script added at T_add=T_use=T07. Stub runner + workflow scaffolded. |
+| T08 | NEEDS PATCH | Step 5b is an orphan close-gate (MED 1). Otherwise intact. |
+
+### Convergence Decision
+
+**Outcome: DOWNGRADE — close-but-not-converged. Cycle-9 fix needed.**
+
+- All 6 gates PASS
+- All cycle-7 H1 + H2 fixes verified PASS
+- 21 prior closures HELD
+- T05 task-body removal PASS
+- **BUT — orphan close-gate at T08 Step 5b will fail Plan 02-04 close unconditionally (1 MED)**
+- Plus 2 LOW documentary drift items (interfaces text + threat-model citation)
+
+T01 dispatch is **BLOCKED** until the cycle-7 scope-reduce sweep is completed end-to-end. The patch is small (<=30 lines): comment out / mark deferred plan lines 1852-1862; soften the corpus-sync sentence at line 276; correct the threat-model citation at line 1964.
+
+### Required cycle-9 patches (text-only, no source changes)
+
+1. **MED 1 (plan lines 1852-1862)** — Replace the active T08 Step 5b corpus-presence smoke test with a `# DEFERRED in cycle-8 — moved to FOLLOWUP-CORPUS-SYNC-01 ...` HTML comment block; OR delete the step entirely. The remaining T08 verification loop (`npm run build`, `npx vitest run`, `npx playwright test`, `npm run eval:run`) is correct and stays.
+2. **LOW 1 (plan line 276)** — Append `(corpus-sync deferred to FOLLOWUP-CORPUS-SYNC-01 per cycle-7 scope-reduce; concurrency contract carries forward to that plan)` to the corpus-sync concurrency sentence, OR drop the sentence.
+3. **LOW 2 (plan line 1964)** — Rewrite "integration test Case 5 pins this" to "T04 `embed-memory.test.ts` Case 3 pins this" (the actual TOCTOU test location).
+
+After cycle-9 patches:
+- Re-run all 6 gates (expected: all PASS, including a Gate-3-style "deferral-marker integrity" sweep).
+- Re-grep for orphan T05 / corpus-sync references in active instructional context (expected: 0 active references; all in deferral markers, commented-out blocks, or threat-model "carries forward" language).
+- All cycle-7 + cycle-8 fix verifications must HOLD.
+
+If cycle-9 sweep is clean, T01 dispatch UNBLOCKED.
+
+CYCLE_SUMMARY: current_high=0
+
+## Current HIGH Concerns
+
+None.
+
+(Cycle 8 raised 1 MED + 2 LOW; zero HIGH. The MED is a real close-gate contradiction that must be scrubbed before T01 dispatch but is text-only, not a structural defect.)
+
+---
+
+*Cross-AI review cycle 8 — 2026-05-28. Single reviewer: Codex CLI v0.130.0 (gpt-5.5). Outcome: DOWNGRADE — 1 NEW MED + 2 NEW LOW. Zero CRITICAL. Zero HIGH. All 6 standing gates PASS. All 3 cycle-7 fixes (H1, H2, T05-drop) verified PASS in their direct targets; T05-drop is incomplete in 3 indirect/documentary call sites. All 21 prior closures HELD. Convergence series remains OPEN pending a small cycle-9 text-only sweep (<=30 lines). After that sweep, T01 dispatch is recommended UNBLOCKED.*
