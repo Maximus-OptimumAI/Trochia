@@ -1,6 +1,6 @@
 ---
 phase: 2
-cycles_completed: [1, 2, 3]
+cycles_completed: [1, 2, 3, 4]
 reviewers: [codex]
 plans_reviewed:
   - .planning/phases/02-knowledge-layer/02-04-PLAN.md
@@ -12,6 +12,7 @@ codex_model:
   cycle_1: default (gpt-5-codex unavailable on this ChatGPT account; CLI fell back to default)
   cycle_2: default (gpt-5-codex still unavailable; CLI fell back to default)
   cycle_3: gpt-5.5 (Codex CLI v0.130.0 reported model 'gpt-5.5' for this run)
+  cycle_4: gpt-5.5 (Codex CLI v0.130.0; same model as cycle 3)
 cycle_1:
   reviewed_at: 2026-05-26T20:18:37Z
   findings: { critical: 4, high: 4, medium: 4, low: 2 }
@@ -28,6 +29,14 @@ cycle_3:
   findings: { critical: 0, high: 0, medium: 0, low: 1 }
   resolution_summary: "M2 cleanup CORRECTLY APPLIED at lines 1364 + 1581; both audited as CORRECTLY CLEANED. All other uuidv5/CORPUS_NAMESPACE grep hits are ACCEPTABLE-CONTEXT (canonical impl code, code comments, historical-context prose). Zero regressions. Zero new HIGH/CRITICAL. L2 (broad plan-checker #18 + #21) remains PARTIAL — 8b41d22 did not touch it; carries forward as cleanup during T05 implementation."
   verdict: APPROVED for T01 dispatch (re-confirmed; risk LOW)
+cycle_4:
+  reviewed_at: 2026-05-28T13:58:00Z
+  head_at_review: 45885c5
+  baseline: 8b41d22
+  scope: "Non-regression check for pnpm→npm migration (commit 45885c5): 27 mechanical pnpm→npm rewrites in 02-04-PLAN.md (25 instructional `pnpm <script>`→`npm run <script>` + 2 CI-infra cleanups in eval.yml) + 2 additive package.json changes (db:check script + packageManager pin to npm@11.12.1)."
+  findings: { critical: 0, high: 0, medium: 0, low: 0 }
+  resolution_summary: "Codex independently verified the diff against the live repo (HEAD-resolved git diff + rg checks + file reads). All 4 npm-migration checklist items CLEAN: (1) semantic preservation — `pnpm <script>` correctly rewritten to `npm run <script>`; chained `&&` order and exit propagation preserved; no malformed `npm typecheck`/`npm lint`/`npm eval:run` forms; (2) CI workflow consistency — `actions/setup-node@v4` + `cache: npm` + `npm ci` + `npm run eval:run` coherent with package-lock.json; no orphaned pnpm references; YAML structure intact; (3) `db:check` script correctness — `drizzle-kit check` (validates migration history) is the right subcommand; drizzle-kit@0.31.10 confirmed in devDependencies; (4) `packageManager` pin — `npm@11.12.1` is a published version (npm CLI v11 changelog confirmed); defensively correct for Corepack-aware tooling. All 13 cumulative cycle-1+2+3 closures held: Inngest registration path (functions/index.ts not client.ts), embedFn removal, src/lib/env.ts path, DELETE-then-INSERT idempotency, TOCTOU lock scope, package.json in files_modified, corpus disk path resolution, uuidv5→corpusSourceUuid cleanup all still present. Codex also noted bookkeeping edits to STATE.md and 02-REVIEWS.md at HEAD beyond the pasted diff — confirmed no npm drift in those files. M2 status: STILL FULLY RESOLVED. L2 status: still PARTIAL, carries to T05 (unchanged from cycle 3). Zero new HIGH, zero new CRITICAL, zero new MEDIUM, zero new LOW."
+  verdict: APPROVED for T01 dispatch (re-confirmed; risk LOW; convergence series CLOSED)
 ---
 
 # Cross-AI Plan Review — Phase 2 (Knowledge Layer), Cycle 1
@@ -394,3 +403,106 @@ Next step: orchestrator runs `/plan-checker` then dispatches T01 of Plan 02-04.
 ---
 
 *Cross-AI review cycle 3 — 2026-05-27. Single reviewer: Codex CLI v0.130.0 (gpt-5.5). Outcome: APPROVED for T01 dispatch. M2 RESOLVED; L2 carries forward as T05 cleanup (LOW, non-blocking). Convergence achieved.*
+
+---
+
+# Cross-AI Plan Review — Phase 2 (Knowledge Layer), Cycle 4
+
+**Scope of this cycle:** Non-regression check for the pnpm→npm package-manager migration (commit `45885c5`). The diff contains 27 mechanical pnpm→npm rewrites in Plan 02-04 (25 instructional `pnpm <script>` → `npm run <script>` lines + 2 CI-infra cleanups inside `.github/workflows/eval.yml` for T07: removed `pnpm/action-setup@v3`, changed `cache: pnpm` → `cache: npm`, `pnpm install --frozen-lockfile` → `npm ci`) plus two additive `package.json` changes (added `"db:check": "drizzle-kit check"` script — the script that T01 + T08 verify steps depend on, previously missing; added top-level `"packageManager": "npm@11.12.1"` field as a defensive Corepack pin).
+
+**Reviewer:** Codex CLI v0.130.0 (model reported: `gpt-5.5`; same model as cycle 3).
+
+**Baseline:** `8b41d22` (cycle-3 APPROVED commit)
+**HEAD at review:** `45885c5` (`fix(02-04): align plan-doc + repo with npm package manager`)
+
+**Repo evidence for the migration:**
+- `package-lock.json` exists at repo root; no `pnpm-lock.yaml`
+- `npm run db:check` verified clean at HEAD `45885c5` (output: `Everything's fine 🐶🔥`)
+- `drizzle-kit@0.31.10` confirmed in devDependencies
+- `package.json` already had a `scripts` block keyed for npm; pnpm was never wired up
+
+---
+
+## Codex Review — Cycle 4
+
+**Summary**
+
+Cycle 4 is clean. The npm migration preserves command semantics, the T07 workflow snippet is internally consistent, and the additive `package.json` changes are appropriate. Codex independently verified the diff against the live repo (HEAD-resolved `git diff --stat`, ripgrep checks across plan-doc and STATE.md/REVIEWS.md, file reads of package.json and package-lock.json, and the spliced eval.yml YAML block) rather than trusting the pasted patch. Codex also noted that HEAD changes `.planning/STATE.md` and `02-REVIEWS.md` beyond the pasted plan-doc + package.json diff — those are bookkeeping/review-log edits and introduce no npm drift.
+
+**M2 / L2 / Cumulative-Closure Status**
+
+M2 remains FULLY RESOLVED: executor-facing `uuidv5(...)` instructions still point to `corpusSourceUuid(slug)`. L2 remains the same LOW carry-forward to T05 (unchanged from cycle 3).
+
+Cumulative closures from cycles 1+2+3 all held:
+
+| Cycle-1/2/3 closure | Cycle-4 status | Spot-check |
+|---|---|---|
+| Inngest registration target = `src/inngest/functions/index.ts` (NOT `client.ts`) | HELD | Plan-doc lines 1189, 1326, 1345, 1526, 1577, 2119 still reference the registration barrel correctly |
+| `embedFn` removal still required by T04 | HELD | Plan-doc steps 2a + 2b in T04 still call out the deletion from `stubs.ts` + `index.ts` |
+| Env path = `src/lib/env.ts` (NOT `src/env.ts`) | HELD | Plan-doc lines 486, 689, 765, 2030 all point to `src/lib/env.ts` |
+| DELETE-then-INSERT idempotency contract for T04 | HELD | Plan-doc lines 305, 1144, 1332, 2113 still document the pattern |
+| `package.json` in `files_modified` | HELD | Line 66 of frontmatter |
+| Corpus disk path resolution via Vercel-tracing / module-relative | HELD | Line 2268 plan-checker check #21 + T05 `outputFileTracingIncludes` instruction at line 1531 |
+| uuidv5 → `corpusSourceUuid(slug)` cleanup | HELD | Lines 1364 + 1581 still rewritten |
+
+**npm-migration verification (per cycle-4 checklist)**
+
+| # | Check | Verdict | Evidence |
+|---|---|---|---|
+| 1 | Semantic preservation of plan-doc rewrites | CLEAN | `pnpm <script>` correctly rewritten to `npm run <script>`; chained `&&` order and exit propagation preserved; ripgrep across plan-doc found no malformed `npm typecheck` / `npm lint` / `npm eval:run` forms (i.e., no dropped `run` keyword) |
+| 2 | CI workflow internal consistency | CLEAN | `actions/setup-node@v4` + `cache: npm` + `npm ci` + `npm run eval:run` are coherent with `package-lock.json`. No orphaned `pnpm` references in YAML block. YAML indentation intact after the `pnpm/action-setup@v3` step removal |
+| 3 | `db:check` script correctness | CLEAN | `"db:check": "drizzle-kit check"` correctly aliases the Drizzle migration-history validator; `drizzle-kit@0.31.10` present in devDependencies; T01 + T08 verify steps that reference `npm run db:check` will now resolve |
+| 4 | `packageManager` pin | CLEAN | `npm@11.12.1` is a published npm version (npm CLI v11 changelog: https://docs.npmjs.com/cli/v11/using-npm/changelog/). Defensively correct for Corepack-aware tooling. Caveat: it is a toolchain signal rather than universal hard enforcement by itself |
+| 5 | Non-regression of prior cycle closures | CLEAN | All 13 cumulative cycle-1+2+3 closures verified intact via ripgrep + line-anchor spot-checks (see table above) |
+
+**New concerns introduced by `45885c5`**
+
+None.
+
+**Final verdict**
+
+APPROVED for T01 dispatch (re-confirmed) — the npm migration is mechanically sound, closes the previously-undetected `db:check` script gap (which all three prior cycles missed), and does not regress prior-cycle closures.
+
+---
+
+## Consensus Summary — Cycle 4
+
+Single reviewer cycle (Codex CLI v0.130.0, gpt-5.5). Zero CRITICAL, zero HIGH, zero MEDIUM, zero new LOW. M2 + L2 status unchanged from cycle 3 (M2 fully resolved; L2 carries to T05).
+
+### Resolution breakdown (cumulative across all 4 cycles)
+
+| Severity | Cycle 1 raised | After cycle 2 | After cycle 3 | After cycle 4 |
+|---|---|---|---|---|
+| CRITICAL | 4 | 0 open | 0 open | 0 open |
+| HIGH | 4 | 0 open | 0 open | 0 open |
+| MEDIUM | 4 | 1 PARTIAL (M2) | 0 open | 0 open |
+| LOW | 2 | 1 PARTIAL (L2) | 1 PARTIAL (L2 → T05) | 1 PARTIAL (L2 → T05) |
+
+### Newly raised in cycle 4
+
+None.
+
+### Divergent views
+
+N/A (single-reviewer cycle).
+
+### Notable observations
+
+- Codex used live repo verification rather than trusting the pasted patch — it ran `git diff --stat 8b41d22..HEAD`, `rg` across plan-doc + STATE.md + REVIEWS.md for `pnpm` / npm-form drift, file reads of package.json + package-lock.json (confirming lockfileVersion 3, drizzle-kit 0.31.10, packageManager pin), and a spliced read of the eval.yml YAML block to confirm setup-node@v4 + cache:npm + npm ci structure.
+- Codex independently confirmed `db:check` was missing prior to this commit and that adding it closes a real gap that cycles 1–3 missed.
+- The `npm@11.12.1` pin was independently validated against the npm CLI v11 changelog as a published version.
+- Codex flagged (correctly) that HEAD also touches `.planning/STATE.md` and `.planning/phases/02-knowledge-layer/02-REVIEWS.md` beyond the pasted diff. Both files contain zero `pnpm` substring hits after the migration; the changes are bookkeeping only (date roll + cycle-3 record append).
+
+---
+
+## Convergence Verdict — Cycle 4
+
+**APPROVED for T01 dispatch (re-confirmed; convergence series CLOSED).** The npm-migration is mechanically sound and non-regressing. All cycle-1 CRITICAL + HIGH findings remain RESOLVED. M2 MEDIUM remains FULLY RESOLVED (cycle 3). The previously-undetected `db:check` script gap is now closed. The `packageManager` pin guards against future pnpm/npm drift. Only L2 LOW remains PARTIAL — it is a documentation/scoping cleanup for plan-checker checks #18 and #21, deliberately deferred to T05 implementation and not a T01 blocker.
+
+This is the fourth consecutive APPROVED cycle. The convergence series is closed.
+
+Next step: orchestrator runs `/plan-checker` then dispatches T01 of Plan 02-04.
+
+---
+
+*Cross-AI review cycle 4 — 2026-05-28. Single reviewer: Codex CLI v0.130.0 (gpt-5.5). Outcome: APPROVED for T01 dispatch. Non-regression check for pnpm→npm migration: CLEAN. db:check script gap closed. packageManager pinned to npm@11.12.1. Zero new findings at any severity. Convergence series CLOSED.*
