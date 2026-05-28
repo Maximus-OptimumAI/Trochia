@@ -256,3 +256,44 @@ Next: 6c (Install Cursor CLI to Windows PATH)
   without issue. OAuth callback cross-preview issue surfaced separately
   (logged P4.5-POLISH-14, preview-only, prod unaffected).
   Migration timestamp: 2026-05-25. (Phase 2 Plan 02-03 close.)
+
+- **2026-05-27 — Schema-freeze guard hardening (deferred from C5-L1).**
+  `git diff --quiet <baseline> -- src/db/schema/` does NOT catch new
+  untracked files under `src/db/schema/`. It only catches modifications
+  to tracked files. Accepted as a known LOW for Plan 02-04 because the
+  plan-text bans new files under `src/db/schema/` in three places
+  (must_haves, files_modified frontmatter, T08 acceptance criterion) AND
+  the T08 human checkpoint backstops, AND the named risk-#10 threat
+  (a `last_embedded_at` column on business_memory) mutates an existing
+  tracked file so the current guard catches it. Future schema-freeze
+  guards (Plans 02-05 onward) must use the airtight form:
+
+  ```bash
+  git diff --quiet <baseline> -- src/db/schema/ && \
+    test -z "$(git ls-files --others --exclude-standard src/db/schema/)"
+  ```
+
+  Bake this into the plan-author skill's schema-lock template so every
+  future phase ships with the airtight guard from cycle 1. (Phase 2
+  Plan 02-04 cycle-5 review; founder decision 2026-05-27.)
+
+- **2026-05-27 — Deterministic npm-script existence gate (cycle-5
+  permanent rule).** The pnpm + db:check + db:diff escapes survived 4
+  cross-AI review cycles because reviewers treated the plan-doc as ground
+  truth instead of cross-checking package.json. Cycle 5 added a permanent
+  deterministic gate that resolves every `npm run X` reference by numeric
+  task index:
+    1. Run `grep -oE 'npm run [...]' plan-doc | sort -u | comm -23 - <(jq -r '.scripts|keys[]' package.json | sort -u)`.
+    2. For each script S printed: grep `"S":` in the plan to find the
+       add-step task `T_add`; find the earliest task containing
+       `npm run S` as `T_use` (instructional context only — not frontmatter
+       metadata, not post-task prose).
+    3. No add-step found anywhere → HARD FAIL (true phantom).
+    4. `T_add ≤ T_use` → PASS (self-provisioned in time).
+    5. `T_add > T_use` → HARD FAIL (provisioned too late).
+  This replaces the prior loose "same-plan-add-step exception" prose.
+  It is grep-able, scriptable, and CI-enforceable. Bake into every future
+  Phase 2+ `<plan-checker>` block from cycle 1. Cycle reviews must paste
+  the comm output verbatim AND the per-script T_add/T_use resolution for
+  every comm hit. (Phase 2 Plan 02-04 cycle-5 review; recorded in
+  02-REVIEWS.md §"Permanent plan-checker rule (added cycle 5)".)

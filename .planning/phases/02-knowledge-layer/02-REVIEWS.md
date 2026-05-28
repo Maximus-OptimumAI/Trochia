@@ -50,7 +50,7 @@ cycle_5:
     method: "grep -oE 'npm run [a-zA-Z][a-zA-Z0-9:_-]*' .planning/phases/02-knowledge-layer/02-04-PLAN.md | sed 's/npm run //' | sort -u > /tmp/referenced.txt; node -e \"const p=require('./package.json');Object.keys(p.scripts||{}).sort().forEach(k=>console.log(k));\" > /tmp/defined.txt; comm -23 /tmp/referenced.txt /tmp/defined.txt"
     comm_output_verbatim: "eval:run"
     interpretation: "Acceptable forward-reference. The plan-doc references `eval:run` AND T07 step 7 (line 1836) explicitly adds `\"eval:run\": \"tsx src/ai/eval/runner.ts\"` to package.json scripts. files_modified §66 documents the package.json add. The script's first executable dependency (CI workflow, T07 step 10 local verify, T08 verify loop) all run AFTER T07 step 7. This is materially different from the `pnpm` / `db:check` / `db:diff` defects (cycles 4+5 fixes), which referenced nonexistent things WITHOUT any plan add-step. The executable assertion correctly surfaces the forward-reference; the human-judgment layer applies the add-step exception."
-    classified_as: "LOW concern (not HIGH) for THIS cycle due to documented add-step. Future plans must surface comm-output items as HIGH unless a same-plan add-step is verified."
+    classified_as: "LOW concern (not HIGH) per the DETERMINISTIC permanent plan-checker rule (see body §Permanent plan-checker rule (added cycle 5)): for `eval:run`, an add-step `\"eval:run\": \"tsx src/ai/eval/runner.ts\"` exists in T07 step 7 (line 1836), and the earliest invocation `npm run eval:run` lives in T07 step 10 (line 1893) — so T_add (7) <= T_use (7) → PASS, self-provisioned in time. No reviewer judgment required; the rule resolves the case deterministically by task index."
   verdict: APPROVED for T01 dispatch (re-confirmed; risk LOW; convergence series re-CLOSED after one-commit hotfix)
 ---
 
@@ -661,7 +661,7 @@ LOW for T01 dispatch. The patch fixes the substantive phantom-script defect and 
 | # | Severity | Concern | Location | Cycle status |
 |---|---|---|---|---|
 | C5-L1 | LOW | Untracked-new-file gap: git freeze doesn't catch new untracked `src/db/schema/*.ts` files | All 9 git-freeze sites | NEW — open; minor tightening recommended |
-| C5-L2 | LOW | Plan-checker forward-reference handling needs same-plan-add-step exception | Permanent plan-checker rule | NEW — open; rule documented in this cycle |
+| C5-L2 | LOW | Plan-checker forward-reference handling — resolved by deterministic add-step task-index rule (see §Permanent plan-checker rule (added cycle 5)) | Permanent plan-checker rule | RESOLVED — deterministic rule recorded; no reviewer judgment required |
 | C5-L3 | LOW | Line 298 wording could be clearer about "all schema files" vs "Phase-2 schema files" | Line 298 | NEW — open; cosmetic |
 
 ### Newly raised in cycle 5
@@ -711,8 +711,53 @@ This is the fifth consecutive APPROVED cycle (cycle 4 was the closing-out cycle 
 
 Next step: orchestrator runs `/plan-checker` (now with the new permanent comm-based npm-script existence rule) then dispatches T01 of Plan 02-04.
 
-**Permanent plan-checker rule recorded** (carries to all future Phase 2+ phases): the comm-based npm-script existence check MUST be executed against post-commit HEAD on every review cycle; non-empty output triggers HIGH-severity treatment unless the plan itself documents a `package.json` add-step before the script's first execution dependency.
+---
+
+## Permanent plan-checker rule (added cycle 5)
+
+This rule supersedes any prior "same-plan-add-step exception" prose. It MUST be executed on every cross-AI review cycle for Phase 2 and all future phases. It is deterministic — no reviewer judgment is required to classify a comm hit.
+
+### Step 1 — Execute the comm-based existence check
+
+```bash
+# From repo root at post-commit HEAD
+grep -oE 'npm run [a-zA-Z][a-zA-Z0-9:_-]*' <plan-doc> \
+  | sed 's/npm run //' | sort -u > /tmp/referenced.txt
+jq -r '.scripts | keys[]' package.json | sort -u > /tmp/defined.txt
+comm -23 /tmp/referenced.txt /tmp/defined.txt
+```
+
+`npm ci` and `npm install` are built-in npm subcommands, not package.json scripts — exclude them. Bare `npm test` in the plan-doc must additionally assert "test" is in `/tmp/defined.txt`.
+
+### Step 2 — For each script S printed by `comm -23`, classify deterministically
+
+**(a) Search the plan for the add-step.** Run:
+```bash
+grep -n '"S":' <plan-doc>
+```
+This finds any task action that writes `"S": "..."` into the package.json `scripts` block.
+
+**(b) If NO add-step is found anywhere in the plan → HARD FAIL.** This is a true phantom script (`db:check` and `db:diff` class). Convergence blocked until either the plan adds an add-step task action OR package.json is amended pre-cycle.
+
+**(c) If an add-step exists in task `T_add`:** find the earliest task `T_use` that contains `npm run S` in instructional context (task `<action>`, `<verify><automated>`, `<acceptance_criteria>`, or task-bound bash blocks — NOT frontmatter `<files>` / `<derived_from>` metadata, NOT post-task `<success_metrics>` / `<handoff_to_*>` prose).
+- **If `T_add` (numeric task index) ≤ `T_use` (numeric task index) → PASS.** The script is self-provisioned in time. Classify as LOW or INFO; no convergence block.
+- **If `T_add` > `T_use` → HARD FAIL.** The script is provisioned too late — it is invoked before it is created. Convergence blocked until task ordering is fixed (move the add-step earlier, or move the invocation later).
+
+### Worked example (cycle 5 — `eval:run`)
+
+- comm output: `eval:run`
+- grep `"eval:run":` in plan-doc → line 1836 (T07 step 7): `"eval:run": "tsx src/ai/eval/runner.ts"` ⇒ `T_add = 7`
+- grep `npm run eval:run` in plan-doc task bodies → earliest task-bound hit at line 1873 (T07 CI yaml) ⇒ `T_use = 7`
+- `T_add (7) ≤ T_use (7)` → **PASS, self-provisioned in time.** Classified LOW.
+
+### Why this replaces the loose "same-plan-add-step exception" prose
+
+The earlier prose required reviewer judgment to decide whether a forward-reference was "documented." This is exactly the kind of subjective gate that let `db:check` and `db:diff` survive 4 cycles. The deterministic version above is grep-able, scriptable, and CI-enforceable — a reviewer either runs the two greps and compares numeric task indices, or fails the gate. No human inference required.
+
+### Carry-forward
+
+This rule is recorded as a permanent plan-checker requirement for all future Phase 2+ phases. The plan-author skill template should bake the executable two-grep check into every `<plan-checker>` block emitted from this point forward. Cycle reviews must paste the comm output verbatim AND the per-script T_add/T_use task-index resolution for every comm hit.
 
 ---
 
-*Cross-AI review cycle 5 — 2026-05-28. Single reviewer: Codex CLI v0.130.0 (gpt-5.5). Outcome: APPROVED for T01 dispatch. Non-regression check for db:diff removal: CLEAN. 9 db:diff → git-freeze replacements verified semantically correct and form-consistent. FOLLOWUP-DBDIFF-01 deferral documented. Mandatory executable plan-checker assertion executed — eval:run surfaced as acceptable forward-reference. Three new LOW findings (untracked-file gap, plan-checker handling rule, line 298 wording). Zero new CRITICAL/HIGH/MEDIUM. Permanent comm-based plan-checker rule recorded. Convergence series re-CLOSED after one-commit hotfix.*
+*Cross-AI review cycle 5 — 2026-05-28. Single reviewer: Codex CLI v0.130.0 (gpt-5.5). Outcome: APPROVED for T01 dispatch. Non-regression check for db:diff removal: CLEAN. 9 db:diff → git-freeze replacements verified semantically correct and form-consistent. FOLLOWUP-DBDIFF-01 deferral documented. Mandatory executable plan-checker assertion executed — `eval:run` surfaced and deterministically resolved as PASS (T_add=7, T_use=7) per the new permanent rule. Three new LOW findings (C5-L1 untracked-file gap ACCEPTED with lessons.md upgrade; C5-L2 plan-checker handling RESOLVED by deterministic rule; C5-L3 line-298 wording SKIPPED as cosmetic). Zero new CRITICAL/HIGH/MEDIUM. Convergence series re-CLOSED after one-commit hotfix.*
