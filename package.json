@@ -2,6 +2,7 @@
   "name": "trochia",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "npm@11.12.1",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -14,6 +15,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "check:banned": "node scripts/check-banned-strings.mjs",
+    "db:check": "drizzle-kit check",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
     "gen:dpa-pdf": "tsx scripts/generate-dpa-pdf.ts"
