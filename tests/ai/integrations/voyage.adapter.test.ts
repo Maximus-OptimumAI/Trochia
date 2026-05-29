@@ -229,6 +229,11 @@ describe('voyage.adapter — Plan 02-04 / KNW-04b', () => {
   });
 
   it('Case 6 — timeout (delay > 30s) → AbortController fires → VOYAGE_NETWORK_FAILED', async () => {
+    // NOTE: This pins the AbortError → VOYAGE_NETWORK_FAILED routing contract via a direct
+    // fetch-stub throwing AbortError. It does NOT exercise the adapter's own AbortController +
+    // setTimeout(30s) wiring (swapped from the planned fake-timers approach to avoid a Vitest
+    // unhandled-rejection race). Timer-plumbing coverage deferred — see FOLLOWUP-VOYAGE-TIMEOUT-TEST.
+    //
     // Direct path: stub global.fetch to throw an AbortError immediately. This
     // exercises the SAME catch block in voyage.adapter.ts that the real 30s
     // AbortController timeout would hit, without needing fake timers. The
