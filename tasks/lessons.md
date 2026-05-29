@@ -298,6 +298,26 @@ Next: 6c (Install Cursor CLI to Windows PATH)
   every comm hit. (Phase 2 Plan 02-04 cycle-5 review; recorded in
   02-REVIEWS.md §"Permanent plan-checker rule (added cycle 5)".)
 
+- **2026-05-29 — vitest 4.1.6 has no `--repeat` flag; determinism
+  re-runs use a serial in-test loop (or `vitest.config` `repeats`).**
+  Plan 02-04 T03 dispatch surfaced this: cycle-7-converged plan said
+  `npx vitest run … --repeat=3` for the chunker determinism case;
+  vitest 4.1.6 (the pinned version) throws
+  `CACError: Unknown option \`--repeat\``. Executor swapped to 3 serial
+  runs — equivalent, since Case 1 itself runs `chunkText(input)` 100×
+  in-test. **Gate-1 sibling rule (carries to all future plans):**
+  Gate 1 verifies `npm run X` scripts resolve in `package.json`. ADD a
+  parallel verification that every CLI FLAG used in a plan command
+  (`--repeat`, `--coverage.thresholds.lines=N`, `--reporter=json`, etc.)
+  actually exists in the installed tool version — `vitest run --help`
+  output should be greppable for the flag. Caught the same defect class
+  as the npm-script existence gate, just one level deeper (the script
+  exists, the flag it's invoked with doesn't). Bake into the
+  plan-author skill: when authoring a CLI invocation in a plan code
+  sketch, verify the flag exists in the installed tool's `--help` at
+  authoring time, not at execution time. (Phase 2 Plan 02-04 T03
+  dispatch, 2026-05-29.)
+
 - **2026-05-27 — Sibling plan-checker rules (extends cycle-5 npm-script
   gate).** Plan 02-04 T01 pre-dispatch surfaced a new defect class on top
   of the cycle-5 npm-script gate: the plan-doc imported helpers that do
