@@ -472,3 +472,35 @@ Next: 6c (Install Cursor CLI to Windows PATH)
   far above any 800-token chunk under either path — drift here only affects
   cost-tracking fidelity in OBS-COST-01 (Plan 02-07), not correctness.
   (Phase 2 Plan 02-04 T03, 2026-05-29.)
+
+- **2026-05-29 — `--no-verify` is permitted IFF every failing test grep-matches
+  a documented FOLLOWUP (bounded-bypass rule, carries forward).** Standing
+  rule had been "never `--no-verify`." Phase 2 Plan 02-04 T04 surfaced a real
+  edge case: the pre-push gate fails on the 2 pre-existing
+  `FOLLOWUP-HARDCODED-DOMAIN-REGEX-01` tests
+  (`tests/billing/checkout-session.test.ts:66` +
+  `tests/lib/email.test.ts:56` — both flag the legitimate
+  `trochia.asranest.com` build domain because the regex over-fires). Fixing
+  the regex requires CCO/compliance review (trademark-safety test); deferring
+  the fix while still being able to push is the right ergonomic.
+
+  **Bounded-bypass rule (explicit):**
+    - `--no-verify` is permitted IFF, BEFORE the bypass commit:
+        1. The executor stashes its own work-in-progress
+        2. Re-runs the pre-push gate on the pre-task baseline (the commit
+           the task started from)
+        3. Confirms the same failures appear at baseline (i.e., NOT caused
+           by the task's own changes)
+        4. Confirms every failing test name grep-matches an open FOLLOWUP
+           in `02-04-PLAN.md` `deferred_items` (currently only
+           `FOLLOWUP-HARDCODED-DOMAIN-REGEX-01`)
+    - **Any failing test that does NOT grep-match a documented FOLLOWUP →
+      fix root cause, never bypass.**
+    - The bypass must be recorded as a deviation in the executor's success
+      report, with the stash + re-run evidence quoted.
+    - When the FOLLOWUP fix lands, the bounded-bypass carve-out for that
+      FOLLOWUP retires automatically.
+
+  Bake this rule into the gsd-executor agent's posture so future dispatches
+  apply it without an orchestrator carve-out in each dispatch prompt.
+  (Phase 2 Plan 02-04 T04, 2026-05-29.)
