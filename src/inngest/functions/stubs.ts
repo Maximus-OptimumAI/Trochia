@@ -6,11 +6,14 @@
  * bodies. Each later phase replaces the body with the real implementation:
  *
  *   - deck-parse      (event `deck/uploaded`)            — Phase 2/3 (LlamaParse → slide JSON)
- *   - embed           (event `embedding/requested`)      — Phase 2 (Voyage embeddings → pgvector)
  *   - transcribe      (event `transcript/uploaded`)      — Phase 4 (transcript parse + align)
  *   - brief-enrich    (event `brief/enrich.requested`)   — Phase 4 (pre-call brief enrichment)
  *   - esign-webhook   (event `esign/event.received`)     — Phase 9 (Dropbox Sign envelope events)
  *   - reminders       (cron `0 9 * * *`)                 — Phase 3 (application / follow-up reminders)
+ *
+ * The former `embed` stub (event `embedding/requested`) was REMOVED in Plan 02-04 /
+ * T04 — replaced by the real `embedMemory` function at `./embed-memory.ts` which
+ * triggers on `memory.confirmed` (per-tenant concurrency 3, retries 2).
  */
 import { logger } from '@/lib/logger';
 
@@ -20,13 +23,6 @@ export const deckParseFn = inngest.createFunction(
   { id: 'deck-parse', retries: 4, concurrency: { limit: 5 }, triggers: [{ event: 'deck/uploaded' }] },
   async () => {
     logger.info('stub: deck-parse — implemented in Phase 2/3');
-  },
-);
-
-export const embedFn = inngest.createFunction(
-  { id: 'embed', retries: 4, concurrency: { limit: 10 }, triggers: [{ event: 'embedding/requested' }] },
-  async () => {
-    logger.info('stub: embed — implemented in Phase 2');
   },
 );
 

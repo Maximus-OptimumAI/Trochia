@@ -26,12 +26,31 @@ const EXPECTED_IDS = [
   'reconcile-stripe',
   'purge-soft-deleted',
   'deck-parse',
-  'embed',
+  // 'embed' (stub) removed in Plan 02-04 / T04 — replaced by 'embed-memory'.
+  'embed-memory',
   'transcribe',
   'brief-enrich',
   'esign-webhook',
   'reminders',
 ];
+
+/**
+ * Per-function retry expectations. The Phase-1 stubs are all 4 retries; the
+ * embed-memory function (Plan 02-04 / T04) is tuned to 2 because every retry
+ * is a Voyage call cost (per src/inngest/functions/embed-memory.ts module
+ * docstring).
+ */
+const RETRY_BY_ID: Record<string, number> = {
+  'ai-health-check': 4,
+  'reconcile-stripe': 4,
+  'purge-soft-deleted': 4,
+  'deck-parse': 4,
+  'embed-memory': 2,
+  transcribe: 4,
+  'brief-enrich': 4,
+  'esign-webhook': 4,
+  reminders: 4,
+};
 
 describe('Inngest serve() registration', () => {
   it('registers all expected functions by id', () => {
@@ -42,9 +61,12 @@ describe('Inngest serve() registration', () => {
     expect(allFunctions).toHaveLength(EXPECTED_IDS.length);
   });
 
-  it('every function has 4 retries configured', () => {
+  it('every function has the expected retry count for its workload class', () => {
     for (const fn of allFunctions) {
-      expect(fnRetries(fn)).toBe(4);
+      const id = fnId(fn);
+      const expected = RETRY_BY_ID[id];
+      expect(expected, `retry expectation missing for function id ${id}`).toBeDefined();
+      expect(fnRetries(fn)).toBe(expected);
     }
   });
 

@@ -168,6 +168,15 @@ import {
   type ProvenanceField,
 } from '@/ai/schemas/business-memory.zod';
 import { businessMemory, interaction, type BusinessMemoryRow } from '@/db/schema/memory';
+// Plan 02-04 / T04 (KNW-04b) — module-level `inngest` client. The canonical
+// pattern is direct `inngest.send(...)` from request-path code (see
+// src/app/api/webhooks/stripe/route.ts:37+111 and src/modules/data-rights/
+// delete-account.ts:32+70); TRPCContext does NOT carry an inngest field, so
+// `ctx.inngest.send(...)` would not typecheck. The send is wrapped in
+// try/catch + logger.warn so an Inngest outage cannot fail the confirmDraft
+// mutation — matches the Stripe webhook resilience pattern. A missed embed
+// is re-driven on the next confirmDraft (idempotent under DELETE-then-INSERT).
+import { inngest } from '@/inngest/client';
 import { AppError, isAppError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import { protectedProcedure, router } from '@/server/trpc';
@@ -794,6 +803,35 @@ export const memoryRouter = router({
 
         return refreshed[0];
       });
+
+      // Plan 02-04 / T04 (KNW-04b) — emit `memory.confirmed` to trigger the
+      // embed-memory Inngest function. Payload carries ONLY the three identifiers
+      // (accountId, businessMemoryId, lastUpdatedAt) — ZERO draft content, ZERO
+      // chunk_text, ZERO PII. Wrapped in try/catch + logger.warn so an Inngest
+      // outage does NOT fail the confirmDraft mutation (matches the Stripe
+      // webhook resilience pattern at src/app/api/webhooks/stripe/route.ts:110-117).
+      // A missed embed is re-driven by the next confirmDraft — the T04
+      // DELETE-then-INSERT semantics make re-firing the same event idempotent.
+      if (persisted) {
+        try {
+          await inngest.send({
+            name: 'memory.confirmed',
+            data: {
+              accountId: ctx.tenantId,
+              businessMemoryId: persisted.id,
+              lastUpdatedAt: persisted.lastUpdatedAt.toISOString(),
+            },
+          });
+        } catch (err) {
+          logger.warn('memory.confirmDraft: memory.confirmed inngest.send failed', {
+            err,
+            accountId: ctx.tenantId,
+            businessMemoryId: persisted.id,
+          });
+          // Do NOT rethrow — confirmDraft already succeeded; the next confirm
+          // re-drives the embed pipeline (idempotent under DELETE-then-INSERT in T04).
+        }
+      }
 
       logger.info('memory.confirmDraft: ok', {
         accountId: ctx.tenantId,

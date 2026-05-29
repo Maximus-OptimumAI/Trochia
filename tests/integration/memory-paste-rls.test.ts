@@ -65,10 +65,23 @@ import {
 // Vitest hoists `vi.mock()` to the top of the file, before any imports. We
 // route the mock through `vi.hoisted()` so each test can swap the return
 // value via `extractMock.mockResolvedValueOnce(...)` without re-mocking.
-const { extractMock } = vi.hoisted(() => ({ extractMock: vi.fn() }));
+const { extractMock, inngestSendMock } = vi.hoisted(() => ({
+  extractMock: vi.fn(),
+  inngestSendMock: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock('@/ai/agents/extract-from-paste.agent', () => ({
   extractFromPaste: extractMock,
+}));
+
+// Plan 02-04 / T04 — confirmDraft emits `memory.confirmed` via the module-level
+// `inngest` client. Mock the client at module scope so the integration test does
+// not require a running Inngest Dev Server. We assert on `inngestSendMock.mock.calls`
+// in the dedicated case below.
+vi.mock('@/inngest/client', () => ({
+  inngest: {
+    send: inngestSendMock,
+  },
 }));
 
 // ── Build the caller factory once + derive the caller type from it ──────────
@@ -206,6 +219,8 @@ d('Phase-2 paste flow — RLS integration (memoryRouter)', () => {
   beforeEach(async () => {
     extractMock.mockReset();
     extractMock.mockResolvedValue(buildDraft());
+    inngestSendMock.mockReset();
+    inngestSendMock.mockResolvedValue(undefined);
     await cleanup();
     A = await createTenant('us');
     B = await createTenant('us');
@@ -573,6 +588,78 @@ d('Phase-2 paste flow — RLS integration (memoryRouter)', () => {
       // The rejected call surfaced CONFLICT, not a generic 500.
       const rejectedError = (rejected[0] as PromiseRejectedResult).reason as { code?: string; message?: string };
       expect(rejectedError.code).toBe('CONFLICT');
+    },
+  );
+
+  // ───────────────────────────────────────────────────────────────────────
+  // Plan 02-04 / T04 — confirmDraft emits exactly ONE `memory.confirmed`
+  //                    event with payload { accountId, businessMemoryId,
+  //                    lastUpdatedAt } and NOTHING else.
+  // ───────────────────────────────────────────────────────────────────────
+
+  it(
+    "confirmDraft on success emits exactly one `memory.confirmed` event with the canonical payload shape",
+    { timeout: TEST_TIMEOUT_MS },
+    async () => {
+      const aCaller = callerFor(A);
+
+      const extracted = await aCaller.memory.extractFromPaste({ paste: VALID_PASTE });
+      const confirmed = await aCaller.memory.confirmDraft({
+        confirmed: { ...extracted.draft, confirmedAt: new Date().toISOString() },
+      });
+
+      // Exactly one event emitted on the success path.
+      expect(inngestSendMock).toHaveBeenCalledTimes(1);
+      const payload = inngestSendMock.mock.calls[0][0] as {
+        name: string;
+        data: Record<string, unknown>;
+      };
+      expect(payload.name).toBe('memory.confirmed');
+
+      // Payload SHAPE: exactly { accountId, businessMemoryId, lastUpdatedAt } — no
+      // extra fields (ZERO draft content, ZERO chunk_text, ZERO PII). Exact-key
+      // assertion is the privacy boundary.
+      expect(Object.keys(payload.data).sort()).toEqual([
+        'accountId',
+        'businessMemoryId',
+        'lastUpdatedAt',
+      ]);
+      expect(payload.data.accountId).toBe(A.accountId);
+      expect(payload.data.businessMemoryId).toBe(confirmed!.id);
+      expect(payload.data.lastUpdatedAt).toBe(confirmed!.lastUpdatedAt.toISOString());
+    },
+  );
+
+  it(
+    "confirmDraft does NOT emit `memory.confirmed` when extractFromPaste runs alone (no confirm)",
+    { timeout: TEST_TIMEOUT_MS },
+    async () => {
+      const aCaller = callerFor(A);
+
+      // Extract only — no confirm follow-up.
+      await aCaller.memory.extractFromPaste({ paste: VALID_PASTE });
+
+      expect(inngestSendMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it(
+    "confirmDraft still succeeds when inngest.send throws (resilience pattern; matches stripe webhook)",
+    { timeout: TEST_TIMEOUT_MS },
+    async () => {
+      const aCaller = callerFor(A);
+
+      // Stage the failure for THIS call only.
+      inngestSendMock.mockRejectedValueOnce(new Error('inngest cloud unreachable'));
+
+      const extracted = await aCaller.memory.extractFromPaste({ paste: VALID_PASTE });
+      const confirmed = await aCaller.memory.confirmDraft({
+        confirmed: { ...extracted.draft, confirmedAt: new Date().toISOString() },
+      });
+
+      // Persisted successfully — confirmedAt set despite the Inngest failure.
+      expect(confirmed?.confirmedAt).not.toBeNull();
+      expect(inngestSendMock).toHaveBeenCalledTimes(1);
     },
   );
 });
