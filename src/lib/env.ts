@@ -102,6 +102,14 @@ const serverSchema = clientSchema.extend({
   OPENAI_API_KEY: z.string().optional(), // Plan 04 owns this — only required-in-prod when AI_FALLBACK_ENABLED (kept optional; default-off fallback)
   AI_FALLBACK_ENABLED: booleanish, // Plan 04 owns this flag
 
+  // ── Voyage embeddings (Plan 02-04 / KNW-04b) ──
+  // Consumed only by src/ai/integrations/voyage.adapter.ts (separate from the
+  // Anthropic chokepoint). Optional for THIS plan; Plan 02-04 T08 flips this
+  // to `prodRequired(z.string())` once the prod env is populated. The adapter
+  // raises VOYAGE_API_KEY_MISSING at call time when the key is absent — so
+  // module-load doesn't crash for tests that import the adapter without it.
+  VOYAGE_API_KEY: z.string().optional(),
+
   // ── Langfuse ── (Plan 05 / 01-05-PLAN.md flipped these to required-in-prod)
   LANGFUSE_PUBLIC_KEY: prodRequired(z.string()),
   LANGFUSE_SECRET_KEY: prodRequired(z.string()),
