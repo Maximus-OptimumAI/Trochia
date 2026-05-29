@@ -1,0 +1,39 @@
+name: Eval Harness
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Run eval suite
+        id: eval
+        env:
+          # All eval checks return 'pending' at Plan 02-04 close.
+          # Plan 02-05 wires in Test-CI DATABASE_URL + ANTHROPIC_API_KEY + VOYAGE_API_KEY
+          # secrets to unlock the real check implementations.
+          NODE_ENV: test
+        run: npm run eval:run
+      - name: Upload eval report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report
+          path: eval-report.json
+          retention-days: 30

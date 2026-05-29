@@ -18,6 +18,7 @@
     "db:check": "drizzle-kit check",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
+    "eval:run": "tsx src/ai/eval/runner.ts",
     "gen:dpa-pdf": "tsx scripts/generate-dpa-pdf.ts"
   },
   "dependencies": {
