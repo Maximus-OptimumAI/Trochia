@@ -157,6 +157,29 @@ permanent.
 **Priority**: Polish — none are exploitable; L1 is the highest of the three
 (false-positive rejection on legitimate API key documentation).
 
+## FOLLOWUP-CORPUS-01: Expand curated corpus from 5 → 50 docs
+
+**Severity**: Backlog (corpus depth)
+**Triggered**: Plan 02-04 T06, 2026-05-26.
+**Scope**: Seed corpus shipped 5 docs in `data/corpus/` (SAFE primer, pre-seed
+benchmarks, pitch narrative, pipeline hygiene, term-sheet vocabulary). Plan
+target for Phase 2.5 / pre-Phase-3 is 50 docs.
+**Source candidates**: YC SAFE deep-dive, Lenny's Newsletter, Pari Passu, Carta
+benchmarks set, NfX guides, a16z posts, Charles Hudson pre-seed, accelerator
+FAQs, public term-sheet libraries.
+**Governance**: Each new doc follows the same shape — YAML frontmatter (title,
+slug, source_url, license_note, last_reviewed), ≤2-sentence paraphrase, ≤400-char
+body, no verbatim quotes >15 words, banned-string-clean. Append to
+`data/corpus/MANIFEST.json` with body SHA256.
+**Tracked-in row (plan-canonical format)**:
+
+| FOLLOWUP-CORPUS-01 | Expand curated corpus from 5 → 50 docs (YC SAFE deep-dive, Lenny's, Pari Passu, Carta benchmarks set, NfX guides, a16z, Charles Hudson pre-seed, accelerator FAQs, public term-sheet libraries) | Phase 2.5 / pre-Phase-3 | Deferred from Plan 02-04 |
+
+**Priority**: Backlog — Phase 2 corpus-sync reader is deferred to
+FOLLOWUP-CORPUS-SYNC-01; the 5 seed docs are inert at Phase 2 runtime.
+
+---
+
 ## P4.5-POLISH-14: OAuth callback redirects to wrong preview deployment
 **Symptom**: Initiating Google OAuth from Phase 2 preview URL
 (trochia-git-phase-2-knowle-*.vercel.app) redirects callback to Phase 1

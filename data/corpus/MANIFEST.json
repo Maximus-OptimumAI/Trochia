@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "generated_at": "2026-05-26T00:00:00Z",
+  "docs": [
+    {
+      "slug": "safe-primer",
+      "source_url": "https://www.ycombinator.com/documents",
+      "sha256_of_body": "961d0a912121762c3661d0a9cbfd62e73ace1df1c00cc969d77b407bbc01f9a9",
+      "last_reviewed": "2026-05-26"
+    },
+    {
+      "slug": "pre-seed-benchmarks",
+      "source_url": "https://carta.com/data/",
+      "sha256_of_body": "9172132769809a0eedc02f601b7db001019098bf39ff6954ad5998bb95e626f0",
+      "last_reviewed": "2026-05-26"
+    },
+    {
+      "slug": "pitch-narrative-structure",
+      "source_url": "https://www.paulgraham.com/founders.html",
+      "sha256_of_body": "dee18f1a8b8b719a6481ea89e1e3c5262f142c2568072b272e5bc7af5d44d921",
+      "last_reviewed": "2026-05-26"
+    },
+    {
+      "slug": "investor-pipeline-hygiene",
+      "source_url": "https://www.nfx.com/post/investor-pipeline",
+      "sha256_of_body": "2f4031b4040c5fbaf4f030445221341d36ff5455e857708429ffa0fa2c30c07e",
+      "last_reviewed": "2026-05-26"
+    },
+    {
+      "slug": "term-sheet-vocabulary",
+      "source_url": "https://www.ycombinator.com/library/4A-a-guide-to-seed-fundraising",
+      "sha256_of_body": "b9071d63d5fdb109b5f97efce4dfe977d210c6f423a37edcaaa340835be01a2c",
+      "last_reviewed": "2026-05-26"
+    }
+  ],
+  "deferred": {
+    "id": "FOLLOWUP-CORPUS-01",
+    "remaining_doc_count": 45,
+    "tracked_in": "tasks/phase-4-5-polish.md"
+  }
+}
