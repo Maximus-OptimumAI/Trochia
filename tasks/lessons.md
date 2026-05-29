@@ -437,3 +437,18 @@ Next: 6c (Install Cursor CLI to Windows PATH)
   is the canonical example: re-authoring with gates 1-6 active from
   word one beats grafting fixes onto a plan that's been patched 8 times.
   (Phase 2 Plan 02-04 cycle-7 close, 2026-05-27.)
+
+- **Chunker tokenCount is an ESTIMATE under the heuristic path; label it on
+  the type, not only in the docstring.** Plan 02-04 T03 ships `chunkText` with
+  the `1 token ≈ 4 chars` heuristic because `@anthropic-ai/tokenizer` is not
+  a dep (verified package.json at T03 implementation; only `@anthropic-ai/sdk`
+  is present, and the plan explicitly says NOT to add the tokenizer at this
+  stage — `tasks/constraints.md` keeps `ai/client.ts` as the Anthropic
+  chokepoint and adding a new SDK on the Voyage-embedding path would dilute
+  that boundary). The `tokenCount` field is annotated `estimated under
+  heuristic` directly on the `Chunk` type, so a future reader sees the caveat
+  at the call site, not just buried in the module docstring. Plan 02-05 swaps
+  in a real tokenizer if eval shows drift. Voyage's 32K-token input limit is
+  far above any 800-token chunk under either path — drift here only affects
+  cost-tracking fidelity in OBS-COST-01 (Plan 02-07), not correctness.
+  (Phase 2 Plan 02-04 T03, 2026-05-29.)
