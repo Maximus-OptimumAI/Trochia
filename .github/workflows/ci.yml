@@ -45,6 +45,12 @@ jobs:
       # Required-in-prod by src/lib/env.ts (Plan 04 / 01-04 flipped ANTHROPIC_API_KEY).
       # The CI fallback keeps the production build green before the real key secret is added.
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY || 'ci-anthropic-key' }}
+      # Required-in-prod by src/lib/env.ts (Plan 02-04 / 02-04-T08 flipped VOYAGE_API_KEY).
+      # Voyage is only invoked at runtime by the embed pipeline; CI never calls Voyage,
+      # so the fallback is a non-secret literal placeholder that satisfies the
+      # `prodRequired(z.string())` non-empty check at build-time. Do not add a real
+      # GitHub secret here — the real key lives in Vercel production env only.
+      VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY || 'ci-placeholder-not-a-real-key' }}
       # Required-in-prod by src/lib/env.ts (Plan 05 / 01-05 flipped the observability + email vars).
       # Fallbacks keep the production build green before the real secrets are added.
       SENTRY_DSN: ${{ secrets.SENTRY_DSN || 'https://ci@ci.ingest.sentry.io/0' }}

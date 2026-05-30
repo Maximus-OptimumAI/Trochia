@@ -104,11 +104,11 @@ const serverSchema = clientSchema.extend({
 
   // ── Voyage embeddings (Plan 02-04 / KNW-04b) ──
   // Consumed only by src/ai/integrations/voyage.adapter.ts (separate from the
-  // Anthropic chokepoint). Optional for THIS plan; Plan 02-04 T08 flips this
-  // to `prodRequired(z.string())` once the prod env is populated. The adapter
+  // Anthropic chokepoint). Plan 02-04 T08 flipped this to required-in-prod
+  // after the rotated key was populated in Vercel production env. The adapter
   // raises VOYAGE_API_KEY_MISSING at call time when the key is absent — so
-  // module-load doesn't crash for tests that import the adapter without it.
-  VOYAGE_API_KEY: z.string().optional(),
+  // tests/dev that import the adapter without it still load cleanly.
+  VOYAGE_API_KEY: prodRequired(z.string()),
 
   // ── Langfuse ── (Plan 05 / 01-05-PLAN.md flipped these to required-in-prod)
   LANGFUSE_PUBLIC_KEY: prodRequired(z.string()),
