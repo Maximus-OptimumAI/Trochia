@@ -2,7 +2,7 @@
 
 **Closing:** Plan 02-04 (Phase 2 Week 4 — embed pipeline + curated corpus + eval scaffold) — `[CLOSED on branch — NOT deployed to prod]`
 **Branch:** `phase-2-knowledge-layer` at HEAD `3301aa9` (Phase C SUMMARY commit will be the next push)
-**Main:** `32e35c1` (untouched — no merge)
+**Main:** `acfab36` (untouched — no merge)
 **PR #7:** OPEN as DRAFT (base=main, head=phase-2-knowledge-layer); stays draft through more Phase 2 work
 **Next plan to start:** Plan 02-05 (eval harness — flip the three `'pending'` stubs to real implementations)
 
@@ -41,7 +41,7 @@ Reason: the embed-memory pipeline introduces a new AI-token egress (Voyage embed
 **Operational consequence:**
 - PR #7 stays a DRAFT through Plan 02-05 + 02-06 + 02-07
 - `phase-2-knowledge-layer` branch accumulates commits
-- `main` stays at `32e35c1`
+- `main` stays at `acfab36`
 - At Plan 02-07 close, the joint-merge plan ships all three (read path + write path live-debut + cost cap) in one Vercel auto-deploy on push to main
 
 **The principle generalizes:** every future plan introducing a new AI-token egress (Plan 02-06 qa-rag query embedding, Phase 3 deck reviewer, Phase 4 pipeline auto-stage, Phase 5 voice ASR vendor) should ratify with the founder whether it's a "ship write path before read path" candidate (rare; only when the write path itself surfaces founder value) or a "wait for joint deploy" candidate (default).

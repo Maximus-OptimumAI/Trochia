@@ -106,7 +106,7 @@ key-decisions:
   - "ci.yml VOYAGE_API_KEY fallback is a non-credential-shaped literal — 'ci-placeholder-not-a-real-key'. CI never actually calls Voyage at runtime; the fallback exists purely to satisfy the prod-mode `next build` env validation. Real Voyage key belongs ONLY in Vercel production env; adding a real GitHub secret would be a security regression (the literal is intentionally not shaped like a real Voyage 'pa-' prefix key)."
   - "Eval harness ships fail-OPEN at 02-04 close — all 3 stubs return 'pending'; runner contract `anyFail → exit 1` is codified but never triggered while stubs are in place. Plan 02-05 flips stubs to real implementations and the gate activates. Process-level handoff (plan-checker assertion) is the bridge until FOLLOWUP-EVAL-PENDING-RUNTIME-GATE-01 lands a runtime allowlist in the runner itself."
   - "data/corpus/*.md ships INERT — 5 seed docs land at this plan close but no runtime reader exists in Plan 02-04. The corpus-sync Inngest function that would fan out per-tenant embedding was scope-reduced out of this plan in cycle 7 (T05 dropped after surfacing fundamental implementation drift) and deferred to FOLLOWUP-CORPUS-SYNC-01. T01's NEW-1 case pins the per-tenant schema invariant via direct service-client inserts so the schema contract is locked even though no production code writes corpus rows yet."
-  - "Plan 02-04 is merge-READY, not merged — DEPLOY-DEFERRED per founder ruling 2026-05-30: prod deploy waits until the read path (02-06/02-07) ships, with OBS-COST-01 in-app cost caps landing in that same merge. The write path's prod-debut + the cost cap that bounds founder-side worst-case spend + the read-side retrieval value all arrive together. PR #7 stays a DRAFT through more Phase 2 work; main untouched at 32e35c1. PULL-OBS-COST-01-FORWARD captured as the reminder for the joint-merge plan."
+  - "Plan 02-04 is merge-READY, not merged — DEPLOY-DEFERRED per founder ruling 2026-05-30: prod deploy waits until the read path (02-06/02-07) ships, with OBS-COST-01 in-app cost caps landing in that same merge. The write path's prod-debut + the cost cap that bounds founder-side worst-case spend + the read-side retrieval value all arrive together. PR #7 stays a DRAFT through more Phase 2 work; main untouched at acfab36. PULL-OBS-COST-01-FORWARD captured as the reminder for the joint-merge plan."
 
 requirements-completed:
   - KNW-04   # Voyage voyage-3-large embeddings via Inngest pipeline; idempotent per (tenant_id, source_type, source_id); embedding_model_version persisted; HNSW + cosine retrieval-ready — canonical requirement COMPLETE
@@ -346,7 +346,7 @@ Verified before commit:
 - Banned-string clean — zero hard-banned terms in this document
 - Trochia voice held — operator register only; no `we / I / happy / love / feel / want / help / hope` in the substantive summary body
 - Schema-lock holds — `npx drizzle-kit check` reports `Everything's fine 🐶🔥` at HEAD `3301aa9`
-- DEPLOY-DEFERRED posture explicit; PR #7 confirmed DRAFT; main confirmed at `32e35c1` (untouched)
+- DEPLOY-DEFERRED posture explicit; PR #7 confirmed DRAFT; main confirmed at `acfab36` (untouched)
 
 ---
 
