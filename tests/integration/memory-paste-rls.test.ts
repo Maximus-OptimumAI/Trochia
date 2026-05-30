@@ -560,7 +560,7 @@ d('Phase-2 paste flow — RLS integration (memoryRouter)', () => {
   );
 
   it(
-    "concurrent confirmDraft on the same draft surfaces CONFLICT on the loser (P2-3)",
+    "concurrent confirmDraft on the same draft surfaces a typed loser-error (CONFLICT or NOT_FOUND) — never silent overwrite (P2-3)",
     { timeout: TEST_TIMEOUT_MS },
     async () => {
       const aCaller = callerFor(A);
@@ -569,9 +569,24 @@ d('Phase-2 paste flow — RLS integration (memoryRouter)', () => {
       extractMock.mockResolvedValueOnce(buildDraft({ companyName: 'Pre-Confirm Co' }));
       const { draft } = await aCaller.memory.extractFromPaste({ paste: VALID_PASTE });
 
-      // Two parallel confirms on the same draft row. The UPDATE WHERE clause
-      // re-asserts `confirmedAt IS NULL`, so only ONE call sees a row to
-      // update; the other gets CONFLICT (not a silent overwrite).
+      // Two parallel confirms on the same draft row. The race is non-
+      // deterministic under READ COMMITTED — and BOTH outcomes below are
+      // correct surfaces of the "loser-takes-typed-error, winner-takes-row"
+      // invariant the procedure enforces:
+      //
+      //   Scenario A (both txns' SELECT runs before either UPDATE commits):
+      //     loser sees the draft; loser's UPDATE WHERE re-asserts
+      //     `confirmedAt IS NULL AND lastUpdatedAt = <captured>` and matches
+      //     zero rows after the winner commits → throws CONFLICT
+      //     (src/server/routers/memory.ts:763-769).
+      //   Scenario B (winner commits before loser's SELECT runs):
+      //     loser's SELECT `WHERE confirmedAt IS NULL` returns zero rows →
+      //     throws NOT_FOUND (src/server/routers/memory.ts:655-661).
+      //
+      // The flake history (CI #68, 2026-05-30) was timing — Scenario A is the
+      // local-default under low-latency pooler hops; Scenario B surfaces under
+      // CI contention. Both honor the safety invariant; the test asserts the
+      // invariant, not a specific race outcome.
       const results = await Promise.allSettled([
         aCaller.memory.confirmDraft({
           confirmed: { ...draft, confirmedAt: new Date().toISOString() },
@@ -584,10 +599,14 @@ d('Phase-2 paste flow — RLS integration (memoryRouter)', () => {
       const fulfilled = results.filter((r) => r.status === 'fulfilled');
       const rejected = results.filter((r) => r.status === 'rejected');
       expect(fulfilled.length, 'exactly one confirm must succeed').toBe(1);
-      expect(rejected.length, 'exactly one confirm must surface CONFLICT').toBe(1);
-      // The rejected call surfaced CONFLICT, not a generic 500.
-      const rejectedError = (rejected[0] as PromiseRejectedResult).reason as { code?: string; message?: string };
-      expect(rejectedError.code).toBe('CONFLICT');
+      expect(rejected.length, 'exactly one confirm must surface a loser-error').toBe(1);
+      // The rejected call surfaced a typed loser-error, not a generic 500 /
+      // UNKNOWN_SERVER_ERROR / phantom-success.
+      const rejectedError = (rejected[0] as PromiseRejectedResult).reason as {
+        code?: string;
+        message?: string;
+      };
+      expect(['CONFLICT', 'NOT_FOUND']).toContain(rejectedError.code);
     },
   );
 
