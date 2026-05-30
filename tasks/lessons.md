@@ -504,3 +504,78 @@ Next: 6c (Install Cursor CLI to Windows PATH)
   Bake this rule into the gsd-executor agent's posture so future dispatches
   apply it without an orchestrator carve-out in each dispatch prompt.
   (Phase 2 Plan 02-04 T04, 2026-05-29.)
+
+- **2026-05-30 — Founder-gated review + deploy flow (Plan 02-04 T08 close
+  pattern, carries forward).** The flow that closed Plan 02-04 codifies
+  three boundaries every future plan with a `security_gate` + production
+  surface should honor:
+
+  **Boundary 1 — Pre-review prep is executor-owned, redeploy is founder-
+  owned.** The executor can prepare the changeset (env flips, GHA bumps,
+  CI fallbacks) and lands them as one pre-review commit, but does NOT
+  trigger `/codex` or `/cso` and does NOT trigger prod redeploy. Both
+  are the founder's commands — billed, time-boxed, deliberate. The
+  executor's job is to leave the branch in a "ready for review" state
+  and surface that clearly.
+
+  **Boundary 2 — Both reviews run before prod redeploy; their verdicts
+  serialize.** `/codex` runs first (correctness lens), then `/cso`
+  (security lens). Each verdict is one of:
+    - APPROVED → proceed
+    - APPROVED-WITH-FIXES → land the fixes as ONE pre-redeploy commit on
+      the same branch, no `--no-verify`, then proceed
+    - REJECTED → re-architect; do not push more code until the issue is
+      designed out
+  Fixes from both gates can batch into the same pre-redeploy commit. The
+  commit message must cite which finding ID each fix closes.
+
+  **Boundary 3 — Cross-review overlap is a high-signal positive.** When
+  `/codex` and `/cso` flag the SAME issue from different lenses (e.g.,
+  Plan 02-04 T08: TEST_DATABASE_URL silent-skip flagged by both Codex
+  P2-2 + /cso F1), the priority bumps up — that's two independent
+  perspectives converging on the same defect, not noise. Fix it. When
+  the lenses DISAGREE (Codex says X is a finding, /cso says X is by-
+  design, or vice versa), surface the disagreement to the founder for
+  ratification rather than silently siding with one.
+
+  (Phase 2 Plan 02-04 T08, 2026-05-30.)
+
+- **2026-05-30 — Defer the write path's prod-debut until the read path
+  + cost caps ship in the SAME merge (carries forward as a strategic
+  pattern for AI-cost-bearing features).** Plan 02-04 implemented the
+  embed-memory pipeline (founder-confirm → memory.confirmed → Voyage
+  embed → pgvector upsert). The pipeline is functionally complete,
+  schema-clean, /codex+/cso APPROVED, CI green. But the founder ratified
+  a deploy-deferred close: ship the write path to prod ONLY when the
+  read path (Plan 02-06 hybrid retriever + Plan 02-07 qa-rag) lands,
+  AND when OBS-COST-01 ($5/user/day cap) is pulled forward into that
+  same merge.
+
+  **Rationale (the principle):** Any feature that introduces a new AI
+  egress with per-token billing must not enter prod without
+  - (a) the cost cap that bounds founder-side worst-case spend, AND
+  - (b) the read-side surface that gives the write-side observable
+    value — shipping a write-only pipeline to prod means founders pay
+    Voyage embed costs but get zero retrieval value until weeks later.
+  The aggregate value AND the aggregate risk both arrive at the
+  read-path merge, so that's where the prod cutover belongs.
+
+  **What this looks like operationally:** Plan 02-04 closes "merge-
+  ready" not "merged". PR #7 stays a DRAFT. The branch
+  `phase-2-knowledge-layer` accumulates 02-05 → 02-06 → 02-07 work in
+  the same PR. At Plan 02-07 close, `PULL-OBS-COST-01-FORWARD` (logged
+  in 02-04-PLAN.md `deferred_items`) reminds the planner to ship the
+  cost cap in the same wave, not as a separate Plan 02-07-FOLLOWUP.
+  Then PR #7 merges, prod auto-deploys, the entire memory feature
+  (write + read + caps) goes live together.
+
+  **Generalize:** every future plan that introduces a new AI-token
+  egress (Plan 02-06 qa-rag query embedding, Phase 3 deck reviewer
+  Sonnet+Opus pass, Phase 4 pipeline auto-stage, Phase 5 voice ASR
+  vendor) should ratify with the founder whether it's a "ship the
+  write path before the read path" candidate (rare; only when the
+  write path itself surfaces founder value, e.g., visible activity
+  count) or a "wait for the joint deploy" candidate (default). The
+  default is wait, not ship.
+
+  (Phase 2 Plan 02-04 T08 close, 2026-05-30.)
