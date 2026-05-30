@@ -9,7 +9,11 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
+  # `pull-requests: write` removed at T08 close — the workflow uploads an
+  # artifact + writes to GITHUB_STEP_SUMMARY but does NOT post PR comments.
+  # The PR-comment step described in plan must_haves artifact #11 is deferred
+  # to FOLLOWUP-EVAL-PR-COMMENT-01 (lands when eval checks go real in Plan
+  # 02-05). Re-add `pull-requests: write` at that time. (/cso F2, 2026-05-30.)
 
 jobs:
   eval:
