@@ -99,13 +99,44 @@ describe('runEvalSuite', () => {
     expect(result.checks.every((c) => c.status === 'pass')).toBe(true);
   });
 
+  // Cases 4 + 5 call runEvalSuite() to assert structural shape (ids + summary).
+  // They do NOT exercise any check's body. Since Plan 02-05 T02 flipped
+  // extraction-floor to a LIVE check (it fires the real extractFromPaste agent
+  // whenever ANTHROPIC_API_KEY is present — and tests/setup.ts loads a key from
+  // .env.local), these cases now MUST stub the live checks to keep them from
+  // making real network calls. Stubbing to 'skip' mirrors the env-absent baseline
+  // and leaves the assertions (id membership / summary shape) unchanged.
   it('Case 4 — every canonical check id is present in the result', async () => {
+    vi.spyOn(extractionFloor, 'run').mockResolvedValueOnce({
+      id: 'extraction-floor',
+      description: extractionFloor.description,
+      status: 'skip',
+      reason: 'test-stub: env-unavailable',
+    });
+    vi.spyOn(cacheHit, 'run').mockResolvedValueOnce({
+      id: 'cache-hit',
+      description: cacheHit.description,
+      status: 'skip',
+      reason: 'test-stub: env-unavailable',
+    });
     const result = await runEvalSuite();
     const ids = result.checks.map((c) => c.id).sort();
     expect(ids).toEqual(['cache-hit', 'extraction-floor', 'qa-grounding']);
   });
 
   it('Case 5 — Markdown summary shape', async () => {
+    vi.spyOn(extractionFloor, 'run').mockResolvedValueOnce({
+      id: 'extraction-floor',
+      description: extractionFloor.description,
+      status: 'skip',
+      reason: 'test-stub: env-unavailable',
+    });
+    vi.spyOn(cacheHit, 'run').mockResolvedValueOnce({
+      id: 'cache-hit',
+      description: cacheHit.description,
+      status: 'skip',
+      reason: 'test-stub: env-unavailable',
+    });
     const result = await runEvalSuite();
     expect(result.summary).toContain('## Trochia eval harness');
     expect(result.summary).toContain('extraction-floor');
