@@ -1777,3 +1777,74 @@ CYCLE_SUMMARY: current_high=0
 ---
 
 *Cross-AI review cycle 9 — 2026-05-29. Single reviewer: Codex CLI v0.130.0 (gpt-5.5, read-only sandbox). HEAD `88944ac`. Outcome: APPROVED for T01 dispatch. All 6 standing gates PASS. All 3 cycle-8 cleanup fixes (MED 1 + LOW 1 + LOW 2) verified PASS. All 24 prior closures hold. Zero NEW HIGH/MED/LOW. Convergence series CLOSED after 9 cycles. Founder decision rule honoured: cycle returned clean — stopping and surfacing the verdict.*
+
+---
+
+# Plan 02-05 — Eval harness: flip extraction-floor + cache-hit stubs to real (cross-AI convergence)
+
+Plan under review: `.planning/phases/02-knowledge-layer/02-05-PLAN.md` (authored 2026-05-30, branch `phase-2-knowledge-layer` HEAD `3301aa9`). Predecessor convergence (Plan 02-04) closed at cycle 9 above. Internal `gsd-plan-checker` (sonnet) returned APPROVED-WITH-NOTES (0 blockers, 2 warnings, 4 notes) before cycle 1; the 2 warnings (PITCH-04 mis-citation → `requirements: []`; reuse `countPopulatedFields`) + Note B (badge param type) were folded into the plan pre-cycle-1.
+
+## Cycle 1 — Codex CLI (read-only sandbox, model_reasoning_effort=high)
+
+Reviewer: Codex CLI (single reviewer, default). Date: 2026-05-30. Tokens ~149k. Outcome: **NOT CONVERGED — 4 HIGH + 2 MEDIUM + 1 LOW.** `current_high=4`.
+
+| ID | Sev | Finding | Plan ref | Disposition |
+|----|-----|---------|----------|-------------|
+| C1-H1 | HIGH | `skip` is non-failing everywhere → a scheduled/manual LIVE run with missing ANTHROPIC_API_KEY / Langfuse creds exits 0 and silently never gates (fail-open hole in the OD-A model). | OD-A; must_haves; T03 | OPEN — add `EVAL_LIVE_REQUIRED=1` signal on schedule/workflow_dispatch; in a live-required context, missing creds → `fail` (or workflow preflight fails). `skip` stays fail-open ONLY on PR/no-live. |
+| C1-H2 | HIGH | OD-3 default read path wrong vs real code: `src/ai/client.ts:108-156` writes `cacheRead/inputTokens` to TRACE metadata and creates NO Langfuse `GENERATION` observations, so `fetchObservations({type:'GENERATION'})` returns no Trochia cache data. | OD-3; T03 | OPEN — switch cache-hit default to `fetchTraces({ name, fromTimestamp, fields:'core,metadata', limit })` reading `metadata.cacheRead/inputTokens`; confirm the trace `name` emitted by client.ts. |
+| C1-H3 | HIGH | "conditional env block keyed on `github.event_name`" is invalid Actions YAML if done as `if:` under `env:`. (Confirms plan-checker Note D.) | T03; OD-2 | OPEN — split the eval step: PR step (no secrets) + live step (`if: ${{ github.event_name != 'pull_request' }}` with secrets); PR-comment step `if: ${{ always() && github.event_name == 'pull_request' }}`. |
+| C1-H4 | HIGH | T04 (optional sanitizer check) cannot run as written: injection payloads are short strings that fail `extractFromPaste`'s MIN-length check before the sanitizer runs; PII fixtures are `draftInput` objects for `redactUnrelatedPartyPII`, not paste inputs. | T04; OD-1 | OPEN (founder decision) — rewire T04 as a DIRECT eval over `promptInjectionSanitizer` + `redactUnrelatedPartyPII` (not via the paste path), OR DEFER T04 to a dedicated plan. Reinforces OD-1. |
+| C1-M1 | MEDIUM | `const PENDING_ALLOWED = ['qa-grounding'] as const` + `.includes(r.id: string)` → TS type error. | T01:265 | OPEN — use `new Set<string>(['qa-grounding'])` (or `readonly string[]`). |
+| C1-M2 | MEDIUM | Plan wording claims `countPopulatedFields` uses "non-empty leaf" semantics, but the real helper counts structured groups by `Object.keys(...).length > 0` only (shallow) — empty strings/arrays inside team/traction/narrative can inflate the extraction-floor metric. | T02:319; frontmatter notes | OPEN — correct plan wording to the shallow semantics, OR update + test the helper before using it as the gate. |
+| C1-L1 | LOW | Close step references `$HOME/.claude/.../summary.md` — conflicts with the review's "don't read ~/.claude" boundary. | line ~557 | N/A for our executor — the GSD summary template legitimately lives there and Claude Code (the executor) reads it; this is an artifact of Codex's own filesystem-boundary instruction. No change required. |
+
+**Cross-check vs internal plan-checker:** C1-H3 == plan-checker Note D (confirmed by a 2nd model). C1-H2 sharpens plan-checker Note C (Codex traced client.ts and found NO GENERATION observations — decisive for fetchTraces). C1-H1 and C1-H4 are NEW (the internal checker missed both the fail-open-on-live hole and the T04 fixture-shape mismatch).
+
+CYCLE_SUMMARY: current_high=4
+
+*Cross-AI review cycle 1 — 2026-05-30. Single reviewer: Codex CLI (read-only sandbox, reasoning=high). Plan HEAD context `3301aa9`. Outcome: NOT CONVERGED (4 HIGH). Next: founder adjudicates C1-H4/OD-1 (T04 rewire vs defer); C1-H1/H2/H3 + M1/M2 fold into the cycle-2 replan; re-review until current_high=0.*
+
+## Cycle 2 — Codex CLI (read-only, high) — verify cycle-1 fixes
+
+Reviewer: Codex CLI. Date: 2026-05-31. Tokens ~99k. Raw line: `current_high=3`.
+
+**Framing correction (orchestrator):** the cycle-2 prompt asked Codex to verify findings "against the real code." Codex correctly reported C1-H1/H2/H3/M1 as "NOT-RESOLVED" because `runner.ts` / `cache-hit.ts` / `eval.yml` still hold the original stubs — but this is a PLANNING-ONLY review; feature code is intentionally not yet written. Codex's own evidence confirms the PLAN now specifies each fix correctly ("plan describes EVAL_LIVE_REQUIRED"; "the revised plan's PR/LIVE YAML pattern is syntactically valid"; "plan text says new Set<string>(['qa-grounding'])"; OD-3 read path corrected to fetchTraces+metadata). So the raw `current_high=3` measures CODE state, not PLAN quality. At the plan level, all cycle-1 HIGH/MED are RESOLVED.
+
+| Cycle-1 ID | Plan-level verdict | Evidence |
+|----|----|----|
+| C1-H1 | RESOLVED (in plan) | OD-A + T01 specify EVAL_LIVE_REQUIRED=1 → 'skip' becomes exit-1 in live context; runner.test Case 8 added. Code not yet written (expected). |
+| C1-H2 | RESOLVED (in plan) | OD-3 + T03 corrected to fetchTraces reading metadata.cacheRead/inputTokens; Codex re-confirmed client.ts writes trace metadata + no GENERATION observations. |
+| C1-H3 | RESOLVED (in plan) | Codex: "the revised plan's PR/LIVE YAML pattern is syntactically valid." |
+| C1-H4/OD-1 | RESOLVED | T04 fully removed; FOLLOWUP-SANITIZER-EVAL-01 captured; no dangling refs. |
+| C1-M1 | RESOLVED (in plan) | Plan specifies `new Set<string>(['qa-grounding'])` + `.has(r.id)`. |
+| C1-M2 | RESOLVED | Plan wording corrected to the real shallow `Object.keys(group).length>0` semantics. |
+
+**NEW findings (genuine plan-level — both folded into the plan this cycle):**
+
+| ID | Sev | Finding | Disposition |
+|----|-----|---------|-------------|
+| C2-NEW-MED | MEDIUM | PR eval step ran on all events → scheduled/manual runs would do a redundant non-live skip-pass before the LIVE pass. | FIXED — PR step now `if: ${{ github.event_name == 'pull_request' }}`; mutually exclusive with the LIVE step's `if: != 'pull_request'` so exactly one eval pass runs per event (T03 action + must_haves + acceptance). |
+| C2-NEW-LOW | LOW | Plan overstated `fields:'io'` as strictly required for metadata; omitting `fields` returns all, `'io'` is required only under a restricted whitelist. | FIXED — OD-3 + T03 wording relaxed: `fields:'core,io'` is the chosen restricted whitelist value, not an unconditional requirement. |
+
+CYCLE_SUMMARY: current_high=0 (plan-level; raw code-vs-plan count was 3 — see framing correction)
+
+*Cross-AI review cycle 2 — 2026-05-31. Codex CLI (read-only, high). Outcome: plan-level convergence on all cycle-1 findings; 2 NEW plan findings (1 MED + 1 LOW) folded in-cycle. Cycle 3 (correctly plan-scoped framing) run next to confirm.*
+
+## Cycle 3 — Codex CLI (read-only, high) — plan-only framing confirmation
+
+Reviewer: Codex CLI. Date: 2026-05-31. Tokens ~120k. Raw line: `current_high=1`. Correctly scoped (told Codex the code is intentionally unwritten — judge plan specification only). Codex confirmed plan-level coherence of every cycle-1/cycle-2 resolution; surfaced 1 HIGH + 1 MEDIUM.
+
+| ID | Sev | Finding | Disposition |
+|----|-----|---------|-------------|
+| C3-H1 | HIGH | Claimed `fetchTraces` `fromTimestamp` is typed `string \| null` (per openapi `paths`), so the plan's `Date` would fail `tsc`. | **REFUTED (false positive) — NO change.** Verified directly against installed `langfuse-core/lib/index.d.ts`: `fetchTraces(query?: GetLangfuseTracesQuery)` (7364); `GetLangfuseTracesQuery = FixTypes<paths["/api/public/traces"]["get"]["parameters"]["query"]>` (7013); `FixTypes` (7104-7108) maps `fromTimestamp` → `Date \| OptionalTypes<...>`. Codex read the UNWRAPPED openapi type (6813 `string\|null`); the type `fetchTraces` actually accepts has `fromTimestamp: Date`. The plan's `Date` spec is correct and typechecks. (Confirms the cycle-2 planner's "Date after FixTypes" note.) |
+| C3-M1 | MEDIUM | T-02-05-04 threat row inaccurately claimed the comment step runs "with no checkout of untrusted code executing before it" — but the PR eval step runs PR-branch code in the same job first. | **FIXED** — rewrote T-02-05-04 to the accurate fork-PR model: GITHUB_TOKEN is read-only on fork `pull_request` regardless of `permissions:` (no `pull_request_target` used); PR eval step holds no secrets; LIVE step (secrets) never runs on PRs; comment reads only whitelisted eval-report.json fields. Split-job isolation noted as optional, not required. |
+
+Codex explicitly confirmed coherent at plan level: OD-1 defer, OD-2 PR/LIVE split with EVAL_LIVE_REQUIRED, OD-A skip-vs-pending gate, PENDING_ALLOWED Set, shallow countPopulatedFields, schema-lock / no-new-deps / no eval SDK import, Langfuse metadata-only read with fields:'core,io'.
+
+CYCLE_SUMMARY: current_high=0 (C3-H1 refuted via type-def evidence; C3-M1 fixed in-cycle)
+
+## Convergence verdict
+
+**CONVERGED at cycle 3.** Genuine plan-level HIGH defects = 0. The series: cycle 1 (4 HIGH + 2 MED + 1 LOW) → replan → cycle 2 (all cycle-1 resolved at plan level; 2 NEW MED/LOW folded) → cycle 3 (1 HIGH refuted as a type-read error; 1 MED fixed). 3 reviewers-rounds, single reviewer (Codex). Internal gsd-plan-checker (sonnet) APPROVED-WITH-NOTES pre-cycle-1. Plan 02-05 is execution-ready pending founder go. Standing gates intact: G-EVAL-1 (post-exec ≤1 'pending' = qa-grounding), schema-lock (zero migrations, exit 0 at 29228e8), AI chokepoint, no new deps, Langfuse metadata-only whitelist.
+
+*Cross-AI convergence CLOSED at cycle 3 — 2026-05-31. Single reviewer: Codex CLI (read-only, high). Founder-gated /codex + /cso at execution close still apply per standing rule.*
