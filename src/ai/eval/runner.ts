@@ -21,17 +21,34 @@
 import { extractionFloor } from './checks/extraction-floor';
 import { qaGrounding } from './checks/qa-grounding';
 import { cacheHit } from './checks/cache-hit';
-import type { EvalCheck, EvalSuiteResult } from './types';
+import type { EvalCheck, EvalStatus, EvalSuiteResult } from './types';
 import { writeFileSync, appendFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 
 const CHECKS: EvalCheck[] = [extractionFloor, qaGrounding, cacheHit];
 
+// Runtime allowlist of check ids permitted to return 'pending'
+// (FOLLOWUP-EVAL-PENDING-RUNTIME-GATE-01, C1-M1). qa-grounding stays 'pending'
+// until Plan 02-07's qa-rag agent lands; any OTHER 'pending' fails the run.
+// A `Set<string>` (not a literal-tuple) so `.has(r.id)` typechecks against
+// `r.id: string` without a const-assertion narrowing.
+const PENDING_ALLOWED = new Set<string>(['qa-grounding']);
+
 export async function runEvalSuite(): Promise<EvalSuiteResult> {
   const results = await Promise.all(CHECKS.map((c) => c.run()));
+
+  // When EVAL_LIVE_REQUIRED==='1' (nightly / manual live runs), a 'skip'
+  // (env-unavailable) is promoted to a FAILURE — a run that was supposed to
+  // reach its dependency and could not is a RED gate, not a silent pass (C1-H1).
+  const liveRequired = process.env.EVAL_LIVE_REQUIRED === '1';
+
   const anyFail = results.some((r) => r.status === 'fail');
-  const exitCode: 0 | 1 = anyFail ? 1 : 0;
+  const disallowedPending = results.some(
+    (r) => r.status === 'pending' && !PENDING_ALLOWED.has(r.id),
+  );
+  const liveSkipFail = liveRequired && results.some((r) => r.status === 'skip');
+  const exitCode: 0 | 1 = anyFail || disallowedPending || liveSkipFail ? 1 : 0;
 
   const summary = [
     '## Trochia eval harness',
@@ -57,8 +74,19 @@ export async function runEvalSuite(): Promise<EvalSuiteResult> {
   return { checks: results, exitCode, summary };
 }
 
-function badge(s: 'pending' | 'pass' | 'fail'): string {
-  return s === 'pass' ? '✅ pass' : s === 'fail' ? '❌ fail' : '⏳ pending';
+// Param widened to EvalStatus (plan-checker Note B): the compiler flags any
+// future status member the badge forgets to render.
+function badge(s: EvalStatus): string {
+  switch (s) {
+    case 'pass':
+      return '✅ pass';
+    case 'fail':
+      return '❌ fail';
+    case 'skip':
+      return '⏭️ skip';
+    case 'pending':
+      return '⏳ pending';
+  }
 }
 
 // CLI entrypoint. ESM-safe equivalent of `require.main === module`:

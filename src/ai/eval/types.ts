@@ -12,13 +12,33 @@
  * implementations (fail-closed at that point).
  */
 
-export type EvalStatus = 'pending' | 'pass' | 'fail';
+/**
+ * Eval check status model (OD-A + C1-H1).
+ *
+ *   - 'pending' = NOT-YET-IMPLEMENTED. The check has no real body yet. Only
+ *                 `qa-grounding` may carry it (runner allowlists it via
+ *                 PENDING_ALLOWED); any other 'pending' fails the run.
+ *   - 'pass'    = the check ran and met its threshold.
+ *   - 'fail'    = the check ran and missed its threshold (fail-CLOSED → exit 1).
+ *   - 'skip'    = ENV-UNAVAILABLE. The check could not reach its live dependency
+ *                 (e.g. ANTHROPIC_API_KEY / Langfuse creds absent). Fail-OPEN in
+ *                 NON-live contexts (PR / local CI) — never blocks. BUT when the
+ *                 runner sees `EVAL_LIVE_REQUIRED === '1'` (nightly / manual live
+ *                 runs), a 'skip' becomes a FAILURE (exit 1): a run that was
+ *                 SUPPOSED to reach its dependency and could not is a RED gate,
+ *                 not a silent pass.
+ *
+ * 'skip' (env-unavailable) and 'pending' (not-yet-implemented) are deliberately
+ * distinct: a flipped check computes pass/fail/skip from a variable and never
+ * carries the literal 'pending'.
+ */
+export type EvalStatus = 'pending' | 'pass' | 'fail' | 'skip';
 
 export type EvalCheckResult = {
   id: string;
   description: string;
   status: EvalStatus;
-  reason: string;          // human-readable; in 'pending' it explains why
+  reason: string;          // human-readable; in 'pending'/'skip' it explains why
   metric?: number;         // optional numeric value (e.g. p50 latency, FP rate)
   threshold?: number;      // optional comparison threshold
 };
