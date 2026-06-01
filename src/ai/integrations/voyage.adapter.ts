@@ -64,7 +64,12 @@ export type VoyageEmbedInput = {
   /** Trace metadata — required for the privacy-bounded Langfuse payload */
   trace: {
     accountId: string;
-    sourceType: 'memory' | 'corpus' | 'interaction';
+    // OD-4 (Plan 02-06): widened to include 'query' so the read-path query embed
+    // (src/ai/rag/retrieve.ts) traces HONESTLY as source_type:'query' instead of a
+    // false 'memory'. Additive union widening ONLY — TRACE_METADATA_KEYS and
+    // buildTraceMetadata are UNCHANGED (Case 8b pins the exact KEY set, not the
+    // value domain, so the existing adapter tests stay green).
+    sourceType: 'memory' | 'corpus' | 'interaction' | 'query';
     sourceId: string;
   };
 };
