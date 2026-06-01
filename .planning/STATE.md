@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Plan 01-09 complete — Phase 1 ready for verification
-last_updated: "2026-05-29T07:47:34.849Z"
-last_activity: 2026-05-29 -- Phase 02 planning complete
+stopped_at: Plan 02-05 complete (eval harness — extraction-floor + cache-hit flipped to real) — branch-only; PR #7 DRAFT; awaiting founder-gated /codex + /cso
+last_updated: "2026-06-01T14:01:12.813Z"
+last_activity: 2026-06-01 -- Plan 02-05 close (eval harness flip; deploy-deferred per 02-04)
 progress:
   total_phases: 12
   completed_phases: 1

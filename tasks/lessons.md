@@ -579,3 +579,44 @@ Next: 6c (Install Cursor CLI to Windows PATH)
   default is wait, not ship.
 
   (Phase 2 Plan 02-04 T08 close, 2026-05-30.)
+
+- **2026-06-01 — Eval-check env-gates key on credential PRESENCE, not
+  validity — so any UNMOCKED eval check in vitest fires a real (often
+  doomed) network call. Always mock the live dependency in unit tests.**
+  Plan 02-05 flipped two eval checks live: `extraction-floor` gates on
+  `!process.env.ANTHROPIC_API_KEY`, `cache-hit` gates on
+  `isLangfuseConfigured()` (all three Langfuse vars set). Both gates
+  test for the var being SET, never that it is VALID. `tests/setup.ts`
+  loads `.env.local`, which carries a (CI-placeholder / invalid) key —
+  so the gate passes inside vitest and the check fires the REAL
+  `extractFromPaste` / `fetchTraces`, hitting a 401.
+
+  **How it bit, twice:**
+  - T02: T01's `runner.test.ts` Cases 4+5 called `runEvalSuite()`
+    unmocked (safe while all checks were inert `'pending'` stubs). Once
+    extraction-floor went live they fired a real Anthropic 401 →
+    forced a (correct, in-scope) test edit to stub the live checks.
+  - T03: `runner.test.ts` Case 2 mocked only `extractionFloor` and let
+    `cacheHit` run live → a real Langfuse 401. The SDK resolved (not
+    rejected) with a non-array `data`, which threw
+    `TypeError: res.data is not iterable`. Fixed in cache-hit.ts with an
+    `Array.isArray(res.data)` guard (malformed read → 0 traces → ratio
+    0 → `'fail'`; fail-CLOSED, never a throw, never a false pass). Case 2
+    later made hermetic at plan close by stubbing `cacheHit → 'skip'`.
+
+  **Rules going forward:**
+  - In vitest, ALWAYS `vi.mock` the live dependency (`@/ai/agents/
+    extract-from-paste.agent`, `@/lib/langfuse`) for ANY test that
+    invokes a live eval check OR `runEvalSuite()` — a present-but-invalid
+    credential in `.env.local` defeats a presence-only env-gate.
+  - A live read that errors or returns a malformed shape must fail-CLOSED
+    (`'fail'` / propagate), never silently `'pass'`. Pair this with the
+    `EVAL_LIVE_REQUIRED` runner gate (a `'skip'` is a FAILURE on
+    scheduled/manual live runs) so a creds-misconfigured nightly is a RED
+    gate, not a green lie.
+  - Workflow defense (already in eval.yml): the PR step passes NO secrets
+    and does not set `EVAL_LIVE_REQUIRED` → live checks `'skip'` on PRs;
+    only the LIVE step (schedule/dispatch) carries valid creds. The unit
+    suite must not depend on that — it mocks.
+
+  (Phase 2 Plan 02-05 close, 2026-06-01.)

@@ -64,9 +64,9 @@ Trochia AI is an agentic Founder Operating System for raising capital — one Ne
 Plans:
 - [x] 02-01-PLAN.md — Schema spine (business_memory + pipeline_entry + interaction + timeline_event + embeddings; RLS + two-user isolation)
 - [x] 02-02-PLAN.md — Paste extractor (Sonnet 4.6 + Zod) + confirmation UI shell
-- [ ] 02-03-PLAN.md — Conflict resolver + PII redaction + prompt-injection sanitizer (this plan)
-- [ ] 02-04-PLAN.md — Embed pipeline (pgvector HNSW + Inngest + Voyage) + curated corpus loader
-- [ ] 02-05-PLAN.md — Eval harness scaffold (Langfuse + CI workflow)
+- [x] 02-03-PLAN.md — Conflict resolver + PII redaction + prompt-injection sanitizer (this plan)
+- [x] 02-04-PLAN.md — Embed pipeline (pgvector HNSW + Inngest + Voyage) + curated corpus loader
+- [x] 02-05-PLAN.md — Eval harness scaffold (Langfuse + CI workflow)
 - [ ] 02-06-PLAN.md — RAG retrieve service + prompt-caching wiring
 - [ ] 02-07-PLAN.md — Q&A sidebar (Opus 4.7 + streamed citations) + per-user cost tracking
 - [ ] 02-08-PLAN.md — File upload Tier 2 (ChatGPT ZIP / Claude / Notion) + Inngest parser
@@ -220,7 +220,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 4.5 → 5 → 6 → 7 �
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 9/9 | Complete | 2026-05-13 |
-| 2. Knowledge Layer + Memory | 0/TBD | Not started | - |
+| 2. Knowledge Layer + Memory | 5/6 | In Progress|  |
 | 3. Pitch Lab — Deck Reviewer | 0/TBD | Not started | - |
 | 4. Investor Pipeline | 0/TBD | Not started | - |
 | 4.5. Admin Dashboard + Security Hardening + Observability (INSERTED) | 0/TBD | Not started | - |
