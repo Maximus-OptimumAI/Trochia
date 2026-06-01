@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Plan 02-05 complete (eval harness — extraction-floor + cache-hit flipped to real) — branch-only; PR #7 DRAFT; awaiting founder-gated /codex + /cso
-last_updated: "2026-06-01T14:01:12.813Z"
-last_activity: 2026-06-01 -- Plan 02-05 close (eval harness flip; deploy-deferred per 02-04)
+stopped_at: Plan 02-06 complete (hybrid RAG retriever — pgvector cosine + query-time FTS, RRF-fused, tenant-scoped) — branch-only; PR #7 DRAFT; founder-gated /codex + /cso done (batch c89110e); deploy deferred to 02-07 joint merge
+last_updated: "2026-06-01T20:12:59.000Z"
+last_activity: 2026-06-01 -- Plan 02-06 close (hybrid retriever; /codex + /cso batch; deploy-deferred per 02-04)
 progress:
   total_phases: 12
   completed_phases: 1
   total_plans: 14
-  completed_plans: 12
+  completed_plans: 13
   percent: 8
 ---
 
