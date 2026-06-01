@@ -354,4 +354,45 @@ describe('voyage.adapter — Plan 02-04 / KNW-04b', () => {
     ).resolves.toBeDefined();
     expect(traceSpy).not.toHaveBeenCalled();
   });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Case 9 — OD-4 (Plan 02-06): a read-path QUERY embed traces HONESTLY as
+  //          input_type:'query' + source_type:'query' (the widened union member),
+  //          never a false 'memory'. The TRACE_METADATA_KEYS key set is UNCHANGED
+  //          by the union widening — Case 8b still pins the exact key set.
+  // ──────────────────────────────────────────────────────────────────────────
+  it("Case 9 — OD-4 query embed: input_type:'query' + source_type:'query' on the trace; key set unchanged", async () => {
+    server.use(
+      http.post(VOYAGE_URL, () =>
+        HttpResponse.json({
+          data: [{ embedding: new Array(1024).fill(0.25), index: 0 }],
+          usage: { total_tokens: 4 },
+        }),
+      ),
+    );
+
+    const { voyage } = await import('@/ai/integrations/voyage.adapter');
+
+    await voyage.embed({
+      texts: ['how much runway do we have'],
+      inputType: 'query',
+      trace: { accountId: 'acc-1', sourceType: 'query', sourceId: 'corr-uuid-1' },
+    });
+
+    expect(traceSpy).toHaveBeenCalledOnce();
+    const call = traceSpy.mock.calls[0][0] as {
+      input: Record<string, unknown>;
+      output: Record<string, unknown>;
+    };
+    // The honest query-trace values.
+    expect(call.input.input_type).toBe('query');
+    expect(call.input.source_type).toBe('query');
+    // The union widening did NOT add/remove a whitelist key — exact key set holds.
+    expect(Object.keys(call.input).sort()).toEqual(
+      ['account_id', 'source_type', 'source_id', 'chunk_count', 'input_type'].sort(),
+    );
+    expect(Object.keys(call.output).sort()).toEqual(
+      ['token_count', 'embedding_model_version', 'latency_ms'].sort(),
+    );
+  });
 });
