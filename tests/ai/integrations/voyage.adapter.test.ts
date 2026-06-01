@@ -1,7 +1,7 @@
 /**
  * Voyage adapter unit tests (Plan 02-04 / KNW-04b / T02).
  *
- * 10-case suite, MSW-backed (no live api.voyageai.com calls):
+ * MSW-backed suite (no live api.voyageai.com calls):
  *   1.  happy path (valid 1024-dim response → embed succeeds)
  *   2.  batch order preserved (response indices reversed → adapter re-orders)
  *   3.  empty input rejected (VOYAGE_INPUT_EMPTY before any HTTP)
@@ -394,5 +394,64 @@ describe('voyage.adapter — Plan 02-04 / KNW-04b', () => {
     expect(Object.keys(call.output).sort()).toEqual(
       ['token_count', 'embedding_model_version', 'latency_ms'].sort(),
     );
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Case 10 — CSO-H2 / codex P1-2: a QUERY embed whose provider 400 body ECHOES
+  //           the query must NOT leak it into the thrown error (status only).
+  //           A document embed still surfaces the body (Case 5) — only query is
+  //           redacted, because the query is CONFIDENTIAL and reaches Sentry
+  //           unscrubbed via the exception message.
+  // ──────────────────────────────────────────────────────────────────────────
+  it('Case 10 — query embed: a provider 400 body echoing the query does NOT leak it into the thrown error', async () => {
+    const SENSITIVE_QUERY = 'CONFIDENTIAL-QUERY-SENTINEL-how-much-runway';
+    server.use(
+      http.post(VOYAGE_URL, () =>
+        new HttpResponse(`{"error":"bad input: ${SENSITIVE_QUERY}"}`, {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    );
+
+    const { voyage } = await import('@/ai/integrations/voyage.adapter');
+
+    let caught: (Error & { code?: string }) | null = null;
+    try {
+      await voyage.embed({
+        texts: [SENSITIVE_QUERY],
+        inputType: 'query',
+        trace: { accountId: 'acc-1', sourceType: 'query', sourceId: 'corr-1' },
+      });
+    } catch (e) {
+      caught = e as Error & { code?: string };
+    }
+
+    expect(caught).not.toBeNull();
+    expect(caught!.code).toBe('VOYAGE_BATCH_FAILED');
+    // Status is safe to surface; the query-bearing body is NOT.
+    expect(caught!.message).toContain('400');
+    expect(caught!.message).not.toContain(SENSITIVE_QUERY);
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Case 11 — CSO-M2 / codex P2-2: a 200 with fewer embeddings than inputs is
+  //           rejected (VOYAGE_COUNT_MISMATCH) BEFORE undefined can flow into a
+  //           downstream cosineDistance.
+  // ──────────────────────────────────────────────────────────────────────────
+  it('Case 11 — count mismatch (200 with 0 embeddings for 1 input) → VOYAGE_COUNT_MISMATCH', async () => {
+    server.use(
+      http.post(VOYAGE_URL, () => HttpResponse.json({ data: [], usage: { total_tokens: 0 } })),
+    );
+
+    const { voyage } = await import('@/ai/integrations/voyage.adapter');
+
+    await expect(
+      voyage.embed({
+        texts: ['hello'],
+        inputType: 'query',
+        trace: { accountId: 'acc-1', sourceType: 'query', sourceId: 'corr-1' },
+      }),
+    ).rejects.toMatchObject({ code: 'VOYAGE_COUNT_MISMATCH' });
   });
 });

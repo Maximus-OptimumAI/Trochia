@@ -49,6 +49,7 @@ import type { PgTransaction } from 'drizzle-orm/pg-core';
 
 import { voyage } from '@/ai/integrations/voyage.adapter';
 import { embeddings } from '@/db/schema/embeddings';
+import { AppError } from '@/lib/errors';
 
 // ────────────────────────────────────────────────────────────────────────────
 // Constants (documented)
@@ -162,7 +163,9 @@ export async function hybridRetrieve(
   // non-integer / oversized topK can never reach the SQL LIMIT, force an
   // unbounded scan, or produce an oversized payload. Every LIMIT and the final
   // slice use effTopK.
-  const effTopK = clamp(Math.trunc(topK ?? 8), 1, MAX_TOP_K);
+  // Number.isFinite guard BEFORE trunc (CSO-M1 / codex P2-1): Math.trunc(NaN)=NaN
+  // and clamp(NaN,…)=NaN, which would otherwise reach the SQL LIMIT.
+  const effTopK = clamp(Number.isFinite(topK) ? Math.trunc(topK) : 8, 1, MAX_TOP_K);
   const pool = effTopK * CANDIDATE_POOL_FACTOR;
 
   // Embed the query through the SINGLE Voyage call site on the read path. This is
@@ -178,59 +181,70 @@ export async function hybridRetrieve(
   const queryVec = queryEmbeddings[0];
 
   // Run BOTH queries inside ONE tenant transaction so the fused candidate lists
-  // are read from a single consistent snapshot (F-5).
-  const { vectorRows, ftsRows } = await ctx.rls(async (tx) => {
-    // VECTOR side — cosine distance over the HNSW vector_cosine_ops index. The
-    // WHERE is built with drizzle's typed builder so T02 can .toSQL()-inspect the
-    // tenant + source_type + model-version predicate (F-1).
-    const dist = cosineDistance(embeddings.embedding, queryVec);
-    const vectorRows = (await tx
-      .select({
-        id: embeddings.id,
-        sourceType: embeddings.sourceType,
-        sourceId: embeddings.sourceId,
-        chunkIdx: embeddings.chunkIdx,
-        chunkText: embeddings.chunkText,
-        dist: sql<number>`${dist}`.as('dist'),
-      })
-      .from(embeddings)
-      .where(
-        and(
-          eq(embeddings.accountId, accountId),
-          inArray(embeddings.sourceType, [...SOURCE_TYPES]),
-          eq(embeddings.embeddingModelVersion, EMBEDDING_MODEL_VERSION),
-        ),
-      )
-      .orderBy(sql`dist asc`)
-      .limit(pool)) as VectorRow[];
+  // are read from a single consistent snapshot (F-5). The whole block is wrapped
+  // so a DB/FTS failure NEVER propagates the bound ${query} (CSO-H1 / codex P1-1).
+  let vectorRows: VectorRow[];
+  let ftsRows: FtsRow[];
+  try {
+    const rows = await ctx.rls(async (tx) => {
+      // VECTOR side — cosine distance over the HNSW vector_cosine_ops index. The
+      // WHERE is built with drizzle's typed builder so T02 can .toSQL()-inspect the
+      // tenant + source_type + model-version predicate (F-1).
+      const dist = cosineDistance(embeddings.embedding, queryVec);
+      const vRows = (await tx
+        .select({
+          id: embeddings.id,
+          sourceType: embeddings.sourceType,
+          sourceId: embeddings.sourceId,
+          chunkIdx: embeddings.chunkIdx,
+          chunkText: embeddings.chunkText,
+          dist: sql<number>`${dist}`.as('dist'),
+        })
+        .from(embeddings)
+        .where(
+          and(
+            eq(embeddings.accountId, accountId),
+            inArray(embeddings.sourceType, [...SOURCE_TYPES]),
+            eq(embeddings.embeddingModelVersion, EMBEDDING_MODEL_VERSION),
+          ),
+        )
+        .orderBy(sql`dist asc`)
+        .limit(pool)) as VectorRow[];
 
-    // KEYWORD side — query-time FTS (OD-1 Option A, NO stored column). Every
-    // runtime value is a bound parameter (websearch_to_tsquery safely parses
-    // arbitrary user text and never errors on malformed input — T-02-06-03). The
-    // tenant + source_type + model-version filters match the vector side exactly.
-    const ftsResult = await tx.execute(sql`
-      select
-        ${embeddings.id} as id,
-        ${embeddings.sourceType} as source_type,
-        ${embeddings.sourceId} as source_id,
-        ${embeddings.chunkIdx} as chunk_idx,
-        ${embeddings.chunkText} as chunk_text,
-        ts_rank_cd(to_tsvector('english', ${embeddings.chunkText}), q) as rank
-      from ${embeddings}, websearch_to_tsquery('english', ${query}) q
-      where ${embeddings.accountId} = ${accountId}
-        and ${embeddings.sourceType} in (${sql.join(
-          SOURCE_TYPES.map((s) => sql`${s}`),
-          sql`, `,
-        )})
-        and ${embeddings.embeddingModelVersion} = ${EMBEDDING_MODEL_VERSION}
-        and to_tsvector('english', ${embeddings.chunkText}) @@ q
-      order by rank desc
-      limit ${pool}
-    `);
-    const ftsRows = ftsResult as unknown as FtsRow[];
-
-    return { vectorRows, ftsRows };
-  });
+      // KEYWORD side — query-time FTS (OD-1 Option A, NO stored column). Every
+      // runtime value is a bound parameter (websearch_to_tsquery safely parses
+      // arbitrary user text and never errors on malformed input — T-02-06-03). The
+      // tenant + source_type + model-version filters match the vector side exactly.
+      const ftsResult = await tx.execute(sql`
+        select
+          ${embeddings.id} as id,
+          ${embeddings.sourceType} as source_type,
+          ${embeddings.sourceId} as source_id,
+          ${embeddings.chunkIdx} as chunk_idx,
+          ${embeddings.chunkText} as chunk_text,
+          ts_rank_cd(to_tsvector('english', ${embeddings.chunkText}), q) as rank
+        from ${embeddings}, websearch_to_tsquery('english', ${query}) q
+        where ${embeddings.accountId} = ${accountId}
+          and ${embeddings.sourceType} in (${sql.join(
+            SOURCE_TYPES.map((s) => sql`${s}`),
+            sql`, `,
+          )})
+          and ${embeddings.embeddingModelVersion} = ${EMBEDDING_MODEL_VERSION}
+          and to_tsvector('english', ${embeddings.chunkText}) @@ q
+        order by rank desc
+        limit ${pool}
+      `);
+      return { vectorRows: vRows, ftsRows: ftsResult as unknown as FtsRow[] };
+    });
+    vectorRows = rows.vectorRows;
+    ftsRows = rows.ftsRows;
+  } catch {
+    // CSO-H1 / codex P1-1: the Drizzle/postgres error can carry the bound ${query}
+    // in its message/params. The query is CONFIDENTIAL and would reach Sentry
+    // UNSCRUBBED (sentry-scrub.ts is key-based on structured fields, not on the
+    // exception message string). Redact to a static error — no query, no cause.
+    throw new AppError('hybrid retrieval query failed', { code: 'RETRIEVE_QUERY_FAILED' });
+  }
 
   // RRF fuse keyed on embeddings.id. Position is 1-based; a doc present in only
   // one list scores from that one list (canonical RRF: score += 1/(k + rank)).

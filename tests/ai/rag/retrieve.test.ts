@@ -37,8 +37,10 @@
  *   (h) result.length <= effTopK for a fixture larger than topK.
  *   (i) WEAK path (F-3): FTS empty + vector low-similarity rows → non-empty,
  *       ftsScore:null on every candidate, length <= effTopK.
- *   (j) topK normalization (C-F1): 0 / -5 / 3.7 / 9999 each clamp to effTopK
+ *   (j) topK normalization (C-F1): 0 / -5 / 3.7 / 9999 / NaN each clamp to effTopK
  *       ∈ [1,50]; the serialized LIMIT param is the clamped integer * pool factor.
+ *   (k) DB/FTS failure is REDACTED (CSO-H1 / codex P1-1): the thrown error carries
+ *       neither the query nor the original cause; code = RETRIEVE_QUERY_FAILED.
  */
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { drizzle } from 'drizzle-orm/postgres-js';
@@ -400,6 +402,7 @@ describe('hybridRetrieve (Plan 02-06 / KNW-05a)', () => {
       { topK: -5, expectedEffTopK: 1 }, // negative → 1
       { topK: 3.7, expectedEffTopK: 3 }, // trunc → 3
       { topK: 9999, expectedEffTopK: MAX_TOP_K }, // clamp down to 50
+      { topK: NaN, expectedEffTopK: 8 }, // NaN → default 8 (Number.isFinite guard, CSO-M1)
     ];
 
     for (const { topK, expectedEffTopK } of cases) {
@@ -414,6 +417,35 @@ describe('hybridRetrieve (Plan 02-06 / KNW-05a)', () => {
       // Empty fixture → [] regardless of topK; the LIMIT proof is the assertion.
       expect(result).toEqual([]);
     }
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Case (k) — DB/FTS failure is redacted (CSO-H1 / codex P1-1)
+  // ──────────────────────────────────────────────────────────────────────────
+  it('(k) a DB/FTS failure is redacted — the thrown error carries neither the query nor the original cause', async () => {
+    const SENSITIVE_QUERY = 'CONFIDENTIAL-QUERY-SENTINEL-cap-table';
+    // ctx.rls rejects with an error that embeds the query (as a real Drizzle /
+    // postgres.js error would via its message + bound params). retrieve.ts must
+    // NOT propagate it — query text would otherwise reach Sentry unscrubbed.
+    const throwingCtx: HybridRetrieveCtx = {
+      rls: (async () => {
+        throw new Error(`syntax error at or near params=['${SENSITIVE_QUERY}']`);
+      }) as HybridRetrieveCtx['rls'],
+    };
+
+    let thrown: (Error & { code?: string; cause?: unknown }) | undefined;
+    try {
+      await hybridRetrieve({ accountId: ACCOUNT_ID, query: SENSITIVE_QUERY }, throwingCtx);
+    } catch (e) {
+      thrown = e as Error & { code?: string; cause?: unknown };
+    }
+
+    expect(thrown).toBeDefined();
+    expect(thrown!.code).toBe('RETRIEVE_QUERY_FAILED');
+    expect(thrown!.message).toBe('hybrid retrieval query failed');
+    expect(thrown!.message).not.toContain(SENSITIVE_QUERY);
+    // No cause chain re-attaching the original (query-bearing) error.
+    expect(thrown!.cause).toBeUndefined();
   });
 
   // ──────────────────────────────────────────────────────────────────────────

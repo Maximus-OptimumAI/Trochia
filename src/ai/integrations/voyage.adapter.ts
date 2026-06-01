@@ -145,18 +145,30 @@ export const voyage = {
         signal: controller.signal,
       });
     } catch (err) {
+      // CSO-H2 / codex P1-2: for a query embed, redact the error message AND drop
+      // `cause` — both can carry the founder's CONFIDENTIAL query, which would reach
+      // Sentry unscrubbed. Document embeds keep the network-error detail.
+      const isQuery = input.inputType === 'query';
       throw new AppError(
-        err instanceof Error ? err.message.slice(0, 200) : 'unknown',
-        { code: 'VOYAGE_NETWORK_FAILED', cause: err },
+        isQuery
+          ? 'voyage query embed failed (network)'
+          : err instanceof Error
+            ? err.message.slice(0, 200)
+            : 'unknown',
+        isQuery ? { code: 'VOYAGE_NETWORK_FAILED' } : { code: 'VOYAGE_NETWORK_FAILED', cause: err },
       );
     } finally {
       clearTimeout(timeout);
     }
 
     if (!response.ok) {
-      const body = (await response.text().catch(() => '')).slice(0, 200);
+      // CSO-H2 / codex P1-2: for a query embed, do NOT include the response body —
+      // a provider 400/429 can echo the query text. Status is safe; body is only
+      // surfaced for document embeds.
+      const isQuery = input.inputType === 'query';
+      const body = isQuery ? '' : (await response.text().catch(() => '')).slice(0, 200);
       throw new AppError(
-        `voyage ${response.status}: ${body}`,
+        isQuery ? `voyage query embed failed (status ${response.status})` : `voyage ${response.status}: ${body}`,
         { code: 'VOYAGE_BATCH_FAILED' },
       );
     }
@@ -171,6 +183,16 @@ export const voyage = {
     // this behavior).
     const ordered = [...json.data].sort((a, b) => a.index - b.index);
     const embeddingsOut = ordered.map((e) => e.embedding);
+
+    // Count assertion (CSO-M2 / codex P2-2): one embedding per input, BEFORE use,
+    // so an empty/short `data` 200 can't send `undefined` downstream (e.g. into
+    // cosineDistance). The count is not sensitive — safe to surface for any embed.
+    if (embeddingsOut.length !== input.texts.length) {
+      throw new AppError(
+        `expected ${input.texts.length} embeddings, got ${embeddingsOut.length}`,
+        { code: 'VOYAGE_COUNT_MISMATCH' },
+      );
+    }
 
     // Dim assertion — surfaces config drift loudly
     for (const e of embeddingsOut) {
