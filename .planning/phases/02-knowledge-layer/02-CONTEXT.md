@@ -91,7 +91,7 @@ In scope per `.planning/REQUIREMENTS.md` Phase 2 row: **KNW-01, KNW-02, KNW-03, 
 ### Per-user cost monitoring
 
 - Tag every Anthropic call in Langfuse with `user_id` (extends Phase 1 client)
-- Daily soft cap: **$5/user/day default**; over-cap → soft-throttle to Haiku tier with founder-visible banner
+- Daily **HARD cap: $5/user/day** (tunable; `CAP_MICRO_USD`) — over-cap **BLOCKS** the call at BOTH AI chokepoints (Anthropic synthesis + Voyage embed), surfacing a user-facing "Daily AI limit reached — resets at midnight UTC" message (never a fabricated answer). Enforced via atomic reserve-then-settle (Plan 02-07 OBS-COST-01). **[LOCKED — updated 2026-06-01 per founder ratification OD-8: the original "soft-throttle to Haiku tier" wording is SUPERSEDED — soft-throttle only slows spend, it does not cap it, which would nullify the provable ≤$5/user/day bound. Hard block is the locked decision.]**
 - Reuses Phase 4.5 SEC-02 pattern (tier-aware caps) — Phase 2 lays groundwork at user granularity
 
 ### Schema (Drizzle)

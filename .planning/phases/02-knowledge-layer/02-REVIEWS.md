@@ -1886,3 +1886,207 @@ CYCLE_SUMMARY: current_high=0 (CONVERGED at cycle 1; 2 NEW findings — 1 MED + 
 **CONVERGED at cycle 1.** Genuine plan-level HIGH defects = 0. The series: internal gsd-plan-checker APPROVED-WITH-NOTES (1 HIGH + 2 MED + 3 LOW, all folded) → Codex cycle 1 (0 HIGH; confirmed every load-bearing claim incl. the schema-lock guardrail; 2 NEW MED/LOW folded). Single cross-AI reviewer (Codex). Plan 02-06 is execution-ready pending founder go. Founder guardrails verified held: SCHEMA-LOCK (OD-1 Option A — query-time FTS, zero schema change, FOLLOWUP-DBDIFF-01 stays deferred; the schema-change fork surfaced as the explicit OD-1, not silent); NEW AI EGRESS (single Voyage query-embed chokepoint, PULL-OBS-COST-01-FORWARD deferred to 02-07 joint merge, tenant-scoped + RLS); MOCK-LIVE-DEPS in tests. DEPLOY-DEFERRED stands: branch-only, PR #7 DRAFT, main untouched. Founder-gated /codex + /cso at execution close still apply (standing rule 12).
 
 *Cross-AI convergence CLOSED at cycle 1 — 2026-06-01. Single reviewer: Codex CLI 0.130.0 (read-only, high). Internal gsd-plan-checker (sonnet) APPROVED-WITH-NOTES pre-cycle-1.*
+
+---
+
+## Plan 02-07 -- Cross-AI Review (qa-rag agent + ambient Q&A sidebar + per-user cost cap)
+
+### Cycle 0 -- gsd-plan-checker (sonnet) -- pre-Codex
+
+Reviewer: gsd-plan-checker (internal, sonnet). Date: 2026-06-01. Branch: phase-2-knowledge-layer @ HEAD 05758d5.
+Overall verdict: **APPROVED-WITH-NOTES** (0 CRITICAL, 2 HIGH, 4 MEDIUM, 3 LOW).
+
+---
+
+#### Founder Guardrail Verdicts
+| # | Guardrail | Verdict | Notes |
+|---|-----------|---------|-------|
+| 1 | Cost cap = REAL enforcement at BOTH chokepoints | **PASS** | must_haves truths 1-3 + T01 acceptance pin CHECK-before + RECORD-after at client.ts and voyage.adapter.ts. fail-CLOSED on meter outage specified. |
+| 2 | 0.6-cosine floor + post-synthesis citation validation | **PASS** | OD-7 two-stage grounding. Floor: max(vectorScore ?? -1) -- correct: retrieve.ts line 260 vectorScore = 1 - dist. Post-synthesis citation drop specified. qa-grounding eval pins criterion 7. |
+| 3 | Privacy: query/answer/chunks never in trace/log/error | **PASS** | T-02-07-02 + T02/T04 action + must_haves truth 7: static AppError at throw sites, metadata-only interaction row (OD-5). |
+| 4 | Anthropic synthesis through existing runAgent; no new client | **PASS** | must_haves truth 8; T02 forbids importing @anthropic-ai/sdk and getServiceClient in qa-rag; acceptance grep returns ZERO for both. |
+| 5 | qa-grounding eval flipped to real + PENDING_ALLOWED emptied | **PASS** | T03 sets PENDING_ALLOWED = new Set<string>([]). runner.ts line 36 currently has qa-grounding in the set -- confirmed against live code. |
+| 6 | Mock live deps; no real call on present-but-invalid key | **PASS** | must_haves truth 10; all tasks specify mocked live deps; env-gate-keys-on-presence pattern from lessons.md cited. |
+| 7 | Schema change ratified + FOLLOWUP-DBDIFF-01 activated | **PASS** | OD-1 Option A; must_haves truth 11; acceptance requires git diff --quiet 29228e8 to EXIT NON-ZERO -- documented as intentional first schema change. |
+| 8 | DEPLOY-DEFERRED: branch-only, PR #7 DRAFT, main untouched | **PASS** | In frontmatter notes, objective, T05. T05 type=checkpoint:human-action captures sequence without executing. |
+---
+
+#### Load-Bearing Claim Verdicts
+
+| Claim | Verdict | Evidence |
+|-------|---------|----------|
+| OD-1: No pre-existing durable usage/cost/spend store ANYWHERE | **VERIFIED -- REQUIRED** | grep src/db/schema/*.ts for usage/spend/cost/micro_usd/ai_usage: ZERO table or column definitions. tenancy.ts has no such columns. No dedicated usage table. OD-1 Option A (new table + migration) is genuinely required. |
+| interaction table: qa_sidebar + nullable query/answer + citations jsonb | **VERIFIED** | memory.ts lines 104-276: interactionKindEnum includes qa_sidebar; query nullable, answer nullable, citations jsonb, model, langfuseTraceId, latencyMs. OD-5 needs NO schema change. |
+| runAgent opts has NO costContext/accountId today | **VERIFIED** | client.ts lines 58-69: RunAgentOpts has taskClass, stablePrefix, variableSuffix, schema, maxTokens -- NO costContext. OD-3 addition is a required change. Prompt-caching breakpoint (blocks[blocks.length-1]) unaffected. |
+| hybridRetrieve vectorScore = cosine SIMILARITY; 0.6 floor correct | **VERIFIED** | retrieve.ts line 260: vectorScore = 1 - Number(row.dist). FTS-only hits: vectorScore null (lines 274-279). max(vectorScore ?? -1) < 0.6 is correct: null-safe, compares similarity not distance. |
+| voyage.embed called from read path AND Inngest; cap via getServiceClient + explicit accountId works from both | **VERIFIED** | voyage.adapter.ts called from retrieve.ts (ctx.rls) and embed-memory (Inngest). getServiceClient with explicit accountId works from both. trace.accountId already present. |
+| protectedProcedure injects ctx.db + ctx.tenantId + ctx.account | **VERIFIED** | trpc.ts lines 39-53: all three narrowed to non-null. qaRouter.ask seam is real. |
+| runner.ts empty Set supported; fixtures seam exists | **VERIFIED** | runner.ts line 36: new Set containing qa-grounding -- one-line change to empty. fixtures/index.ts exports PASTE_FIXTURE_PATHS + loadFixtureText(). Extension is additive. |
+| Schema-lock break explicitly acknowledged in plan | **VERIFIED** | Plan frontmatter line 14, OD-1, must_haves truth 11, T01 acceptance_criteria all call this the first intentional schema change since 29228e8. FOLLOWUP-DBDIFF-01 activated. |
+
+---
+
+#### Finding Register
+
+#### Finding Register
+
+**F-1 (HIGH) -- Cost-cap RACE under burst concurrency is under-specified.**
+
+The atomic upsert ON CONFLICT ... DO UPDATE is correct for the RECORD side -- Postgres row-locks the (account_id, usage_date) tuple for the duration, so concurrent RECORDs accumulate correctly. However, assertWithinDailyCap reads micro_usd_spent in a SEPARATE database round-trip before the call. Under burst concurrency, N concurrent requests can all read < CAP before any RECORD fires. All N pass the check. Spend overshoots by up to (N_concurrent - 1) x per-call-max-cost.
+
+must_haves truth 2 says recorded total never exceeds cap + one bounded in-flight call. This is correct for sequential requests only. T-02-07-04 says concurrency-safe under the row lock -- true for RECORD, not for CHECK. The integration test models only the sequential case and passes without concurrent-burst protection.
+
+Fix: (a) Document accepted bounded-overshoot as N_concurrent x per-call-max; update must_haves truth 2 and integration test to say sequential-case assumption. OR (b) Implement atomic check-and-reserve via single SQL UPDATE ... WHERE micro_usd_spent + est <= CAP RETURNING micro_usd_spent -- zero rows returned = blocked.
+
+Plan ref: T01; T-02-07-04; must_haves truth 2.
+
+---
+
+**F-2 (HIGH) -- T04 read_first omits src/ai/untrusted.ts.**
+
+Prompt-injection screening (T-02-07-03) lives in qa-rag.agent.ts (T02) via delimitUntrusted + screenForInjection in variableSuffix. An executor implementing T04 without reading untrusted.ts may: (a) not verify the security boundary is upheld upstream, (b) add a duplicate screening layer in the router, or (c) miss T-02-07-03 in code review. All three are executor-guidance failures on a security-relevant boundary.
+
+Fix: Add src/ai/untrusted.ts to T04 read_first with note: verify prompt-injection screening is in qa-rag.agent.ts (T02), NOT in the router (T04).
+
+Plan ref: T04 read_first.
+
+---
+
+**F-3 (MEDIUM) -- T04 interaction row write omits userId.**
+
+memory.ts line 252: userId uuid NOT NULL references users.id. The T04 action says persist a METADATA-ONLY kind:qa_sidebar interaction row and mentions accountId but not userId (ctx.session.user.id). An executor following the action as written will hit a NOT NULL constraint violation at runtime.
+
+Fix: Add userId: ctx.session.user.id to the interaction row insert in T04 action and the qa.ts artifact descriptor.
+
+Plan ref: T04 action; qa.ts artifact descriptor.
+
+---
+
+**F-4 (MEDIUM) -- OD-6 streaming deferral does not cite the Discretion classification.**
+
+02-CONTEXT lists streaming protocol under Claudes Discretion (not Decisions). OD-6 cites the requirement for streamed answers without noting the Discretion classification. The deferral is a valid planner exercise of discretion -- structured citations require the full forced-tool-use output path.
+
+Fix: Add to OD-6: the streaming protocol choice is in 02-CONTEXTs Claudes Discretion section -- this deferral is a valid discretion exercise, not a contradicted decision.
+
+Plan ref: OD-6.
+
+---
+
+**F-5 (MEDIUM) -- Phase-2 exit gate criterion 5 (median Q&A < 8s) has no verification path.**
+
+T03 covers criterion 6 (I-do-not-know rate >= 90%) and criterion 7 (zero fabricated citations). Criterion 5 (median < 8s) is not covered by any eval check in this plan. The interaction table persists latencyMs (OD-5) but no eval check computes the p50. The success_criteria checklist has no latency checkbox. Phase 2 cannot pass all 8 exit gate criteria after this plan closes unless criterion 5 is measured.
+
+Fix: Either add a qa-latency eval check to T03 (reads interaction.latencyMs p50, asserts < 8000ms; env-gated on ANTHROPIC_API_KEY), OR add FOLLOWUP-QA-LATENCY-EVAL-01 and explicitly acknowledge criterion 5 verification is deferred. Add a latency checkbox to success_criteria.
+
+Plan ref: verification section; T03; success_criteria.
+
+---
+
+**F-6 (MEDIUM) -- T03 eval fixture shape under-specified.**
+
+The plan conflates fixture shape for the REAL eval check (env-gated, calls real askQa) and the unit test (mocks askQa entirely). If the real check calls real askQa (env-gated, correct per guardrail 6), fixtures need only { question, expectedGrounded, isOutOfScope } -- no mock candidate sets, since real hybridRetrieve runs. If the check mocks hybridRetrieve internally, fixtures must carry candidate sets. An executor may produce the wrong fixture schema.
+
+Fix: Clarify in T03 action: the REAL eval check (env-gated) calls real askQa -> real hybridRetrieve + runAgent (absent key -> skip). Unit test mocks askQa entirely. Fixture JSON shape: { question: string, expectedGrounded: boolean, isOutOfScope: boolean }.
+
+Plan ref: T03 action; fixture artifact descriptor.
+
+---
+
+**F-7 (LOW) -- T01 acceptance does not verify BOTH inputType paths are capped.**
+
+grep assertWithinDailyCap|recordSpend in voyage.adapter.ts passes if the gate exists anywhere in the file. An executor could gate only inputType:query and leave document embeds uncapped. OD-4 shared ledger requires the gate for any accountId-present embed call regardless of inputType.
+
+Fix: Add assertion or unit test case that both inputType:query and inputType:document invoke assertWithinDailyCap.
+
+Plan ref: T01 acceptance_criteria.
+
+---
+
+**F-8 (LOW) -- Soft-throttle to hard-block evolution not documented as explicit override.**
+
+02-CONTEXT Decisions says over-cap -> soft-throttle to Haiku tier with founder-visible banner. The plan implements hard block (429 TOO_MANY_REQUESTS) per the founder guardrail PULL-OBS-COST-01-FORWARD. The founder guardrail supersedes the earlier CONTEXT decision but the override is not documented in-plan.
+
+Fix: Add to OD-2: 02-CONTEXT described soft-throttle to Haiku as over-cap behavior; the founder guardrail specifies hard block (fail-closed). Tier-aware soft-throttle is a future evolution (SEC-02 tier-aware caps, Phase 4.5).
+
+Plan ref: OD-2; must_haves truth 1.
+
+---
+
+#### Dimension Summary
+
+| Dimension | Verdict |
+|-----------|---------|
+| 1 Requirement Coverage | PASS (criterion 5 latency gap -- F-5) |
+| 2 Task Completeness | PASS WITH NOTES (F-2 HIGH read_first gap; F-3 MEDIUM userId NOT NULL) |
+| 3 Dependency Correctness | PASS |
+| 4 Key Links Planned | PASS |
+| 5 Scope Sanity | PASS WITH NOTE (~23 files; justified by joint-deploy posture) |
+| 6 Verification Derivation | PASS WITH NOTES (criterion 5 latency unverified) |
+| 7 Context Compliance | PASS WITH NOTES (F-4 OD-6 framing; F-8 override undocumented) |
+| 7b Scope Reduction | PASS |
+| 7c Arch Tier Compliance | PASS |
+| 8 Nyquist | PASS |
+| 9 Cross-Plan Data Contracts | PASS |
+| 10 CLAUDE.md Compliance | PASS |
+| 11 Research Resolution | SKIPPED |
+| 12 Pattern Compliance | SKIPPED |
+
+---
+
+#### Overall Verdict: APPROVED-WITH-NOTES
+
+0 CRITICAL, 2 HIGH, 4 MEDIUM, 3 LOW.
+
+The plan is architecturally sound and all 8 founder guardrails pass at plan level.
+
+**OD-1 determination (load-bearing):** NO pre-existing durable usage/cost/spend store exists anywhere in src/db/schema. The new ai_usage_daily table (Option A) is genuinely required and is the first schema change since 29228e8. Correctly founder-ratified.
+
+**Cost-cap race verdict (F-1 / HIGH):** The atomic upsert handles RECORD concurrency safely. The CHECK side has a TOCTOU window under burst concurrency. Overshoot = N_concurrent x per-call-max, not the one bounded call the plan asserts. The integration test covers only the sequential case. Must be addressed before T01 dispatch.
+
+Must-fix before T01 dispatch:
+- F-1 (HIGH): Document or eliminate the concurrent-request overshoot contract.
+- F-2 (HIGH): Add src/ai/untrusted.ts to T04 read_first.
+
+Recommended fixes before execution:
+- F-3 (MEDIUM): Add userId to T04 interaction row -- will cause NOT NULL runtime error.
+- F-5 (MEDIUM): Address criterion 5 latency verification gap or add FOLLOWUP explicitly.
+- F-6 (MEDIUM): Clarify T03 fixture shape and real-eval vs unit-test execution boundary.
+- F-4 (MEDIUM), F-8 (LOW): One-sentence framing clarifications in OD-6 and OD-2.
+
+*Review closed 2026-06-01. Reviewer: gsd-plan-checker (Claude Sonnet 4.6). Next: Codex CLI cycle 1 (founder dispatch).*
+
+---
+
+### Cycle 1-5 -- Codex CLI (cross-AI convergence)
+
+Reviewer: Codex CLI 0.130.0 (read-only sandbox, model_reasoning_effort=high, plan-only framing -- Codex told the code is intentionally unwritten; judge plan specification only). Five cycles, single cross-AI reviewer. The defect class across every cycle was the SAME load-bearing invariant: the cost-cap RESERVE must be a PROVABLE upper bound of the entire provider invocation (actual <= reserve) at BOTH chokepoints. Each cycle tightened one residual leak in that proof until current_high hit 0.
+
+#### Per-cycle verdicts + fold-resolutions
+
+| Cycle | Verdict | current_high | Findings raised | Fold-resolution |
+|-------|---------|--------------|-----------------|-----------------|
+| C1 | GATE FAIL | 2 | **P1-A** Anthropic reserve not an upper bound; **P1-B** Voyage reserve not an upper bound; **P2-C** reservation lifecycle; **P2-D** eval observability; **P2-E** grounded-consistency. | P1-A: the Anthropic RESERVE becomes the upper bound of the ENTIRE runAgent invocation -- 2x(maxInputTokens x inputRate + maxTokens x outputRate) at full non-cached Opus input pricing + the OpenAI fallback worst-case when AI_FALLBACK_ENABLED; SETTLE accumulates ACTUAL across ALL fired attempts (1st + repair + fallback) incl. cache_creation + cache_read; rates.ts gains cache-write + cache-read rates. P1-B: the Voyage RESERVE is computed from the actual input.texts (sum over the <=8 batch) for BOTH query AND document paths -- never a fixed 1-query ceiling; SETTLE to json.usage.total_tokens. P2-C: SETTLE-or-REFUND runs in a finally at both chokepoints (pre-call throw -> full refund; post-call throw -> settle to actual); hard-crash strand bounded + self-heals at UTC-day rollover; precise reclaim deferred as FOLLOWUP-COST-RESERVATION-RECLAIM-01. P2-D: validateCitations exported pure + eval-observable evidence (droppedCitationCount + maxVectorScore + retrieved key set); T03 asserts droppedCitationCount===0 + a unit test proving the eval FAILS on a dropped citation. P2-E: grounded:true REQUIRES >=1 valid citation AND zero dropped -- any dropped citation -> grounded:false + deterministic "I don't know". |
+| C2 | GATE FAIL | 2 | **P1-A** repair-input not bounded; **P1-B** char/4 Voyage estimate can under-reserve; **P2-C** reservation-token usageDate; **P2-D** eval-debug not type-separated from the client answer. (P2-E confirmed RESOLVED.) | P1-A: the repair retry re-sends attempt1's assistant tool_use content + a validation-error + the tool schema, so its input EXCEEDS the base estimate; reserve = attempt1(maxInputTokens) + attempt2(repairInputCeiling = maxInputTokens + maxTokens + REPAIR_OVERHEAD_TOKENS) [+ fallback worst-case under flag]; OpenAI fallback now EXPOSES token usage so SETTLE prices it from actual. P1-B: Voyage reserve basis replaces ceil(len/CHARS_PER_TOKEN) with Buffer.byteLength(text,'utf8') per text (a token is >=1 byte -> byte-length >= token-count always), summed over input.texts; T01 adds a unicode/multibyte + a many-short-tokens text both proving RESERVE >= actual. P2-C: reserveWithinDailyCap RETURNS a reservation token { accountId, usageDate, reservedMicroUsd } where usageDate is the UTC day captured AT RESERVE TIME; settle/refund write to token.usageDate's row, NEVER CURRENT_DATE -- a call crossing UTC midnight adjusts the ORIGINAL day (T01 adds a 23:59:59->00:00:01 crossing test). P2-D: AskQaResult = { answer, debug:{ droppedCitationCount, maxVectorScore, retrievedKeys } }; askQa returns AskQaResult; qaRouter.ask returns ONLY result.answer (strips debug at the boundary); the eval consumes .debug. |
+| C3 | GATE FAIL | 1 | **P1-A** residual (3 sub-points): input must be priced at the cache-write rate; the input ceiling must be MEASURED not estimated; the OpenAI fallback exposed no usage and was out of scope. | P1-A(1): cache_creation prices ABOVE base input (~1.25x), so the RESERVE prices its ENTIRE input side at OPUS_CACHE_WRITE (the highest input-side per-token rate) -> actual input cost <= reserved no matter the bucket split; actualAnthropicMicroUsd still prices each ACTUAL bucket at its real rate. P1-A(2): maxInputTokens was an ESTIMATE -- replaced with a MEASURED inputTokenCeiling = Buffer.byteLength(assembledPromptText,'utf8') (system stablePrefix blocks + variableSuffix, in memory BEFORE the fetch), mirroring the P1-B discipline. P1-A(3): the OpenAI fallback is DISABLED when costContext is present -- a metered runAgent prices ONLY the (<=2) Anthropic attempts and NEVER invokes fallbackToOpenAI; double-validation failure throws AI_STRUCTURED_OUTPUT_INVALID (qa-rag maps it to a deterministic "I don't know"). Fallback-worst-case term + FALLBACK constants REMOVED from the reserve path; fallback.ts stays OUT of files_modified (the change is the skip in client.ts). Net provable invariant: reserve = 2 attempts x (measured-input-byte-ceiling @ cache-write + maxTokens @ output), settle accumulates actual at real per-bucket rates, fallback disabled under cap => actual <= reserve. |
+| C4 | GATE FAIL | 1 | **P1-A** residual: the measured inputTokenCeiling omitted the serialized forced-tool input_schema + tool_choice (also billed input the request sends). | RESOLVED: inputTokenCeiling = Buffer.byteLength(systemBlocksText + variableSuffixText + JSON.stringify(tools) + JSON.stringify(toolChoice),'utf8') -- the COMPLETE billed input surface = (a) system stablePrefix blocks, (b) variableSuffix, (c) the serialized forced-tool tools/input_schema (z.toJSONSchema(opts.schema)), (d) the serialized tool_choice. Byte-length over the full concatenation stays a true token upper bound. The repair attempt2 ceiling stays inputTokenCeiling + maxTokens + REPAIR_OVERHEAD_TOKENS (the repair re-sends the SAME tools + the echoed assistant content + the error string, all bounded by this). |
+| C5 | **CONVERGED** | 0 | None. | P1-A RESOLVED: the measured inputTokenCeiling covers the COMPLETE billed input surface (system blocks + variableSuffix + serialized forced-tool input_schema + tool_choice) priced at the cache-write rate, so the Anthropic reserve is a provable whole-invocation upper bound (actual <= reserve). No new findings. Full resolved + clean set re-confirmed no-regression. |
+
+#### Final Codex CLEAN-verified list (re-confirmed at cycle 5)
+
+- **Dual-chokepoint cost enforcement** -- a REAL $5/user/day cap that BLOCKS at BOTH src/ai/client.ts (Anthropic) and voyage.adapter.ts (Voyage); tracking-only would be a FAIL.
+- **RESERVE-then-SETTLE concurrency + finally lifecycle** keyed on the reservation usageDate captured at reserve time (settle/refund never write to CURRENT_DATE; a UTC-midnight crossing adjusts the original day).
+- **Anthropic reserve = provable whole-invocation upper bound** -- (<=2) attempts, each input side @ OPUS_CACHE_WRITE over the MEASURED byte-length ceiling of the complete billed input surface (system + variableSuffix + input_schema + tool_choice); repair attempt2 = ceiling + maxTokens + REPAIR_OVERHEAD; fallback disabled under costContext.
+- **Voyage reserve = UTF-8 byte-length per text** over the <=8 batch (byte-length >= token-count always), BOTH query + document paths; settle to json.usage.total_tokens.
+- **Two-stage grounding** -- 0.6 cosine-similarity floor (PRE-synthesis "I don't know", no Opus call) + POST-synthesis citation validation; grounded:true => >=1 valid citation AND zero dropped, else grounded:false + deterministic "I don't know".
+- **Eval observability** -- type-separated AskQaResult.debug (droppedCitationCount + maxVectorScore + retrievedKeys, NO query/answer/chunk text); the eval consumes .debug, the client gets only result.answer.
+- **Single Anthropic chokepoint + prompt caching** -- synthesis via the EXISTING runAgent; no new client; no @anthropic-ai/sdk or getServiceClient inside qa-rag.
+- **Untrusted handling** -- retrieved chunks pass screenForInjection + delimitUntrusted into variableSuffix (never stablePrefix).
+- **qa-grounding eval flip** -- 'pending' -> real + PENDING_ALLOWED emptied (the gate goes fully active).
+- **OD-1 schema-lock acknowledgment** -- the new ai_usage_daily table is the first intentional schema change since 29228e8; FOLLOWUP-DBDIFF-01 activated.
+- **OD-8 hard-block divergence** -- a CONSCIOUS override of 02-CONTEXT's soft-throttle-to-Haiku wording, per founder kickoff guardrail #1.
+- **Privacy redaction at throw sites** -- query/answer/chunks never in trace/log/error.
+- **Pre-prod gates captured** -- the founder-run pre-prod-merge checklist is recorded (not executed) in this plan.
+
+Converged at cycle 5 (current_high=0). Per standing rule 12, the founder-gated /codex + /cso fire at EXECUTION close, not planning. DEPLOY-DEFERRED -- branch-only, PR #7 DRAFT, main untouched.
+
+*Cross-AI convergence CLOSED at cycle 5 -- 2026-06-01. Single reviewer: Codex CLI 0.130.0 (read-only, high, plan-only). Internal gsd-plan-checker (sonnet) APPROVED-WITH-NOTES pre-cycle-1.*
