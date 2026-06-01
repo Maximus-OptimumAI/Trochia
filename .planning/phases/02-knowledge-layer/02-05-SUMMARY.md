@@ -151,9 +151,29 @@ All ratified by the founder during the per-task greenlight loop.
 - **FOLLOWUP-NODE-VERSION-SKEW-01** + **FOLLOWUP-SOURCEMAP-PROD-PUBLIC-HARDENING-01** — pre-first-prod-merge gates (unchanged).
 - The 02-04 deploy-deferred posture stands: PR #7 DRAFT, main untouched, prod cutover at the 02-07 joint merge.
 
+## Founder-gated review (/codex + /cso) — completed 2026-06-01
+
+Both complementary gates ran on `3301aa9..HEAD` (eval surface) and were triaged into ONE pre-redeploy batch commit `27446f1` (branch-only, no deploy).
+
+- **/codex** (Codex CLI): GATE FAIL — 2×P1, 3×P2, 2×P3. One P1 (cache-hit parallel/flush) re-rated to P2 after verification (it measures the ambient window, not this run's traces; the real bug was empty-window→fail). All findings addressed.
+- **/cso** (CSO audit): **APPROVED-WITH-FIXES** — 0 CRITICAL, 0 HIGH, 2 MED, 3 LOW. The two prime security properties hold by design: (1) repo secrets never reach a `pull_request` run (LIVE step gated to non-PR); (2) no PII/trace/secret reaches the PR comment or report (hard whitelist + metadata-only Langfuse read). Report at `.gstack/security-reports/20260601-cso-plan-02-05.json` (gitignored).
+
+Batch `27446f1` applied: cache-hit empty-window→`skip`; runner per-check try/catch→sanitized `fail` + always-write report; eval.yml comment same-repo guard (fork-PR 403 safety) + full cell-sanitize/allowlist hardening; PR step `secrets.*`→literal localhost (secret-free); +4 tests (runner thrown-check; cache-hit empty/`{data:undefined}`/rejection). Deferred (non-blocking): /cso M2 SHA-pin first-party actions (consistent with ci.yml convention). Post-batch verify-loop: eval 25/25; tsc clean; eval.yml valid; eval:run PR-sim exit 0 / LIVE-sim exit 1; vitest 293/295 (2 = pre-existing FOLLOWUP-HARDCODED-DOMAIN-REGEX-01).
+
+## Task Commits (final)
+
+| | Commit | |
+|---|---|---|
+| T01 | `1f5941f` | runner skip/PENDING_ALLOWED/EVAL_LIVE_REQUIRED gate |
+| T02 | `ddade8b` | extraction-floor flip + fixtures seam |
+| T03 | `ca1b574` | cache-hit flip via fetchTraces + eval.yml split |
+| Close fix | `268029e` | eval.yml CI env + Case 2 hermetic test |
+| Close docs | `01cb9e1` | SUMMARY + lessons + ROADMAP/STATE |
+| Pre-redeploy triage | `27446f1` | /codex + /cso findings batched |
+
 ## DEPLOY-DEFERRED note
 
-No prod deploy fires at this close. 02-05 is branch-only on `phase-2-knowledge-layer`; PR #7 stays DRAFT; main untouched. The founder-gated `/codex` + `/cso` review runs next, then the plan rests inside the deploy-deferred branch until the 02-07 joint write+read+cost-cap merge.
+No prod deploy fires at this close. 02-05 is branch-only on `phase-2-knowledge-layer`; PR #7 stays DRAFT; main untouched at `acfab36`. Both founder-gated reviews are complete (above); the plan rests inside the deploy-deferred branch until the 02-07 joint write+read+cost-cap merge.
 
 ## Self-Check: PASSED
 
