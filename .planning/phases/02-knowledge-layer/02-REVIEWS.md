@@ -1848,3 +1848,41 @@ CYCLE_SUMMARY: current_high=0 (C3-H1 refuted via type-def evidence; C3-M1 fixed 
 **CONVERGED at cycle 3.** Genuine plan-level HIGH defects = 0. The series: cycle 1 (4 HIGH + 2 MED + 1 LOW) → replan → cycle 2 (all cycle-1 resolved at plan level; 2 NEW MED/LOW folded) → cycle 3 (1 HIGH refuted as a type-read error; 1 MED fixed). 3 reviewers-rounds, single reviewer (Codex). Internal gsd-plan-checker (sonnet) APPROVED-WITH-NOTES pre-cycle-1. Plan 02-05 is execution-ready pending founder go. Standing gates intact: G-EVAL-1 (post-exec ≤1 'pending' = qa-grounding), schema-lock (zero migrations, exit 0 at 29228e8), AI chokepoint, no new deps, Langfuse metadata-only whitelist.
 
 *Cross-AI convergence CLOSED at cycle 3 — 2026-05-31. Single reviewer: Codex CLI (read-only, high). Founder-gated /codex + /cso at execution close still apply per standing rule.*
+
+---
+
+# Plan 02-06 — Cross-AI Review (hybrid RAG retriever / KNW-05a)
+
+## Cycle 0 — internal gsd-plan-checker (sonnet) — pre-Codex
+
+Reviewer: gsd-plan-checker (internal, sonnet). Date: 2026-06-01. Verdict: **APPROVED-WITH-NOTES** (0 CRITICAL, 1 HIGH, 2 MED, 3 LOW). All 3 founder guardrails PASS; grounding verified against live code.
+
+| ID | Sev | Finding | Plan ref | Disposition |
+|----|-----|---------|----------|-------------|
+| F-1 | HIGH | Per-side test-predicate-assertion mechanics under-specified + collide with `embed-memory.test.ts`'s "ignore `_pred`" fake DB (which cannot introspect drizzle expression trees) → cases (c)/(d) could pass vacuously and silently void the cross-tenant mitigation's own proof. | T02; must_haves.artifacts test | FOLDED — T02 mandates vector-side `.toSQL()` serialization + FTS-side `sql`` bound-param inspection; explicitly forbids copying the embed-memory shortcut. |
+| F-2 | MED | OD-4 (draft) passed `sourceType:'memory'` for a query embed — a knowingly-false value written onto the privacy-contract Langfuse trace; corrupts any analytics grouping by `source_type`. | OD-4; truth #8; T-02-06-02 | FOLDED — OD-4 revised: widen the adapter `trace.sourceType` TS union with an honest `'query'` literal (does NOT change `TRACE_METADATA_KEYS`; Case 8b key-set pin holds); +1 adapter test pins the query-trace shape. |
+| F-3 | MED | The dominant real-world weak-retrieval shape (vector returns far-but-nonzero rows, FTS empty) was untested; only "both sides empty → []" was covered. | OD-5; T02 case (e) | FOLDED — T02 case (i) added: FTS empty + vector low-similarity → non-empty result, `ftsScore:null` on every candidate, length ≤ effTopK; prevents an executor adding a vector-side cutoff that would leak 02-07's grounding decision into the retriever. |
+| F-4 | LOW | `vectorScore = 1 - dist` not documented as a cosine *similarity* ∈ [-1,1] vs a distance — an executor could misread the 02-CONTEXT "0.6 cosine" floor as a distance. | T01 Step 5; truth #13; OD-5 | FOLDED — range contract documented on the artifact + truth: cosine similarity, [-1,1], higher=better, the scale the 0.6 floor compares against. |
+| F-5 | LOW | Vector + FTS queries read in two separate `ctx.rls` transactions → a concurrent write between them could skew fusion. | T01 Step 2/3; truth #2 | FOLDED — both queries now run inside ONE `ctx.rls(async tx => …)` snapshot. |
+| F-6 | LOW | `CANDIDATE_POOL = topK*4` called a "constant" but varies with the runtime `topK`; an executor could hoist it to a fixed module const computed from default 8 and ignore a caller's larger topK. | T01 constants | FOLDED — `CANDIDATE_POOL_FACTOR = 4`; per-side LIMIT = `effTopK * FACTOR`. |
+
+CYCLE_SUMMARY: internal pre-Codex APPROVED-WITH-NOTES; all 6 folded before the Codex cycle.
+
+## Cycle 1 — Codex CLI (read-only sandbox, model_reasoning_effort=high) — plan-only framing
+
+Reviewer: Codex CLI 0.130.0. Date: 2026-06-01. Tokens ~89k. Correctly plan-scoped (told Codex the code is intentionally unwritten — judge plan specification only). Raw line: `current_high=0`.
+
+Codex explicitly confirmed coherent at plan level: OD-1 Option A query-time FTS is technically sound and needs NO schema change; the `git diff --quiet 29228e8` schema-lock guard is asserted in must_haves + T01 acceptance; RRF k=60 rank-based fusion + the `1/(60+1)+1/(60+3)` worked example are correct; the OD-4 `'query'` union widening is genuinely key-set-preserving (Case 8b holds); `vectorScore = 1 - cosineDistance` is the correct cosine similarity for the 0.6 floor; tenant scope (explicit account_id + RLS, never getServiceClient) + single Voyage chokepoint + mock-all-deps in tests are all sound; SQL parameterization (websearch_to_tsquery bound params) is correct; scope is correctly fenced to retrieval (synthesis/citation/grounding/cost-cap all deferred to 02-07).
+
+| ID | Sev | Finding | Plan ref | Disposition |
+|----|-----|---------|----------|-------------|
+| C-F1 | MEDIUM | `topK` is caller-controlled but uncapped — a huge/zero/negative/non-integer `topK` can create excessive DB work, an oversized payload, or an invalid SQL `LIMIT`. The `topK*4` mitigation does not normalize the input. | T-02-06-04; T01 signature/constants; T02 case (h) | FOLDED — added `MAX_TOP_K = 50` + `effTopK = clamp(Math.trunc(topK ?? 8), 1, MAX_TOP_K)` normalization BEFORE any SQL; every LIMIT + final slice use `effTopK`; T-02-06-04 rewritten; truth added; T02 case (j) pins topK=0 / -5 / 3.7 / 9999 → clamped integer LIMIT. |
+| C-F2 | LOW | T02's predicate-proof mechanics are directionally right but brittle if they rely on a private mock object shape; `.toSQL()` only proves the real query if the test captures a real Drizzle builder. | must_haves.artifacts test; T02 action | FOLDED — T02 now specifies a stable harness: `drizzle.mock({ schema })` (or the real query builder) → `.toSQL()` on the actual vector/FTS query objects, with a SEPARATE mocked executor for fixture rows; not private-shape poking. |
+
+CYCLE_SUMMARY: current_high=0 (CONVERGED at cycle 1; 2 NEW findings — 1 MED + 1 LOW — folded in-cycle)
+
+## Convergence verdict
+
+**CONVERGED at cycle 1.** Genuine plan-level HIGH defects = 0. The series: internal gsd-plan-checker APPROVED-WITH-NOTES (1 HIGH + 2 MED + 3 LOW, all folded) → Codex cycle 1 (0 HIGH; confirmed every load-bearing claim incl. the schema-lock guardrail; 2 NEW MED/LOW folded). Single cross-AI reviewer (Codex). Plan 02-06 is execution-ready pending founder go. Founder guardrails verified held: SCHEMA-LOCK (OD-1 Option A — query-time FTS, zero schema change, FOLLOWUP-DBDIFF-01 stays deferred; the schema-change fork surfaced as the explicit OD-1, not silent); NEW AI EGRESS (single Voyage query-embed chokepoint, PULL-OBS-COST-01-FORWARD deferred to 02-07 joint merge, tenant-scoped + RLS); MOCK-LIVE-DEPS in tests. DEPLOY-DEFERRED stands: branch-only, PR #7 DRAFT, main untouched. Founder-gated /codex + /cso at execution close still apply (standing rule 12).
+
+*Cross-AI convergence CLOSED at cycle 1 — 2026-06-01. Single reviewer: Codex CLI 0.130.0 (read-only, high). Internal gsd-plan-checker (sonnet) APPROVED-WITH-NOTES pre-cycle-1.*
