@@ -70,6 +70,16 @@ describe('runEvalSuite', () => {
       status: 'fail',
       reason: 'test-stub: forced failure',
     });
+    // cacheHit is now a LIVE check (Plan 02-05 T03); stub it so this runner unit
+    // test stays hermetic — without this it fires a real fetchTraces against any
+    // .env.local Langfuse creds. 'skip' is non-failing, so the asserted exit 1 is
+    // attributable solely to extractionFloor's 'fail'.
+    vi.spyOn(cacheHit, 'run').mockResolvedValueOnce({
+      id: 'cache-hit',
+      description: cacheHit.description,
+      status: 'skip',
+      reason: 'test-stub: env-unavailable',
+    });
     const result = await runEvalSuite();
     expect(result.exitCode).toBe(1);
     expect(result.checks.find((c) => c.id === 'extraction-floor')?.status).toBe('fail');

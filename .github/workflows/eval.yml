@@ -38,6 +38,12 @@ jobs:
         if: ${{ github.event_name == 'pull_request' }}
         env:
           NODE_ENV: test
+          # src/lib/env.ts requires these two URL vars UNCONDITIONALLY (not
+          # prodRequired) and validates at import — the eval checks now import
+          # env.ts transitively, so eval:run crashes without them. Same
+          # non-secret localhost fallback pattern as ci.yml.
+          NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000' }}
+          NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL || 'http://localhost:3000' }}
         run: npm run eval:run
 
       # ── LIVE eval step (nightly + manual) ──────────────────────────────────
@@ -50,6 +56,9 @@ jobs:
         if: ${{ github.event_name != 'pull_request' }}
         env:
           NODE_ENV: test
+          # Same unconditional env.ts URL requirement as the PR step above.
+          NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000' }}
+          NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL || 'http://localhost:3000' }}
           EVAL_LIVE_REQUIRED: '1'
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
