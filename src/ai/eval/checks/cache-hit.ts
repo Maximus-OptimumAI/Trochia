@@ -91,8 +91,8 @@ export const cacheHit: EvalCheck = {
     let counted = 0;
     // Defensive: the SDK can resolve a response whose `data` is absent / non-array
     // on some error paths (e.g. a creds 401 the SDK swallows). Treat a missing
-    // `data` as zero traces → ratio 0 → 'fail' (a live read that returned nothing
-    // is a fail, never a throw).
+    // `data` as zero traces — which falls through to the counted===0 → 'skip'
+    // branch below (data-unavailable), never a throw.
     const traces = Array.isArray(res.data) ? res.data : [];
     for (const trace of traces) {
       // Filter to Anthropic-chokepoint traces by the `agent:` name prefix.
@@ -102,6 +102,21 @@ export const cacheHit: EvalCheck = {
       cacheRead += meta.cacheRead ?? 0;
       inputTokens += meta.inputTokens ?? 0;
       counted += 1;
+    }
+
+    // Zero agent:* traces in the window is data-unavailable, NOT a cache
+    // failure — return 'skip' so we never conflate "no traffic yet" (or a
+    // swallowed 401) with "caching broken" (/codex P1 + /cso). 'skip' is
+    // fail-OPEN on PR/local and a RED gate under EVAL_LIVE_REQUIRED, so a quiet
+    // nightly still surfaces a data/creds problem rather than a false 'fail'.
+    // Also makes the ratio division below safe (no inputTokens → no divide).
+    if (counted === 0) {
+      return {
+        id: this.id,
+        description: this.description,
+        status: 'skip' as const,
+        reason: `no agent:* traces in the ${WINDOW_DAYS}d window — insufficient data (data-unavailable, non-blocking)`,
+      };
     }
 
     const ratio = cacheRead / Math.max(inputTokens, 1);

@@ -109,4 +109,28 @@ describe('cacheHit.run', () => {
     expect(r.reason).toContain('ratio');
     expect(r.reason).toContain('traces');
   });
+
+  it('zero agent:* traces in the window → skip (insufficient data, NOT fail)', async () => {
+    // /codex P1 + /cso: an empty/low-volume window is data-unavailable, not a
+    // cache failure. Only non-agent traces present → counted 0 → skip.
+    fetchTraces.mockResolvedValueOnce({
+      data: [trace('healthcheck', { cacheRead: 5, inputTokens: 5 })],
+    });
+    const r = await cacheHit.run();
+    expect(r.status).toBe('skip');
+    expect(r.reason).toContain('insufficient data');
+  });
+
+  it('non-array res.data (e.g. a swallowed 401) → skip, never a throw', async () => {
+    // The Array.isArray(res.data) guard treats a malformed response as zero
+    // traces → counted 0 → skip (fail-OPEN on PR/local, RED under EVAL_LIVE_REQUIRED).
+    fetchTraces.mockResolvedValueOnce({ data: undefined });
+    const r = await cacheHit.run();
+    expect(r.status).toBe('skip');
+  });
+
+  it('fetchTraces rejection propagates (the runner, not this check, converts it to fail)', async () => {
+    fetchTraces.mockRejectedValueOnce(new Error('langfuse 500'));
+    await expect(cacheHit.run()).rejects.toThrow('langfuse 500');
+  });
 });

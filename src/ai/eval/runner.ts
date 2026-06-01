@@ -21,7 +21,7 @@
 import { extractionFloor } from './checks/extraction-floor';
 import { qaGrounding } from './checks/qa-grounding';
 import { cacheHit } from './checks/cache-hit';
-import type { EvalCheck, EvalStatus, EvalSuiteResult } from './types';
+import type { EvalCheck, EvalCheckResult, EvalStatus, EvalSuiteResult } from './types';
 import { writeFileSync, appendFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
@@ -36,7 +36,26 @@ const CHECKS: EvalCheck[] = [extractionFloor, qaGrounding, cacheHit];
 const PENDING_ALLOWED = new Set<string>(['qa-grounding']);
 
 export async function runEvalSuite(): Promise<EvalSuiteResult> {
-  const results = await Promise.all(CHECKS.map((c) => c.run()));
+  // Each check is isolated: a thrown check becomes a sanitized 'fail' result
+  // rather than rejecting Promise.all (which would skip the report write and
+  // leave the PR-comment step reading a stale/absent eval-report.json). The
+  // error message is truncated and carries no stack/secret/PII (/codex P2 +
+  // /cso). A thrown check is fail-CLOSED — it can never pass silently.
+  const results = await Promise.all(
+    CHECKS.map(async (c): Promise<EvalCheckResult> => {
+      try {
+        return await c.run();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return {
+          id: c.id,
+          description: c.description,
+          status: 'fail',
+          reason: `check threw: ${msg.slice(0, 120)}`,
+        };
+      }
+    }),
+  );
 
   // When EVAL_LIVE_REQUIRED==='1' (nightly / manual live runs), a 'skip'
   // (env-unavailable) is promoted to a FAILURE — a run that was supposed to

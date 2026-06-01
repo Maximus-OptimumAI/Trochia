@@ -40,10 +40,12 @@ jobs:
           NODE_ENV: test
           # src/lib/env.ts requires these two URL vars UNCONDITIONALLY (not
           # prodRequired) and validates at import — the eval checks now import
-          # env.ts transitively, so eval:run crashes without them. Same
-          # non-secret localhost fallback pattern as ci.yml.
-          NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000' }}
-          NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL || 'http://localhost:3000' }}
+          # env.ts transitively, so eval:run crashes without them. The PR step
+          # is SECRET-FREE (/codex P2 + /cso L1): use LITERAL localhost, never
+          # secrets.*. The PR run env-skips the live checks, so this URL only
+          # satisfies env.ts import validation; it is never used meaningfully.
+          NEXT_PUBLIC_SITE_URL: 'http://localhost:3000'
+          NEXT_PUBLIC_APP_URL: 'http://localhost:3000'
         run: npm run eval:run
 
       # ── LIVE eval step (nightly + manual) ──────────────────────────────────
@@ -80,7 +82,11 @@ jobs:
       # sanitized reason, metric, threshold, and the exit code — NEVER secrets,
       # env values, or trace/paste/PII content. Uses the default GITHUB_TOKEN.
       - name: Comment eval summary on PR
-        if: ${{ always() && github.event_name == 'pull_request' }}
+        # Same-repo guard (/codex P1 + /cso L2): on FORK PRs the GITHUB_TOKEN is
+        # downgraded to read-only, so createComment 403s and would false-fail an
+        # otherwise-green PR. Only post when the PR head is from THIS repo (a
+        # branch push). Fork PRs skip the comment entirely — non-blocking.
+        if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
         uses: actions/github-script@v7
         with:
           script: |
@@ -95,7 +101,19 @@ jobs:
             }
 
             // Build the comment body from a HARD WHITELIST of report fields only.
-            // Never echo secrets, env values, or trace/paste/PII content.
+            // Never echo secrets, env values, or trace/paste/PII content. Every
+            // cell is sanitized + truncated and `status` is allowlisted — even
+            // though `reason` is authored by our own check code, this is
+            // defense-in-depth against markdown/HTML injection if a PR alters a
+            // check's output (/codex P2 + /cso M1).
+            const ALLOWED_STATUS = new Set(['pass', 'fail', 'skip', 'pending']);
+            const cell = (v) =>
+              String(v ?? '—')
+                .replace(/[\r\n]+/g, ' ')   // no row/line breaks
+                .replace(/[`<>|]/g, '')      // strip backticks, angle brackets, pipes
+                .slice(0, 200);              // cap length
+            const numCell = (v) =>
+              typeof v === 'number' && Number.isFinite(v) ? String(v) : '—';
             const lines = [
               MARKER,
               '## Trochia eval harness',
@@ -103,20 +121,17 @@ jobs:
               '_Live-AI checks (extraction-floor, cache-hit) run nightly + on manual dispatch; on PRs they env-skip (non-blocking)._',
               '',
             ];
-            if (!report) {
-              lines.push('No `eval-report.json` produced for this run.');
+            if (!report || !Array.isArray(report.checks)) {
+              lines.push('No valid `eval-report.json` produced for this run.');
             } else {
               lines.push('| Check | Status | Metric | Threshold | Reason |');
               lines.push('|---|---|---|---|---|');
-              for (const c of report.checks ?? []) {
-                const metric = c.metric === undefined ? '—' : String(c.metric);
-                const threshold = c.threshold === undefined ? '—' : String(c.threshold);
-                // reason strings are authored to carry only counts/ratios.
-                const reason = String(c.reason ?? '').replace(/\|/g, '\\|');
-                lines.push(`| \`${c.id}\` | ${c.status} | ${metric} | ${threshold} | ${reason} |`);
+              for (const c of report.checks) {
+                const status = ALLOWED_STATUS.has(c?.status) ? c.status : 'invalid';
+                lines.push(`| ${cell(c?.id)} | ${status} | ${numCell(c?.metric)} | ${numCell(c?.threshold)} | ${cell(c?.reason)} |`);
               }
               lines.push('');
-              lines.push(`**Exit code:** ${report.exitCode}`);
+              lines.push(`**Exit code:** ${Number.isInteger(report.exitCode) ? report.exitCode : '?'}`);
             }
             const body = lines.join('\n');
 

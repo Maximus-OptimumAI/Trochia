@@ -219,4 +219,29 @@ describe('runEvalSuite', () => {
     expect(result.exitCode).toBe(1);
     expect(result.checks.find((c) => c.id === 'extraction-floor')?.status).toBe('skip');
   });
+
+  it('Case 9 — a thrown check becomes a sanitized fail (not a rejection), report still produced', async () => {
+    // Per-check try/catch isolation (/codex P2 + /cso L3): a check that throws
+    // must NOT reject Promise.all (which would skip the report write). It is
+    // converted to a fail-CLOSED 'fail' result; the other checks + the summary
+    // still resolve. Keep the live checks deterministic.
+    delete process.env.EVAL_LIVE_REQUIRED;
+    vi.spyOn(extractionFloor, 'run').mockRejectedValueOnce(
+      new Error('boom: simulated check failure with sensitive-looking detail'),
+    );
+    vi.spyOn(cacheHit, 'run').mockResolvedValueOnce({
+      id: 'cache-hit',
+      description: cacheHit.description,
+      status: 'skip',
+      reason: 'test-stub: env-unavailable',
+    });
+    const result = await runEvalSuite();
+    const ef = result.checks.find((c) => c.id === 'extraction-floor');
+    expect(ef?.status).toBe('fail');
+    expect(ef?.reason).toContain('check threw');
+    expect(result.exitCode).toBe(1);
+    // All three checks still present (no check dropped by the rejection).
+    expect(result.checks).toHaveLength(3);
+    expect(result.summary).toContain('## Trochia eval harness');
+  });
 });
