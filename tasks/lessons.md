@@ -620,3 +620,38 @@ Next: 6c (Install Cursor CLI to Windows PATH)
     suite must not depend on that — it mocks.
 
   (Phase 2 Plan 02-05 close, 2026-06-01.)
+
+- **2026-06-02 — `eval:run` belongs in EVERY verify-loop, not just the unit
+  suite — vitest bundler-aliases `server-only` so a broken import passes
+  unit tests while `tsx` (eval:run) crashes at module-eval.** Plan 02-07
+  T01→T03 shipped a `cap.ts` that statically imported `@/db/client` (which
+  transitively pulls `server-only`). The full vitest suite stayed GREEN —
+  vitest's Next-aware transform aliases `server-only` to a no-op, so the
+  module graph resolved fine in-test. But `npm run eval:run` (plain `tsx`,
+  no Next transform) crashed at module-eval the moment the eval's static
+  import graph reached `cap.ts` → `@/db/client` → `server-only` (which
+  throws by design outside a Server Component). The hotfix `a9babe5` made
+  `cap.ts` lazy-import `@/db/client` behind an async accessor so the
+  `server-only` module is only evaluated at call time (inside a request),
+  never at import time in the `tsx` eval graph.
+
+  **Two rules from here (carry to all future Phase 2+ plans):**
+    1. **`npm run eval:run` (PR-sim: creds unset → all checks `'skip'`,
+       exit 0) is a MANDATORY verify-loop gate alongside typecheck / lint /
+       check:banned / vitest.** It is the ONLY gate that exercises the
+       `runAgent` + eval static import graph under a real Node/`tsx`
+       module-eval (no Next bundler aliasing). A clean vitest run does NOT
+       prove the eval graph loads. Run it on every plan that touches
+       `src/ai/**` (agents, client, cap, eval, schemas).
+    2. **Any new `@/db/client` / `server-only` import that lands in the
+       `runAgent` OR eval static import graph MUST be lazy** — a dynamic
+       `import()` behind an async accessor, evaluated at call time inside a
+       request, NEVER a top-level static import. A top-level
+       `import '@/db/client'` (or anything that transitively imports
+       `server-only`) anywhere reachable from `src/ai/client.ts` or
+       `src/ai/eval/runner.ts`'s static graph crashes `eval:run` at
+       module-eval. The cap meter (`cap.ts`) is the canonical example: it
+       needs the request-scoped DB client, but it must reach for it lazily.
+
+  (Phase 2 Plan 02-07 T04+T05 close — cites the T01→T03 regression + the
+  `a9babe5` cap.ts lazy-import fix, 2026-06-02.)
