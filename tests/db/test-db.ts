@@ -138,6 +138,7 @@ export async function cleanup(): Promise<void> {
   const db = admin();
   await db.execute(
     sql`truncate table
+      public.ai_usage_daily,
       public.embeddings,
       public.timeline_event,
       public.interaction,

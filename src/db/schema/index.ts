@@ -17,3 +17,7 @@ export * from '@/db/schema/legal';
 export * from '@/db/schema/memory';
 export * from '@/db/schema/timeline';
 export * from '@/db/schema/embeddings';
+// Plan 02-07 (OD-1 Option A — FOUNDER-RATIFIED 2026-06-01): the durable per-(tenant,
+// UTC-day) AI-spend counter behind the $5/user/day HARD cap. The FIRST schema change
+// since the 29228e8 lock; the lock re-anchors to the post-0007 HEAD.
+export * from '@/db/schema/ai_usage_daily';

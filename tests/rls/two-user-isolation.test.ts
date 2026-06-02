@@ -93,6 +93,12 @@ d('two-user tenant isolation', () => {
         embedding: new Array(1024).fill(0) as number[],
         embeddingModelVersion: 'voyage-3-large',
       });
+      // Plan 02-07: the AI cost-cap ledger (tenant-scoped — one row per (tenant, UTC-day)).
+      await adb.insert(schema.aiUsageDaily).values({
+        accountId: t.accountId,
+        usageDate: '2026-06-02',
+        microUsdSpent: 0,
+      });
     };
     await seed(A);
     await seed(B);
@@ -126,6 +132,7 @@ d('two-user tenant isolation', () => {
         'interaction',
         'timeline_event',
         'embeddings',
+        'ai_usage_daily',
       ]) {
         const aVisible = await tx.execute<{ n: string }>(
           sql`select count(*)::text as n from public.${sql.raw(tbl)} where account_id = ${A.accountId}`,
@@ -159,6 +166,8 @@ d('two-user tenant isolation', () => {
       'interaction',
       'timeline_event',
       'embeddings',
+      // Plan 02-07
+      'ai_usage_daily',
     ]);
     const uncovered = tables.filter((t) => !covered.has(t));
     expect(

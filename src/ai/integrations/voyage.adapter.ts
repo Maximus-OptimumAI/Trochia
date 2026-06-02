@@ -23,6 +23,13 @@
  *   (voyage.adapter.test.ts Case 8 + 8b) pin this by sentinel-string
  *   assertion AND exact-key-set assertion (defense in depth).
  */
+import {
+  refundReservation,
+  reserveWithinDailyCap,
+  settleSpend,
+  type Reservation,
+} from '@/ai/cost/cap';
+import { voyageMicroUsd, voyageReserveMicroUsd } from '@/ai/cost/rates';
 import { env } from '@/lib/env';
 import { AppError } from '@/lib/errors';
 import { getLangfuseClient } from '@/lib/langfuse';
@@ -124,6 +131,42 @@ export const voyage = {
       });
     }
 
+    // ── Cost cap (Plan 02-07 / OD-3 / OD-4 / P1-B / P2-C) ──
+    // RESERVE the UPPER-BOUND cost of this embed batch BEFORE the fetch. The reserve is a
+    // UTF-8 byte-length sum over the ACTUAL input.texts batch (≤8) — a token is ≥1 byte so
+    // byte-length ≥ token-count ALWAYS (P1-B); never char/4, never a 1-query ceiling. Gates
+    // BOTH inputType:'query' (read) AND 'document' (write) — the shared daily ledger (OD-4).
+    // SETTLE-or-REFUND runs in a `finally` keyed on the reservation token's usageDate (P2-C):
+    // success → settle to json.usage.total_tokens; a pre-fetch throw → full refund.
+    const reservation: Reservation = await reserveWithinDailyCap(
+      input.trace.accountId,
+      voyageReserveMicroUsd(input.texts),
+    );
+    let settledTokens: number | undefined;
+
+    try {
+      return await this.embedAfterReserve(input, reservation, (tokens) => {
+        settledTokens = tokens;
+      });
+    } finally {
+      if (settledTokens === undefined) {
+        await refundReservation(reservation);
+      } else {
+        await settleSpend(reservation, voyageMicroUsd(settledTokens));
+      }
+    }
+  },
+
+  /**
+   * The fetch-onward body, fenced off so the RESERVE/SETTLE `finally` in `embed` wraps the
+   * entire provider call. `onTokens(total_tokens)` reports the actual usage to the settle
+   * path; if it is never called (a pre-settle throw) the reservation is fully refunded.
+   */
+  async embedAfterReserve(
+    input: VoyageEmbedInput,
+    _reservation: Reservation,
+    onTokens: (totalTokens: number) => void,
+  ): Promise<VoyageEmbedResult> {
     const t0 = Date.now();
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -177,6 +220,11 @@ export const voyage = {
       data: Array<{ embedding: number[]; index: number }>;
       usage: { total_tokens: number };
     };
+
+    // The provider has billed — report the ACTUAL usage so the cost-cap `finally` SETTLES
+    // (rather than refunds) even if a downstream count/dim assertion throws below (the spend
+    // already happened). P2-C: settle to actual on a post-call throw, never refund it.
+    onTokens(json.usage.total_tokens);
 
     // Re-order by `index` to match input order (Voyage returns by index;
     // defensive sort — Case 2 in the test suite reverses indices and pins

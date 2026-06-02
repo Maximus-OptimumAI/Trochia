@@ -46,6 +46,25 @@ vi.mock('@/lib/langfuse', () => ({
   isLangfuseConfigured: vi.fn(() => true),
 }));
 
+// ────────────────────────────────────────────────────────────────────────────
+// Cost-cap mock (Plan 02-07 / T01). voyage.embed now RESERVES against the $5/day
+// cost ledger before the fetch (OD-3/OD-4). These adapter UNIT tests mock the live
+// cost store to a no-op so they exercise ONLY the Voyage egress behavior — the cost
+// gate itself is proven in tests/ai/cost/* + tests/integration/cost-cap.test.ts (the
+// env-gate-keys-on-presence lesson: a present-but-invalid DATABASE_URL must never fire
+// a real store call from a unit test).
+// ────────────────────────────────────────────────────────────────────────────
+vi.mock('@/ai/cost/cap', () => ({
+  CAP_MICRO_USD: 5_000_000,
+  reserveWithinDailyCap: vi.fn(async (accountId: string, estMicroUsd: number) => ({
+    accountId,
+    usageDate: '2026-06-02',
+    reservedMicroUsd: estMicroUsd,
+  })),
+  settleSpend: vi.fn(async () => undefined),
+  refundReservation: vi.fn(async () => undefined),
+}));
+
 // Re-import so we can grab the mocked function.
 import { getLangfuseClient } from '@/lib/langfuse';
 
