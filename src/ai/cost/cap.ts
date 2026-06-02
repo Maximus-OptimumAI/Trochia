@@ -50,8 +50,28 @@
  */
 import { sql } from 'drizzle-orm';
 
-import { getServiceClient } from '@/db/client';
 import { AppError } from '@/lib/errors';
+
+/**
+ * Lazy accessor for the RLS-bypassing service client (OD-3).
+ *
+ * `@/db/client` does `import 'server-only'`, which throws at MODULE-EVAL under the
+ * `tsx` runtime (`npm run eval:run`). cap.ts is in the static import graph of
+ * `src/ai/client.ts` (runAgent → cost cap), which the eval runner pulls in via the
+ * extraction-floor check — so a TOP-LEVEL `import { getServiceClient }` would crash
+ * `eval:run` at load even though no metered call ever fires on the no-key skip path.
+ * Deferring the import behind this async accessor keeps `server-only` off the
+ * module-eval chain; it loads only when a cost function actually executes (the Next.js
+ * server runtime, where `server-only` is satisfied). vitest's `vi.mock('@/db/client')`
+ * applies to this dynamic import exactly as to a static one.
+ */
+let _getServiceClient: typeof import('@/db/client').getServiceClient | undefined;
+async function serviceClient() {
+  if (!_getServiceClient) {
+    ({ getServiceClient: _getServiceClient } = await import('@/db/client'));
+  }
+  return _getServiceClient();
+}
 
 /** $5.00 expressed in micro-USD (1 USD = 1_000_000 micro-USD). Documented TUNABLE constant. */
 export const CAP_MICRO_USD = 5_000_000;
@@ -95,7 +115,7 @@ export async function reserveWithinDailyCap(
   // `micro_usd_spent` is a bigint column — store integer micro-USD. CEIL the reserve so it
   // stays a true upper bound (rounding UP can only over-reserve, never under-reserve).
   const reserved = Math.ceil(estMicroUsd);
-  const db = getServiceClient();
+  const db = await serviceClient();
 
   let newTotal: number;
   try {
@@ -162,7 +182,7 @@ async function decrement(token: Reservation): Promise<void> {
  * every write — never 'today'. Same atomic-upsert shape as RESERVE so it is concurrency-safe.
  */
 async function applyDelta(accountId: string, usageDate: string, delta: number): Promise<void> {
-  const db = getServiceClient();
+  const db = await serviceClient();
   try {
     await db.execute(sql`
       INSERT INTO ai_usage_daily (account_id, usage_date, micro_usd_spent)
