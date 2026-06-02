@@ -1,16 +1,16 @@
 /**
  * Eval harness runner tests (EVAL-01a — Plan 02-04, Task 7; hardened in 02-05 T01).
  *
- * Codifies the runner contract, now a RUNTIME gate (Plan 02-05 T01):
+ * Codifies the runner contract, now a RUNTIME gate (Plan 02-05 T01; hardened in
+ * 02-07 T03 — PENDING_ALLOWED is now EMPTY, so ANY 'pending' fails the run):
  *
- *   exit 0 on all-pass, or 'skip' (env-unavailable) when EVAL_LIVE_REQUIRED unset,
- *           with qa-grounding 'pending' allowlisted (PENDING_ALLOWED).
- *   exit 1 on any-fail, any non-allowlisted 'pending', OR any 'skip' when
- *           EVAL_LIVE_REQUIRED==='1'.
+ *   exit 0 on all-pass, or 'skip' (env-unavailable) when EVAL_LIVE_REQUIRED unset.
+ *   exit 1 on any-fail, ANY 'pending' (the allowlist is empty), OR any 'skip'
+ *           when EVAL_LIVE_REQUIRED==='1'.
  *
- * 8 cases:
- *   1. live checks 'skip' + qa-grounding 'pending' (EVAL_LIVE_REQUIRED unset)
- *      → exit 0 (the real PR/local CI baseline)
+ * 9 cases:
+ *   1. all three live checks 'skip' (EVAL_LIVE_REQUIRED unset)
+ *      → exit 0 (the real PR/local CI baseline; qa-grounding is now a live check)
  *   2. any-fail → exit 1 (stub extractionFloor.run → { status: 'fail' })
  *   3. all-pass → exit 0 (stub all three → { status: 'pass' })
  *   4. every check id in result — assert sorted ids deepEqual the canonical 3
@@ -19,7 +19,7 @@
  *   7. 'skip' + EVAL_LIVE_REQUIRED unset → exit 0 (skip is non-failing on PR/local)
  *   8. 'skip' + EVAL_LIVE_REQUIRED='1' → exit 1 (C1-H1 live-required gate)
  */
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { runEvalSuite } from '@/ai/eval/runner';
 import { extractionFloor } from '@/ai/eval/checks/extraction-floor';
 import { qaGrounding } from '@/ai/eval/checks/qa-grounding';
@@ -27,6 +27,20 @@ import { cacheHit } from '@/ai/eval/checks/cache-hit';
 
 describe('runEvalSuite', () => {
   const originalLiveRequired = process.env.EVAL_LIVE_REQUIRED;
+
+  // 02-07 T03: qa-grounding is now a LIVE check that fires the real askQa →
+  // hybridRetrieve + runAgent whenever ANTHROPIC_API_KEY is present (tests/setup
+  // loads one from .env.local). Default it to 'skip' in EVERY case so the runner
+  // suite stays hermetic; cases that need a different qa-grounding status set
+  // their own mockResolvedValueOnce, which takes precedence over this default.
+  beforeEach(() => {
+    vi.spyOn(qaGrounding, 'run').mockResolvedValue({
+      id: 'qa-grounding',
+      description: qaGrounding.description,
+      status: 'skip',
+      reason: 'test-default: env-unavailable',
+    });
+  });
 
   afterEach(() => {
     vi.restoreAllMocks();
@@ -38,14 +52,20 @@ describe('runEvalSuite', () => {
     }
   });
 
-  it('Case 1 — exit 0 when live checks skip + qa-grounding pending (EVAL_LIVE_REQUIRED unset)', async () => {
-    // With the runtime gate live, the real PR/local baseline is: extraction-floor
-    // + cache-hit return 'skip' (env-absent, no creds in CI) and qa-grounding stays
-    // 'pending' (allowlisted). EVAL_LIVE_REQUIRED unset → skip is non-failing.
+  it('Case 1 — exit 0 when all three live checks skip (EVAL_LIVE_REQUIRED unset)', async () => {
+    // 02-07 T03 flipped qa-grounding to a LIVE check + emptied PENDING_ALLOWED.
+    // The real PR/local baseline is now all three checks returning 'skip'
+    // (env-absent, no creds in CI). EVAL_LIVE_REQUIRED unset → skip is non-failing.
     delete process.env.EVAL_LIVE_REQUIRED;
     vi.spyOn(extractionFloor, 'run').mockResolvedValueOnce({
       id: 'extraction-floor',
       description: extractionFloor.description,
+      status: 'skip',
+      reason: 'test-stub: env-unavailable',
+    });
+    vi.spyOn(qaGrounding, 'run').mockResolvedValueOnce({
+      id: 'qa-grounding',
+      description: qaGrounding.description,
       status: 'skip',
       reason: 'test-stub: env-unavailable',
     });
@@ -60,6 +80,35 @@ describe('runEvalSuite', () => {
     expect(result.checks).toHaveLength(3);
     expect(result.checks.find((c) => c.id === 'extraction-floor')?.status).toBe('skip');
     expect(result.checks.find((c) => c.id === 'cache-hit')?.status).toBe('skip');
+    expect(result.checks.find((c) => c.id === 'qa-grounding')?.status).toBe('skip');
+  });
+
+  it('Case 1b — qa-grounding pending now FAILS the run (allowlist empty, 02-07 T03)', async () => {
+    // The previously-allowlisted 'pending' for qa-grounding is no longer allowed:
+    // PENDING_ALLOWED is empty, so ANY 'pending' forces exit 1. Mock the live
+    // checks to 'skip' so the exit 1 is attributable solely to the qa-grounding
+    // 'pending' under test.
+    delete process.env.EVAL_LIVE_REQUIRED;
+    vi.spyOn(extractionFloor, 'run').mockResolvedValueOnce({
+      id: 'extraction-floor',
+      description: extractionFloor.description,
+      status: 'skip',
+      reason: 'test-stub: env-unavailable',
+    });
+    vi.spyOn(cacheHit, 'run').mockResolvedValueOnce({
+      id: 'cache-hit',
+      description: cacheHit.description,
+      status: 'skip',
+      reason: 'test-stub: env-unavailable',
+    });
+    vi.spyOn(qaGrounding, 'run').mockResolvedValueOnce({
+      id: 'qa-grounding',
+      description: qaGrounding.description,
+      status: 'pending',
+      reason: 'test-stub: qa-grounding pending is no longer allowlisted',
+    });
+    const result = await runEvalSuite();
+    expect(result.exitCode).toBe(1);
     expect(result.checks.find((c) => c.id === 'qa-grounding')?.status).toBe('pending');
   });
 

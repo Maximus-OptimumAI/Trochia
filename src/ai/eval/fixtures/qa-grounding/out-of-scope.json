@@ -1,0 +1,16 @@
+[
+  {
+    "question": "What was the closing price of Apple stock yesterday?",
+    "expectedGrounded": false,
+    "isOutOfScope": true,
+    "accountId": "eval-qa-grounding",
+    "expectedRetrievableMarker": ""
+  },
+  {
+    "question": "Who won the most recent FIFA World Cup?",
+    "expectedGrounded": false,
+    "isOutOfScope": true,
+    "accountId": "eval-qa-grounding",
+    "expectedRetrievableMarker": ""
+  }
+]

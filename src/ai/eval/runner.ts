@@ -29,11 +29,12 @@ import { resolve } from 'node:path';
 const CHECKS: EvalCheck[] = [extractionFloor, qaGrounding, cacheHit];
 
 // Runtime allowlist of check ids permitted to return 'pending'
-// (FOLLOWUP-EVAL-PENDING-RUNTIME-GATE-01, C1-M1). qa-grounding stays 'pending'
-// until Plan 02-07's qa-rag agent lands; any OTHER 'pending' fails the run.
+// (FOLLOWUP-EVAL-PENDING-RUNTIME-GATE-01, C1-M1). Plan 02-07 / T03 flipped
+// qa-grounding to a REAL check (the last 'pending' stub), so the allowlist is
+// now EMPTY — the eval gate is fully active: ANY 'pending' fails the run.
 // A `Set<string>` (not a literal-tuple) so `.has(r.id)` typechecks against
 // `r.id: string` without a const-assertion narrowing.
-const PENDING_ALLOWED = new Set<string>(['qa-grounding']);
+const PENDING_ALLOWED = new Set<string>([]);
 
 export async function runEvalSuite(): Promise<EvalSuiteResult> {
   // Each check is isolated: a thrown check becomes a sanitized 'fail' result

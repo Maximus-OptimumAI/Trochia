@@ -1,0 +1,23 @@
+[
+  {
+    "question": "What is our current MRR?",
+    "expectedGrounded": true,
+    "isOutOfScope": false,
+    "accountId": "eval-qa-grounding",
+    "expectedRetrievableMarker": "traction.mrr"
+  },
+  {
+    "question": "What problem does our company solve?",
+    "expectedGrounded": true,
+    "isOutOfScope": false,
+    "accountId": "eval-qa-grounding",
+    "expectedRetrievableMarker": "narrative.problem"
+  },
+  {
+    "question": "Which stage is the company raising at?",
+    "expectedGrounded": true,
+    "isOutOfScope": false,
+    "accountId": "eval-qa-grounding",
+    "expectedRetrievableMarker": "stage"
+  }
+]

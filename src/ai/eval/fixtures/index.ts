@@ -48,3 +48,70 @@ export const PASTE_FIXTURE_PATHS: readonly string[] = PASTE_FIXTURE_FILES.map(
 export function loadFixtureText(path: string): string {
   return readFileSync(path, 'utf8');
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// qa-grounding fixtures (Plan 02-07 / T03)
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Repo-root-anchored directory holding the qa-grounding fixture Q-set. Unlike
+ * the paste fixtures (which live under tests/), these are co-located with the
+ * eval module (they are the eval's own Q-set, not shared test inputs).
+ */
+const QA_GROUNDING_FIXTURE_DIR = join(
+  process.cwd(),
+  'src',
+  'ai',
+  'eval',
+  'fixtures',
+  'qa-grounding',
+);
+
+/** The qa-grounding fixture filenames (starter set — expand per FOLLOWUP). */
+const QA_GROUNDING_FIXTURE_FILES = ['in-scope.json', 'out-of-scope.json'] as const;
+
+/**
+ * Absolute paths to the qa-grounding fixture files. The qa-grounding check loads
+ * each via `loadQaGroundingFixtures` and runs the REAL askQa over the Q-set,
+ * asserting `debug.droppedCitationCount === 0` (criterion 7) + out-of-scope Qs
+ * return grounded:false (criterion 6).
+ *
+ * The 50-Q / 10-out-of-scope full set grows against design-partner data
+ * (FOLLOWUP-QA-GROUNDING-FIXTURE-EXPAND) — the SHAPE + a representative subset
+ * are pinned here so the gate is real now.
+ */
+export const QA_GROUNDING_FIXTURE_PATHS: readonly string[] =
+  QA_GROUNDING_FIXTURE_FILES.map((file) => join(QA_GROUNDING_FIXTURE_DIR, file));
+
+/** One qa-grounding fixture entry (shape pinned in 02-07-PLAN T03 / F-6). */
+export type QaGroundingFixture = {
+  /** The founder's question to run through the real askQa. */
+  question: string;
+  /** Whether a grounded, cited answer is expected (in-scope) or "I don't know". */
+  expectedGrounded: boolean;
+  /** Deliberately out-of-scope Q — must return grounded:false (criterion 6). */
+  isOutOfScope: boolean;
+  /** The eval tenant id the question runs under. */
+  accountId: string;
+  /** A sourceId/marker the in-scope Qs should retrieve (confirms a real hit). */
+  expectedRetrievableMarker: string;
+};
+
+/**
+ * Load + parse all qa-grounding fixture entries from `QA_GROUNDING_FIXTURE_PATHS`.
+ * Each file is a JSON array of `QaGroundingFixture`; the arrays are concatenated.
+ * Throws (loudly) if a path is missing or a file is not a JSON array.
+ */
+export function loadQaGroundingFixtures(
+  paths: readonly string[] = QA_GROUNDING_FIXTURE_PATHS,
+): QaGroundingFixture[] {
+  const all: QaGroundingFixture[] = [];
+  for (const path of paths) {
+    const parsed = JSON.parse(readFileSync(path, 'utf8')) as unknown;
+    if (!Array.isArray(parsed)) {
+      throw new Error(`qa-grounding fixture ${path} is not a JSON array`);
+    }
+    all.push(...(parsed as QaGroundingFixture[]));
+  }
+  return all;
+}
