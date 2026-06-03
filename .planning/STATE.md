@@ -3,9 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Plan 02-06 complete (hybrid RAG retriever — pgvector cosine + query-time FTS, RRF-fused, tenant-scoped) — branch-only; PR #7 DRAFT; founder-gated /codex + /cso done (batch c89110e); deploy deferred to 02-07 joint merge
-last_updated: "2026-06-01T20:12:59.000Z"
-last_activity: 2026-06-01 -- Plan 02-06 close (hybrid retriever; /codex + /cso batch; deploy-deferred per 02-04)
+stopped_at: |
+  02-07 built (T01-T05) + fix batch (05e4bf8) + residual batch applied; verify-green, branch-only.
+  PENDING before merge: re-run BOTH /codex + /cso over the new HEAD (needs OpenAI quota top-up OR
+  check whether ChatGPT-account codex auth has recovered — the date rolled), then the T05 merge
+  sequence (node pin, sourcemap, FOLLOWUP-COST-RATES-RATIFY, apply 0007 to prod, smoke test).
+  PR #7 DRAFT; main untouched at acfab36.
+last_updated: "2026-06-03T00:00:00.000Z"
+last_activity: 2026-06-03 -- Plan 02-07 residual fix batch (R1 client-chokepoint static error + R2 qa-rag cap-state) applied after /codex re-gate; /cso re-gate quota-blocked
 progress:
   total_phases: 12
   completed_phases: 1

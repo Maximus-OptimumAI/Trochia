@@ -202,7 +202,13 @@ export async function askQa(input: AskQaInput, ctx: AskQaCtx): Promise<AskQaResu
   let candidates: Candidate[];
   try {
     candidates = await hybridRetrieve({ accountId, query }, ctx);
-  } catch {
+  } catch (err) {
+    // R2 (codex re-gate P2): hybridRetrieve embeds the query through the METERED
+    // Voyage adapter, so an over-cap tenant throws AI_DAILY_CAP_EXCEEDED here.
+    // Surface the OD-8 limit-reached state (the router maps it), NOT a generic 500
+    // — mirror the synthesis catch below. Every other retrieve error stays the
+    // static, redacted synthesis failure (no bound query reaches it).
+    if (isCapExceeded(err)) throw err;
     throw synthesisFailure();
   }
 

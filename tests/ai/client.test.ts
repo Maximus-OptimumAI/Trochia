@@ -194,9 +194,20 @@ describe('runAgent — Langfuse tracing', () => {
     );
     const runAgent = await importRunAgent({ AI_FALLBACK_ENABLED: 'false', OPENAI_API_KEY: undefined });
 
-    await expect(
-      runAgent({ taskClass: 'reason', stablePrefix: { system: 's' }, variableSuffix: SENSITIVE, schema: TestSchema }),
-    ).rejects.toBeDefined();
+    const thrown = await runAgent({
+      taskClass: 'reason',
+      stablePrefix: { system: 's' },
+      variableSuffix: SENSITIVE,
+      schema: TestSchema,
+    }).catch((e: unknown) => e);
+
+    // R1 (codex re-gate P1): the THROWN error is a STATIC AppError — the raw
+    // provider error (which echoes SENSITIVE) is NOT re-thrown, so a forwarding
+    // caller (the paste router) cannot leak it to tRPC/Sentry.
+    const err = thrown as { message?: string; cause?: unknown; code?: string };
+    expect(err.message).toBe('anthropic request failed');
+    expect(err.code).toBe('AI_PROVIDER_ERROR');
+    expect(JSON.stringify({ m: err.message, c: err.cause })).not.toContain(SENSITIVE);
 
     // The ERROR-level trace.update must carry the static, status-only message.
     const errorCall = langfuseSpy.traceUpdate.mock.calls.find(

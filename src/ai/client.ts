@@ -179,7 +179,18 @@ export async function runAgent<T>(opts: RunAgentOpts<T>): Promise<T> {
             ? `anthropic request failed (status ${providerStatus})`
             : 'anthropic request failed',
       });
-      throw e;
+      // R1 (codex re-gate P1 / CSO-H1 second half): do NOT re-throw the raw
+      // provider error — its message/body/cause can echo the request content
+      // (the query + retrieved chunks in variableSuffix, or paste content on the
+      // extract path), which a forwarding caller (e.g. the paste router) would
+      // surface to tRPC/Sentry UNSCRUBBED. Throw a STATIC AppError with the safe
+      // numeric provider status only, no message text, no cause — closing the leak
+      // at the chokepoint for EVERY caller. (AI_DAILY_CAP_EXCEEDED is unaffected:
+      // it is thrown earlier from reserveWithinDailyCap, never inside this catch.)
+      throw new AppError('anthropic request failed', {
+        code: 'AI_PROVIDER_ERROR',
+        ...(providerStatus !== undefined ? { status: providerStatus } : {}),
+      });
     }
   }
 

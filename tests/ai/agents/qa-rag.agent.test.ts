@@ -349,4 +349,18 @@ describe('askQa — OD-8 cap-exceeded propagates UNCHANGED', () => {
       status: 429,
     });
   });
+
+  it('R2: hybridRetrieve (the metered query embed) throws AI_DAILY_CAP_EXCEEDED → re-thrown, NOT swallowed into QA_SYNTHESIS_FAILED', async () => {
+    const capErr = new AppError('daily AI spend limit reached', {
+      code: 'AI_DAILY_CAP_EXCEEDED',
+      status: 429,
+    });
+    hybridRetrieveMock.mockRejectedValue(capErr);
+
+    // The over-cap query embed surfaces the OD-8 limit state, not a generic 500.
+    await expect(askQa({ accountId: ACCOUNT_ID, query: QUERY }, ctx)).rejects.toBe(capErr);
+    await expect(askQa({ accountId: ACCOUNT_ID, query: QUERY }, ctx)).rejects.toMatchObject({
+      code: 'AI_DAILY_CAP_EXCEEDED',
+    });
+  });
 });
