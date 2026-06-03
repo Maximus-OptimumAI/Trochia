@@ -454,6 +454,10 @@ export async function extractFromPaste(
     variableSuffix,
     schema: businessMemoryDraftSchema,
     maxTokens: EXTRACTOR_MAX_TOKENS,
+    // codex#1 — meter the paste path. This user-facing extraction previously
+    // omitted costContext → unmetered (daily-cap bypass) + unmetered OpenAI
+    // fallback. Pass accountId so the $5/user/day cap meters it at the chokepoint.
+    costContext: { accountId: input.accountId },
   });
   const latencyMs = Date.now() - startMs;
 

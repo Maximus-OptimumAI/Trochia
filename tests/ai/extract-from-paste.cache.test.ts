@@ -146,6 +146,26 @@ vi.mock('@/lib/langfuse', () => ({
 }));
 
 // ────────────────────────────────────────────────────────────────────────────
+// Cost-cap mock (codex#1). The paste path is now METERED — runAgent reserves
+// against the $5/day ledger before the Anthropic call. This structural cache
+// test drives the REAL runAgent through MSW (it must NOT mock runAgent), so the
+// cost store is mocked to a no-op here — the cap behavior itself is proven in
+// tests/ai/cost/* + tests/integration/cost-cap.test.ts (the env-gate-keys-on-
+// presence lesson: a present-but-invalid DATABASE_URL must never fire a real
+// store call from a unit test).
+// ────────────────────────────────────────────────────────────────────────────
+vi.mock('@/ai/cost/cap', () => ({
+  CAP_MICRO_USD: 5_000_000,
+  reserveWithinDailyCap: vi.fn(async (accountId: string, estMicroUsd: number) => ({
+    accountId,
+    usageDate: '2026-06-02',
+    reservedMicroUsd: estMicroUsd,
+  })),
+  settleSpend: vi.fn(async () => undefined),
+  refundReservation: vi.fn(async () => undefined),
+}));
+
+// ────────────────────────────────────────────────────────────────────────────
 // Captured HTTP request bodies — populated by the MSW handler below. Reset
 // per-test in `beforeEach`.
 // ────────────────────────────────────────────────────────────────────────────

@@ -70,6 +70,7 @@ import { runAgent } from '@/ai/client';
 import { qaAnswerSchema, type AskQaResult, type QaAnswer, type QaCitation } from '@/ai/schemas/qa-answer.zod';
 import { delimitUntrusted, screenForInjection } from '@/ai/untrusted';
 import { AppError } from '@/lib/errors';
+import { logger } from '@/lib/logger';
 
 // ────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -224,7 +225,17 @@ export async function askQa(input: AskQaInput, ctx: AskQaCtx): Promise<AskQaResu
     .join('\n\n');
   // Screen the chunk corpus for injection markers (defense-in-depth; the fence
   // already neutralizes, the screen flags). The result is not logged with text.
-  screenForInjection(chunksBlock);
+  // CSO-L1: capture the screen result and emit a CONTENT-BLIND observability
+  // signal (accountId + a count only) when flagged — never the matched text or
+  // any chunk text. The chunks stay fenced in variableSuffix (not a block).
+  const injectionScreen = screenForInjection(chunksBlock);
+  if (injectionScreen.flagged) {
+    logger.warn('ai/qa-rag: prompt-injection markers in retrieved chunks', {
+      accountId,
+      injectionFlagged: true,
+      markerCount: injectionScreen.matches.length,
+    });
+  }
   const untrustedPayload = delimitUntrusted(`QUESTION:\n${query}\n\nRETRIEVED CHUNKS:\n${chunksBlock}`, QA_LABEL);
 
   let model: QaAnswer;
@@ -249,7 +260,10 @@ export async function askQa(input: AskQaInput, ctx: AskQaCtx): Promise<AskQaResu
   // the deterministic "I don't know" body (P2-E) — never serve a body backed by
   // dropped citations.
   const { valid, dropped } = validateCitations(model.citations, retrievedKeySet);
-  const grounded = valid.length >= 1 && dropped.length === 0;
+  // codex#4: grounded:true REQUIRES the model's OWN grounded:true (never override
+  // a model grounded:false), AND ≥1 valid citation AND zero dropped; else the
+  // deterministic "I don't know" body.
+  const grounded = model.grounded === true && valid.length >= 1 && dropped.length === 0;
   const answer: QaAnswer = grounded
     ? { answer: model.answer, citations: valid, grounded: true }
     : iDontKnowAnswer();

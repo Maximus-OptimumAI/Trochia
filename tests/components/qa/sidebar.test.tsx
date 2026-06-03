@@ -146,12 +146,19 @@ describe('QaSidebar', () => {
     expect(grounded).toHaveTextContent('$42k MRR');
     const chips = screen.getAllByTestId('qa-citation-chip');
     expect(chips).toHaveLength(2);
-    // Each chip is a real link to a RELATIVE in-app route (no hardcoded URL).
-    for (const chip of chips) {
-      const href = chip.getAttribute('href') ?? '';
-      expect(href.startsWith('/app/')).toBe(true);
-      expect(href).not.toMatch(/https?:\/\//);
-    }
+    // codex#6: memory chips link to a RELATIVE in-app route (/app/memory); corpus
+    // chips render UNLINKED (no href, no <a>) because /app/corpus does not exist
+    // yet — no 404. Each chip carries its source-type for this assertion.
+    const memoryChip = chips.find((c) => c.getAttribute('data-source-type') === 'memory')!;
+    const corpusChip = chips.find((c) => c.getAttribute('data-source-type') === 'corpus')!;
+    // Memory chip: a real link to a relative /app/ route (no hardcoded URL).
+    const memHref = memoryChip.getAttribute('href') ?? '';
+    expect(memoryChip.tagName).toBe('A');
+    expect(memHref.startsWith('/app/memory')).toBe(true);
+    expect(memHref).not.toMatch(/https?:\/\//);
+    // Corpus chip: NOT a link — a <span> with no href, until /app/corpus ships.
+    expect(corpusChip.tagName).toBe('SPAN');
+    expect(corpusChip.getAttribute('href')).toBeNull();
     // The IDK / limit / error states are NOT shown.
     expect(screen.queryByTestId('qa-sidebar-idk')).toBeNull();
     expect(screen.queryByTestId('qa-sidebar-limit-reached')).toBeNull();

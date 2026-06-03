@@ -214,9 +214,12 @@ describe('voyage.adapter — Plan 02-04 / KNW-04b', () => {
     expect(httpHit).toBe(false);
   });
 
-  it('Case 5 — non-2xx response (429) → VOYAGE_BATCH_FAILED, body truncated to 200 chars', async () => {
-    // Body is intentionally > 200 chars to exercise the truncation.
-    const longBody = `{"error":"rate limited","detail":"${'x'.repeat(300)}"}`;
+  it('Case 5 — non-2xx response (429) on a DOCUMENT embed → VOYAGE_BATCH_FAILED, STATIC message (status only, body NEVER read) [B/codex#3/CSO-H2]', async () => {
+    // B / codex#3 / CSO-H2: the document (write) path now redacts identically to
+    // the query path — the response body (which can echo chunk text) is NEVER
+    // read. The thrown message is status-only and content-blind.
+    const SENSITIVE_CHUNK = 'CONFIDENTIAL-DOCUMENT-CHUNK-SENTINEL-MRR';
+    const longBody = `{"error":"rate limited","echo":"${SENSITIVE_CHUNK}","detail":"${'x'.repeat(300)}"}`;
     server.use(
       http.post(VOYAGE_URL, () =>
         new HttpResponse(longBody, {
@@ -231,7 +234,7 @@ describe('voyage.adapter — Plan 02-04 / KNW-04b', () => {
     let caught: { code?: string; message?: string } | null = null;
     try {
       await voyage.embed({
-        texts: ['hello'],
+        texts: [SENSITIVE_CHUNK],
         inputType: 'document',
         trace: { accountId: 'acc-1', sourceType: 'memory', sourceId: 'mem-1' },
       });
@@ -241,10 +244,9 @@ describe('voyage.adapter — Plan 02-04 / KNW-04b', () => {
 
     expect(caught).not.toBeNull();
     expect(caught!.code).toBe('VOYAGE_BATCH_FAILED');
-    expect(caught!.message).toContain('voyage 429:');
-    // The message is `voyage 429: ${body.slice(0, 200)}` — total length is
-    // bounded by `"voyage 429: ".length + 200` = 12 + 200 = 212.
-    expect(caught!.message!.length).toBeLessThanOrEqual(212);
+    // Static status-only message — no body, no echoed chunk text.
+    expect(caught!.message).toBe('voyage embed failed (status 429)');
+    expect(caught!.message).not.toContain(SENSITIVE_CHUNK);
   });
 
   it('Case 6 — timeout (delay > 30s) → AbortController fires → VOYAGE_NETWORK_FAILED', async () => {
@@ -449,8 +451,46 @@ describe('voyage.adapter — Plan 02-04 / KNW-04b', () => {
     expect(caught).not.toBeNull();
     expect(caught!.code).toBe('VOYAGE_BATCH_FAILED');
     // Status is safe to surface; the query-bearing body is NOT.
-    expect(caught!.message).toContain('400');
+    expect(caught!.message).toBe('voyage embed failed (status 400)');
     expect(caught!.message).not.toContain(SENSITIVE_QUERY);
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Case 12 — B / codex#3 / CSO-H2: a DOCUMENT embed NETWORK failure must throw
+  //           the STATIC 'voyage embed failed (network)' with NO err.message and
+  //           NO cause — the document chunk text in input.texts can otherwise
+  //           reach Sentry unscrubbed via the error message/cause.
+  // ──────────────────────────────────────────────────────────────────────────
+  it('Case 12 — document embed network failure → STATIC VOYAGE_NETWORK_FAILED (no message, no cause) [B/codex#3/CSO-H2]', async () => {
+    const SENSITIVE_CHUNK = 'CONFIDENTIAL-DOCUMENT-CHUNK-SENTINEL-NETWORK';
+    const originalFetch = globalThis.fetch;
+    // Throw a network-style error whose message embeds the chunk text.
+    globalThis.fetch = vi.fn(async () => {
+      throw new Error(`ECONNRESET while sending ${SENSITIVE_CHUNK}`);
+    }) as typeof globalThis.fetch;
+
+    const { voyage } = await import('@/ai/integrations/voyage.adapter');
+
+    let caught: (Error & { code?: string; cause?: unknown }) | null = null;
+    try {
+      await voyage.embed({
+        texts: [SENSITIVE_CHUNK],
+        inputType: 'document',
+        trace: { accountId: 'acc-1', sourceType: 'memory', sourceId: 'mem-1' },
+      });
+    } catch (e) {
+      caught = e as Error & { code?: string; cause?: unknown };
+    }
+
+    globalThis.fetch = originalFetch;
+
+    expect(caught).not.toBeNull();
+    expect(caught!.code).toBe('VOYAGE_NETWORK_FAILED');
+    expect(caught!.message).toBe('voyage embed failed (network)');
+    expect(caught!.message).not.toContain(SENSITIVE_CHUNK);
+    // No cause carrying the original (chunk-bearing) error.
+    expect(caught!.cause).toBeUndefined();
+    expect(JSON.stringify(caught!.cause ?? '')).not.toContain(SENSITIVE_CHUNK);
   });
 
   // ──────────────────────────────────────────────────────────────────────────

@@ -166,7 +166,19 @@ export async function runAgent<T>(opts: RunAgentOpts<T>): Promise<T> {
         messages,
       });
     } catch (e) {
-      trace.update({ level: 'ERROR', statusMessage: e instanceof Error ? e.message : 'anthropic error' });
+      // A / codex#2 / CSO-H1: NEVER write the raw Anthropic e.message (or cause)
+      // into the Langfuse trace — a QA synthesis carries the query + retrieved
+      // chunks in variableSuffix, and a provider error can echo request content.
+      // Use a STATIC status string plus the safe numeric provider status only.
+      const providerStatus =
+        typeof (e as { status?: unknown }).status === 'number' ? (e as { status: number }).status : undefined;
+      trace.update({
+        level: 'ERROR',
+        statusMessage:
+          providerStatus !== undefined
+            ? `anthropic request failed (status ${providerStatus})`
+            : 'anthropic request failed',
+      });
       throw e;
     }
   }

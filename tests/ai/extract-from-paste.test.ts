@@ -598,6 +598,11 @@ describe('extractFromPaste — per-fixture extraction', () => {
     expect(mockRunAgent).toHaveBeenCalledTimes(1);
     const opts = mockRunAgent.mock.calls[0]![0]!;
     expect(opts.taskClass).toBe('draft');
+    // codex#1 — the user-facing paste path is now METERED: runAgent receives
+    // costContext: { accountId } so the $5/user/day cap covers it (and the
+    // OpenAI fallback is disabled for a provable spend bound). A missing
+    // costContext here is the cap-bypass defect codex#1 closes.
+    expect(opts.costContext).toEqual({ accountId: 'acct-acme-001' });
   });
 
   it('helix-saas — picks one MRR value from contradictory figures (Week 3 surfaces the conflict)', async () => {

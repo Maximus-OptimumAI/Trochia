@@ -107,6 +107,25 @@ describe('qaGrounding.run', () => {
     expect(r.metric).toBe(0);
   });
 
+  it('codex#5 — an in-scope Q that returns grounded:false (or 0 citations) makes the eval FAIL (verify grounding, not just absence of fabrication)', async () => {
+    // All in-scope Qs have droppedCitationCount===0 (no fabrication), but the
+    // first in-scope Q comes back as an "I don't know" (grounded:false, 0
+    // citations). Pre-codex#5 this passed vacuously; now it FAILS because the
+    // in-scope answer was not actually grounded + cited.
+    askQa
+      .mockResolvedValueOnce(iDontKnow()) // in-scope but NOT grounded → inScopeMiss
+      .mockResolvedValueOnce(grounded(0))
+      .mockResolvedValueOnce(grounded(0))
+      .mockResolvedValueOnce(iDontKnow())
+      .mockResolvedValueOnce(iDontKnow());
+
+    const r = await qaGrounding.run();
+    expect(r.status).toBe('fail');
+    // dropped total is still 0 — the fail is from the in-scope grounding miss.
+    expect(r.metric).toBe(0);
+    expect(r.reason).toContain('in-scope grounded+cited 2/3');
+  });
+
   it('ANTHROPIC_API_KEY absent → skip, askQa NOT called', async () => {
     delete process.env.ANTHROPIC_API_KEY;
     const r = await qaGrounding.run();

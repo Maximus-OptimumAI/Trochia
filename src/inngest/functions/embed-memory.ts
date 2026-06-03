@@ -192,7 +192,11 @@ export const embedMemory = inngest.createFunction(
               accountId,
               businessMemoryId,
               batchStart: i,
-              reason: err instanceof Error ? err.message.slice(0, 200) : 'unknown',
+              // B / codex#3 / CSO-H2: log the Voyage AppError's TYPED code (content-
+              // blind, e.g. VOYAGE_NETWORK_FAILED), never err.message — message could
+              // carry chunk text and Sentry's key-based scrub does NOT redact
+              // breadcrumb data strings.
+              code: (err as { code?: string }).code ?? 'UNKNOWN',
             },
           });
           throw err; // let Inngest retry (max 2)

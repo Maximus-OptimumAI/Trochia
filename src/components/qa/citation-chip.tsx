@@ -37,14 +37,19 @@ const SOURCE_LABEL: Record<QaCitation['sourceType'], string> = {
 };
 
 /**
- * Map a citation's source type to its in-app destination route. RELATIVE paths
- * ONLY — never a hardcoded site URL. The `sourceId` is appended as a `ref`
- * query param so the destination can locate the cited record.
+ * Map a citation's source type to its in-app destination route, or `null` when
+ * no route exists yet. RELATIVE paths ONLY — never a hardcoded site URL. The
+ * `sourceId` rides as a `ref` query param so the destination can locate the
+ * cited record.
+ *
+ * codex#6: `/app/corpus` does not exist (only /app/memory, /app/pipeline) —
+ * corpus citations returned `null` and render UNLINKED until that route exists,
+ * so we never produce a 404 chip.
  */
-function citationHref(citation: QaCitation): string {
-  const base = citation.sourceType === 'memory' ? '/app/memory' : '/app/corpus';
+function citationHref(citation: QaCitation): string | null {
+  if (citation.sourceType !== 'memory') return null;
   const params = new URLSearchParams({ ref: citation.sourceId });
-  return `${base}?${params.toString()}`;
+  return `/app/memory?${params.toString()}`;
 }
 
 export interface CitationChipProps {
@@ -57,6 +62,36 @@ export interface CitationChipProps {
 export function CitationChip({ citation, index, className }: CitationChipProps) {
   const label = SOURCE_LABEL[citation.sourceType];
   const href = citationHref(citation);
+
+  const inner = (
+    <>
+      <span aria-hidden>{label}</span>
+      <span aria-hidden className="text-graphite/60">
+        ·
+      </span>
+      <span aria-hidden>{index}</span>
+    </>
+  );
+
+  // codex#6: when no route exists (corpus, until /app/corpus ships) render a
+  // non-interactive <span> with the same visual classes — no hover/focus link
+  // affordances, no <Link>, no 404. Memory keeps the real <Link>.
+  if (href === null) {
+    return (
+      <span
+        className={cn(
+          'inline-flex items-center gap-1 rounded-md border border-stone bg-paper px-2 py-0.5',
+          'font-mono text-mono-sm text-graphite',
+          className,
+        )}
+        aria-label={`Source: ${label}, citation ${index}`}
+        data-testid="qa-citation-chip"
+        data-source-type={citation.sourceType}
+      >
+        {inner}
+      </span>
+    );
+  }
 
   return (
     <Link
@@ -72,11 +107,7 @@ export function CitationChip({ citation, index, className }: CitationChipProps) 
       data-testid="qa-citation-chip"
       data-source-type={citation.sourceType}
     >
-      <span aria-hidden>{label}</span>
-      <span aria-hidden className="text-graphite/60">
-        ·
-      </span>
-      <span aria-hidden>{index}</span>
+      {inner}
     </Link>
   );
 }

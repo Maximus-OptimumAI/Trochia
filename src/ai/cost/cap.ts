@@ -115,10 +115,13 @@ export async function reserveWithinDailyCap(
   // `micro_usd_spent` is a bigint column — store integer micro-USD. CEIL the reserve so it
   // stays a true upper bound (rounding UP can only over-reserve, never under-reserve).
   const reserved = Math.ceil(estMicroUsd);
-  const db = await serviceClient();
 
   let newTotal: number;
   try {
+    // codex#7 — fail-closed includes client acquisition: serviceClient() must be
+    // INSIDE the try so a DB-init/import failure is wrapped as the typed
+    // AI_COST_METER_UNAVAILABLE (503), never a raw operational message.
+    const db = await serviceClient();
     const rows = await db.execute<{ micro_usd_spent: number | string }>(sql`
       INSERT INTO ai_usage_daily (account_id, usage_date, micro_usd_spent)
       VALUES (${accountId}, ${usageDate}, ${reserved})
@@ -182,8 +185,10 @@ async function decrement(token: Reservation): Promise<void> {
  * every write — never 'today'. Same atomic-upsert shape as RESERVE so it is concurrency-safe.
  */
 async function applyDelta(accountId: string, usageDate: string, delta: number): Promise<void> {
-  const db = await serviceClient();
   try {
+    // codex#7 — fail-closed includes client acquisition: serviceClient() inside
+    // the try so a DB-init failure surfaces as the typed AI_COST_METER_UNAVAILABLE.
+    const db = await serviceClient();
     await db.execute(sql`
       INSERT INTO ai_usage_daily (account_id, usage_date, micro_usd_spent)
       VALUES (${accountId}, ${usageDate}, GREATEST(${delta}, 0))

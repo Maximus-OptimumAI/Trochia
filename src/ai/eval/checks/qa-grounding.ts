@@ -77,6 +77,10 @@ export const qaGrounding: EvalCheck = {
     let inScopeCount = 0;
     let outOfScopeCount = 0;
     let outOfScopeMisses = 0;
+    // codex#5: verify grounding, not just absence of fabrication. An all-"I don't
+    // know" run would pass criterion 7 vacuously (droppedTotal===0) — count
+    // in-scope Qs that did NOT come back grounded with ≥1 citation as misses.
+    let inScopeMisses = 0;
 
     for (const fx of fixtures) {
       // The REAL read path is request-scoped — build an rls runner for the eval
@@ -103,10 +107,12 @@ export const qaGrounding: EvalCheck = {
         inScopeCount += 1;
         // criterion 7: zero fabricated citations — read the type-separated debug.
         droppedTotal += result.debug.droppedCitationCount;
+        // codex#5: an in-scope Q must actually be answered grounded + cited.
+        if (result.answer.grounded !== true || result.answer.citations.length < 1) inScopeMisses += 1;
       }
     }
 
-    const pass = droppedTotal === DROPPED_THRESHOLD && outOfScopeMisses === 0;
+    const pass = droppedTotal === DROPPED_THRESHOLD && outOfScopeMisses === 0 && inScopeMisses === 0;
     const status = pass ? ('pass' as const) : ('fail' as const);
 
     // reason carries ONLY counts — no question / answer / chunk text.
@@ -116,7 +122,7 @@ export const qaGrounding: EvalCheck = {
       status,
       metric: droppedTotal,
       threshold: DROPPED_THRESHOLD,
-      reason: `dropped citations ${droppedTotal} across ${inScopeCount} in-scope Qs (threshold ${DROPPED_THRESHOLD}); out-of-scope grounded:false ${outOfScopeCount - outOfScopeMisses}/${outOfScopeCount}`,
+      reason: `dropped citations ${droppedTotal} across ${inScopeCount} in-scope Qs (threshold ${DROPPED_THRESHOLD}); in-scope grounded+cited ${inScopeCount - inScopeMisses}/${inScopeCount}; out-of-scope grounded:false ${outOfScopeCount - outOfScopeMisses}/${outOfScopeCount}`,
     };
   },
 };

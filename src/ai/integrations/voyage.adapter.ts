@@ -187,33 +187,21 @@ export const voyage = {
         }),
         signal: controller.signal,
       });
-    } catch (err) {
-      // CSO-H2 / codex P1-2: for a query embed, redact the error message AND drop
-      // `cause` — both can carry the founder's CONFIDENTIAL query, which would reach
-      // Sentry unscrubbed. Document embeds keep the network-error detail.
-      const isQuery = input.inputType === 'query';
-      throw new AppError(
-        isQuery
-          ? 'voyage query embed failed (network)'
-          : err instanceof Error
-            ? err.message.slice(0, 200)
-            : 'unknown',
-        isQuery ? { code: 'VOYAGE_NETWORK_FAILED' } : { code: 'VOYAGE_NETWORK_FAILED', cause: err },
-      );
+    } catch {
+      // B / codex#3 / CSO-H2: redact for BOTH inputType. The 02-06 fix covered
+      // query only; document embeds (write path) carry chunk text in input.texts,
+      // and err.message/cause can echo it into Sentry unscrubbed. Static message,
+      // NO message, NO cause — for both query + document.
+      throw new AppError('voyage embed failed (network)', { code: 'VOYAGE_NETWORK_FAILED' });
     } finally {
       clearTimeout(timeout);
     }
 
     if (!response.ok) {
-      // CSO-H2 / codex P1-2: for a query embed, do NOT include the response body —
-      // a provider 400/429 can echo the query text. Status is safe; body is only
-      // surfaced for document embeds.
-      const isQuery = input.inputType === 'query';
-      const body = isQuery ? '' : (await response.text().catch(() => '')).slice(0, 200);
-      throw new AppError(
-        isQuery ? `voyage query embed failed (status ${response.status})` : `voyage ${response.status}: ${body}`,
-        { code: 'VOYAGE_BATCH_FAILED' },
-      );
+      // B / codex#3 / CSO-H2: do NOT read response.text() for EITHER inputType —
+      // a provider 400/429 can echo the query OR the document chunk text in the
+      // body. Status only, no body, for both query + document.
+      throw new AppError(`voyage embed failed (status ${response.status})`, { code: 'VOYAGE_BATCH_FAILED' });
     }
 
     const json = (await response.json()) as {

@@ -178,6 +178,38 @@ describe('runAgent — Langfuse tracing', () => {
     expect(meta.model).toMatch(/haiku/);
   });
 
+  it('A / codex#2 / CSO-H1 — on an Anthropic error the trace statusMessage is STATIC (provider status only), never the provider message/body', async () => {
+    // The provider 400 body ECHOES request content (a QA synthesis carries the
+    // query + retrieved chunks in variableSuffix). The ERROR trace must record a
+    // static string with the numeric status only — never the message/body.
+    const SENSITIVE = 'CONFIDENTIAL-QUERY-AND-CHUNK-SENTINEL-mrr-42000';
+    langfuseSpy = makeSpyLangfuse();
+    server.use(
+      http.post(ANTHROPIC_URL, () =>
+        new HttpResponse(`{"error":{"message":"bad request echoing ${SENSITIVE}"}}`, {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    );
+    const runAgent = await importRunAgent({ AI_FALLBACK_ENABLED: 'false', OPENAI_API_KEY: undefined });
+
+    await expect(
+      runAgent({ taskClass: 'reason', stablePrefix: { system: 's' }, variableSuffix: SENSITIVE, schema: TestSchema }),
+    ).rejects.toBeDefined();
+
+    // The ERROR-level trace.update must carry the static, status-only message.
+    const errorCall = langfuseSpy.traceUpdate.mock.calls.find(
+      (c) => (c[0] as { level?: string }).level === 'ERROR',
+    );
+    expect(errorCall).toBeDefined();
+    const statusMessage = (errorCall![0] as { statusMessage: string }).statusMessage;
+    expect(statusMessage).toBe('anthropic request failed (status 400)');
+    // The provider message/body NEVER reaches the trace.
+    const allTraceArgs = JSON.stringify(langfuseSpy.traceUpdate.mock.calls);
+    expect(allTraceArgs).not.toContain(SENSITIVE);
+  });
+
   it('does not crash when getLangfuseClient() returns null (the Phase-1 stub state)', async () => {
     langfuseSpy = null; // stub state
     server.use(http.post(ANTHROPIC_URL, () => HttpResponse.json(anthropicToolResponse({ label: 'ok' }))));
