@@ -224,6 +224,15 @@ const EXTRACT_MODEL_ID = 'claude-sonnet-4-6';
  */
 const CONFLICT_AUDIT_SNIPPET_CAP = 200;
 
+/**
+ * EXACT OD-8 daily-cap copy (RATIFIED 2026-06-01). Mirrors `qa.ts`
+ * `CAP_REACHED_MESSAGE` + `components/qa/sidebar.tsx` verbatim. NO content echo —
+ * this is a non-error, non-fabricated limit-reached state. The cap error message
+ * in `cap.ts` stays its own static literal; this constant is purely the
+ * router-facing copy for the status/state mapping.
+ */
+const AI_DAILY_CAP_REACHED_MESSAGE = 'Daily AI limit reached — resets at midnight UTC.';
+
 // ────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ────────────────────────────────────────────────────────────────────────────
@@ -248,6 +257,16 @@ function rethrowAgentError(err: unknown): never {
       case 'PASTE_TOO_LONG':
       case 'AI_INJECTION_REJECTED':
         throw new TRPCError({ code: 'BAD_REQUEST', message: err.message, cause: err });
+      case 'AI_DAILY_CAP_EXCEEDED':
+        // OD-8 HARD-block (codex re-gate P1_extract_cap_mapping). The paste/extract
+        // path is now metered (codex#1 added `costContext` in
+        // extract-from-paste.agent.ts), so `reserveWithinDailyCap` can throw the
+        // typed cap error through `runAgent` to here. Map it to the user-facing
+        // limit state — 429 + the STATIC OD-8 copy, NO content, NO `cause` — exactly
+        // as `qaRouter.ask` already does (qa.ts). Without this case it fell through
+        // to a generic 500. Cap ENFORCEMENT + the cap.ts message are untouched; this
+        // is purely the router status/state mapping.
+        throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: AI_DAILY_CAP_REACHED_MESSAGE });
       case 'AI_BANNED_OUTPUT':
       case 'AI_STRUCTURED_OUTPUT_INVALID':
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: err.message, cause: err });
