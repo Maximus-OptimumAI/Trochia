@@ -4,13 +4,14 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: |
-  02-07 built (T01-T05) + fix batch (05e4bf8) + residual batch applied; verify-green, branch-only.
-  PENDING before merge: re-run BOTH /codex + /cso over the new HEAD (needs OpenAI quota top-up OR
-  check whether ChatGPT-account codex auth has recovered — the date rolled), then the T05 merge
-  sequence (node pin, sourcemap, FOLLOWUP-COST-RATES-RATIFY, apply 0007 to prod, smoke test).
-  PR #7 DRAFT; main untouched at acfab36.
+  02-07 built (T01-T05) + fix batch (05e4bf8) + residual batch (20fe4cd); re-gate over 726042f..20fe4cd
+  COMPLETE (/cso PASS, /codex APPROVE_WITH_FIXES — R1/R2 + CSO-H1/H2/L1 all CLOSED); re-gate finding
+  P1_extract_cap_mapping fixed + committed (eb5604a); FOLLOWUP-COST-RATES-RATIFY CLOSED (Opus rates
+  corrected 3× → published 4.6/4.7/4.8, absolute-rate test pinned). Verify-green, branch-only.
+  PENDING before merge: remaining T05 merge sequence (node pin, sourcemap, apply 0007 to prod, smoke
+  test). PR #7 DRAFT; main untouched at acfab36.
 last_updated: "2026-06-03T00:00:00.000Z"
-last_activity: 2026-06-03 -- Plan 02-07 residual fix batch (R1 client-chokepoint static error + R2 qa-rag cap-state) applied after /codex re-gate; /cso re-gate quota-blocked
+last_activity: 2026-06-03 -- Plan 02-07 re-gate closed (/cso PASS, /codex APPROVE_WITH_FIXES); P1_extract_cap_mapping fixed (eb5604a); FOLLOWUP-COST-RATES-RATIFY ratified — Opus rates corrected from the deprecated 4/4.1 card (3× high) to published 4.6/4.7/4.8 ($5/$25/$6.25/$0.50), absolute-rate CI pin added
 progress:
   total_phases: 12
   completed_phases: 1

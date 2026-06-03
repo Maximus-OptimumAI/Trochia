@@ -21,6 +21,36 @@ import {
   voyageReserveMicroUsd,
 } from '@/ai/cost/rates';
 
+describe('rates — ABSOLUTE published rates (FOLLOWUP-COST-RATES-RATIFY, verified 2026-06-03)', () => {
+  // These pins guard the ABSOLUTE dollar values against silent drift. The
+  // ordering/proportion checks below let a uniform 3× error (the deprecated
+  // Opus 4/4.1 card: $15/$75/$18.75/$1.50) sit invisible — that is exactly how
+  // the stale rates survived. Source: platform.claude.com/docs/en/about-claude/pricing
+  // (Opus 4.6/4.7/4.8), pulled + founder-ratified 2026-06-03. A future Anthropic
+  // price change must update these literals deliberately, failing CI until it does.
+  it('OPUS_INPUT is the single source of truth, pinned at $5.00/MTok', () => {
+    expect(OPUS_INPUT_MICRO_USD_PER_TOKEN).toBe(5.0);
+  });
+
+  it('OPUS_OUTPUT is pinned at $25.00/MTok', () => {
+    expect(OPUS_OUTPUT_MICRO_USD_PER_TOKEN).toBe(25.0);
+  });
+
+  it('OPUS_CACHE_WRITE derives as input × 1.25 = $6.25/MTok (official 5-min multiplier)', () => {
+    expect(OPUS_CACHE_WRITE_MICRO_USD_PER_TOKEN).toBeCloseTo(6.25, 10);
+    expect(OPUS_CACHE_WRITE_MICRO_USD_PER_TOKEN).toBeCloseTo(OPUS_INPUT_MICRO_USD_PER_TOKEN * 1.25, 10);
+  });
+
+  it('OPUS_CACHE_READ derives as input × 0.10 = $0.50/MTok (official cache-read multiplier)', () => {
+    expect(OPUS_CACHE_READ_MICRO_USD_PER_TOKEN).toBeCloseTo(0.5, 10);
+    expect(OPUS_CACHE_READ_MICRO_USD_PER_TOKEN).toBeCloseTo(OPUS_INPUT_MICRO_USD_PER_TOKEN * 0.1, 10);
+  });
+
+  it('VOYAGE stays pinned at $0.18/MTok (voyage-3-large)', () => {
+    expect(VOYAGE_MICRO_USD_PER_TOKEN).toBe(0.18);
+  });
+});
+
 describe('rates — Anthropic reserve (P1-A)', () => {
   const inputTokenCeiling = 10_000;
   const maxTokens = 1024;

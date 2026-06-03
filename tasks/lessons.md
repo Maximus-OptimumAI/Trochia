@@ -655,3 +655,15 @@ Next: 6c (Install Cursor CLI to Windows PATH)
 
   (Phase 2 Plan 02-07 T04+T05 close — cites the T01→T03 regression + the
   `a9babe5` cap.ts lazy-import fix, 2026-06-02.)
+
+---
+
+## Cost / rate tables (2026-06-03)
+
+- **A cost-rate table MUST carry an absolute-value test against a dated published source — internal ordering/proportion checks are not enough.** `src/ai/cost/rates.ts` shipped the Opus constants as the DEPRECATED Opus 4/4.1 card ($15/$75/$18.75/$1.50) — exactly 3x the current Opus 4.6/4.7/4.8 rates ($5/$25/$6.25/$0.50). It survived every test because `rates.test.ts` only pinned the ORDERING (cache_write >= input >= cache_read) and PROPORTIONS (reserve = input x cache_write + ...). A uniform 3x scale error preserves every ratio, so the suite stayed green while the live cap metered real spend at 3x (the "$5/user/day" HARD-blocked at ~$1.67/day of real Opus cost). The internal `actual <= reserve` bound also held (same constants both sides), so it was conservative-but-wrong, not unsafe — which is exactly why nothing flagged it.
+
+  **Rules (carry to every priced primitive — Phase 3 deck reviewer, Phase 4 Live Raise, Phase 8 Raise Ops):**
+    1. **Pin the ABSOLUTE rate** against a dated published source, not just relationships: `expect(OPUS_INPUT).toBe(5.0)` + the derived `6.25`/`0.50`. A future provider price change must then update the literal deliberately, failing CI until it does.
+    2. **One source of truth, derive the rest.** Make the base input rate the single constant and derive cache-write (x1.25) / cache-read (x0.10) from it so the four numbers can never drift apart.
+    3. **Record the source + date in the code.** A dated comment (`platform.claude.com/docs, pulled 2026-06-03, founder-ratified`) turns "ratify at convergence" from a TODO into an audit trail.
+    4. **Re-verify rates at every prod-merge gate** — model price cards change between when a constant is authored and when it ships. (Phase 2 Plan 02-07 FOLLOWUP-COST-RATES-RATIFY, 2026-06-03.)

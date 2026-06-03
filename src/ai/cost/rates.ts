@@ -33,32 +33,42 @@
  * multibyte/short-token text that would break `char/4` cannot break byte-length). Never
  * char/4, never a fixed 1-query ceiling.
  *
- * ## Rate figures (FOLLOWUP-COST-RATES-RATIFY)
+ * ## Rate figures (FOLLOWUP-COST-RATES-RATIFY — RATIFIED 2026-06-03)
  *
- * Sourced from Anthropic + Voyage public pricing as of authoring (2026-06-01). Founder
- * ratifies the exact figures at convergence. Stored as micro-USD per token (1 USD =
- * 1_000_000 micro-USD) so the ledger is integer-friendly.
+ * VERIFIED + RATIFIED by the founder on 2026-06-03 against the official Anthropic +
+ * Voyage published pricing (source: platform.claude.com/docs/en/about-claude/pricing,
+ * pulled 2026-06-03). Stored as micro-USD per token (1 USD = 1_000_000 micro-USD) so the
+ * ledger is integer-friendly.
  *
- *   Anthropic Claude Opus 4.x (per Anthropic public pricing):
- *     - input        $15.00 / 1M tokens   → 15.0 micro-USD/token
- *     - output       $75.00 / 1M tokens   → 75.0 micro-USD/token
- *     - cache write  $18.75 / 1M tokens   → 18.75 micro-USD/token  (1.25× base input — the HIGHEST input-side rate)
- *     - cache read   $1.50  / 1M tokens   → 1.5  micro-USD/token   (cheapest input-side rate)
+ *   Anthropic Claude Opus 4.6 / 4.7 / 4.8 (the `reason` model is Opus 4.7 — router.ts):
+ *     - input        $5.00  / 1M tokens   → 5.0   micro-USD/token   (single source of truth)
+ *     - output       $25.00 / 1M tokens   → 25.0  micro-USD/token
+ *     - cache write  $6.25  / 1M tokens   → input × 1.25 = 6.25     (5-min write — the HIGHEST input-side rate)
+ *     - cache read   $0.50  / 1M tokens   → input × 0.10 = 0.50     (cheapest input-side rate)
  *   Voyage voyage-3-large (per Voyage public pricing):
  *     - embeddings   $0.18 / 1M tokens    → 0.18 micro-USD/token
  *
+ * PRIOR (pre-2026-06-03) the Opus constants carried the DEPRECATED Opus 4 / 4.1 card
+ * ($15 / $75 / $18.75 / $1.50) — 3× the current Opus 4.6/4.7/4.8 rates. That stale card
+ * metered the live cap at 3× real cost (the "$5/user/day" HARD-blocked at ~$1.67/day of
+ * real Opus spend). Corrected here; the absolute input rate is now pinned in rates.test.ts
+ * so a future absolute-rate drift fails CI (the ORDERING/proportion checks alone let the
+ * 3× error sit invisible — see tasks/lessons.md 2026-06-03).
+ *
  * These are TUNABLE; only the ORDERING (cache_write ≥ input ≥ cache_read on the input side)
  * is load-bearing for the upper-bound proof. The reserve prices input at the MAX input-side
- * rate (cache_write), which the tests pin directly.
+ * rate (cache_write); rates.test.ts pins both that ordering AND the absolute input rate.
  */
 
-// ── Anthropic Opus 4.x micro-USD per token (FOLLOWUP-COST-RATES-RATIFY) ──
-export const OPUS_INPUT_MICRO_USD_PER_TOKEN = 15.0;
-export const OPUS_OUTPUT_MICRO_USD_PER_TOKEN = 75.0;
-/** cache_creation (cache-write) — the HIGHEST input-side per-token rate (~1.25× base input). */
-export const OPUS_CACHE_WRITE_MICRO_USD_PER_TOKEN = 18.75;
-/** cache_read — the cheapest input-side per-token rate. */
-export const OPUS_CACHE_READ_MICRO_USD_PER_TOKEN = 1.5;
+// ── Anthropic Opus 4.6/4.7/4.8 micro-USD per token (FOLLOWUP-COST-RATES-RATIFY) ──
+// INPUT is the single source of truth; the cache rates DERIVE from it via the
+// official published multipliers, so the four numbers can never drift apart.
+export const OPUS_INPUT_MICRO_USD_PER_TOKEN = 5.0;
+export const OPUS_OUTPUT_MICRO_USD_PER_TOKEN = 25.0;
+/** cache_creation (5-min cache-write) — the HIGHEST input-side per-token rate (1.25× base input, the official 5-min multiplier). */
+export const OPUS_CACHE_WRITE_MICRO_USD_PER_TOKEN = OPUS_INPUT_MICRO_USD_PER_TOKEN * 1.25;
+/** cache_read (hit) — the cheapest input-side per-token rate (0.1× base input, the official cache-read multiplier). */
+export const OPUS_CACHE_READ_MICRO_USD_PER_TOKEN = OPUS_INPUT_MICRO_USD_PER_TOKEN * 0.1;
 
 // ── Voyage voyage-3-large micro-USD per token ──
 export const VOYAGE_MICRO_USD_PER_TOKEN = 0.18;
