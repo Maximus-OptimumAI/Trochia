@@ -3,10 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "packageManager": "npm@11.12.1",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "postbuild": "node scripts/post-deploy-health-check.mjs",
+    "postbuild": "node scripts/assert-no-public-sourcemaps.mjs && node scripts/post-deploy-health-check.mjs",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",

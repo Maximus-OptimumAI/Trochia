@@ -7,11 +7,15 @@ stopped_at: |
   02-07 built (T01-T05) + fix batch (05e4bf8) + residual batch (20fe4cd); re-gate over 726042f..20fe4cd
   COMPLETE (/cso PASS, /codex APPROVE_WITH_FIXES — R1/R2 + CSO-H1/H2/L1 all CLOSED); re-gate finding
   P1_extract_cap_mapping fixed + committed (eb5604a); FOLLOWUP-COST-RATES-RATIFY CLOSED (Opus rates
-  corrected 3× → published 4.6/4.7/4.8, absolute-rate test pinned). Verify-green, branch-only.
-  PENDING before merge: remaining T05 merge sequence (node pin, sourcemap, apply 0007 to prod, smoke
-  test). PR #7 DRAFT; main untouched at acfab36.
+  corrected 3× → published 4.6/4.7/4.8, absolute-rate test pinned, b12f601); FOLLOWUP-NODE-VERSION-SKEW-01
+  CLOSED (engines.node=24.x) + FOLLOWUP-SOURCEMAP-PROD-PUBLIC-HARDENING-01 CLOSED (productionBrowserSourceMaps:false
+  + postbuild .map assertion, verified via real build). NEW open: FOLLOWUP-SENTRY-BUILD-INTEGRATION-RESTORE-01
+  (withSentryConfig stripped by 16f29b2, never restored — build-time sourcemap upload OFF + CLIENT-side
+  Sentry capture inactive; server/edge capture intact). Verify-green, branch-only.
+  PENDING before merge: remaining T05 merge sequence (apply 0007 to prod, smoke test). PR #7 DRAFT;
+  main untouched at acfab36.
 last_updated: "2026-06-03T00:00:00.000Z"
-last_activity: 2026-06-03 -- Plan 02-07 re-gate closed (/cso PASS, /codex APPROVE_WITH_FIXES); P1_extract_cap_mapping fixed (eb5604a); FOLLOWUP-COST-RATES-RATIFY ratified — Opus rates corrected from the deprecated 4/4.1 card (3× high) to published 4.6/4.7/4.8 ($5/$25/$6.25/$0.50), absolute-rate CI pin added
+last_activity: 2026-06-03 -- Plan 02-07 merge-prep: FOLLOWUP-NODE-VERSION-SKEW-01 closed (engines.node 24.x) + FOLLOWUP-SOURCEMAP-PROD-PUBLIC-HARDENING-01 closed (productionBrowserSourceMaps:false + postbuild assertion, build-verified); opened FOLLOWUP-SENTRY-BUILD-INTEGRATION-RESTORE-01 (withSentryConfig stripped ~3wk ago; client-side Sentry capture currently OFF in prod, server/edge intact)
 progress:
   total_phases: 12
   completed_phases: 1
