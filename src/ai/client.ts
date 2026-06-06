@@ -30,6 +30,17 @@ import { AppError } from '@/lib/errors';
 import { getLangfuseClient } from '@/lib/langfuse';
 import { logger } from '@/lib/logger';
 
+import {
+  actualAnthropicMicroUsd,
+  estAnthropicReserveMicroUsd,
+  type AnthropicAttemptUsage,
+} from './cost/rates';
+import {
+  refundReservation,
+  reserveWithinDailyCap,
+  settleSpend,
+  type Reservation,
+} from './cost/cap';
 import { fallbackToOpenAI } from './fallback';
 import { pickModel, type TaskClass } from './router';
 
@@ -66,6 +77,22 @@ export interface RunAgentOpts<T> {
   schema: ZodType<T>;
   /** Optional override for `max_tokens` (default 1024). */
   maxTokens?: number;
+  /**
+   * The $5/user/day cost cap context (Plan 02-07 / OD-3). When PRESENT, runAgent:
+   *   - MEASURES inputTokenCeiling = Buffer.byteLength(systemBlocksText + variableSuffixText
+   *     + JSON.stringify(tools) + JSON.stringify(toolChoice),'utf8') — the COMPLETE billed
+   *     input surface (system blocks + variableSuffix + the forced-tool input_schema + the
+   *     tool_choice, all of which the request sends and Anthropic bills; cycle-4);
+   *   - RESERVES estAnthropicReserveMicroUsd({ inputTokenCeiling, maxTokens }) BEFORE the
+   *     first attempt (input priced @ the cache-write rate — P1-A(1));
+   *   - DISABLES the OpenAI fallback (P1-A(3)) — a double-validation miss throws
+   *     AI_STRUCTURED_OUTPUT_INVALID and NEVER calls fallbackToOpenAI, so a metered call
+   *     prices ONLY the (≤2) Anthropic attempts (a provable spend bound);
+   *   - in a `finally`, SETTLES the actual across the fired attempts OR REFUNDS on a
+   *     pre-call throw, keyed on the reservation token's usageDate (P2-C).
+   * When ABSENT (health-check / internal), the cap is skipped and the fallback behaves as today.
+   */
+  costContext?: { accountId: string };
 }
 
 function buildSystemBlocks(prefix: StablePrefix): Anthropic.Messages.TextBlockParam[] {
@@ -126,75 +153,140 @@ export async function runAgent<T>(opts: RunAgentOpts<T>): Promise<T> {
     typeof opts.variableSuffix === 'string' ? opts.variableSuffix : JSON.stringify(opts.variableSuffix);
 
   const baseMessages: Anthropic.Messages.MessageParam[] = [{ role: 'user', content: userContent }];
+  const maxTokens = opts.maxTokens ?? DEFAULT_MAX_TOKENS;
 
   async function call(messages: Anthropic.Messages.MessageParam[]): Promise<Anthropic.Messages.Message> {
     try {
       return await anthropic.messages.create({
         model,
-        max_tokens: opts.maxTokens ?? DEFAULT_MAX_TOKENS,
+        max_tokens: maxTokens,
         system,
         tools,
         tool_choice: toolChoice,
         messages,
       });
     } catch (e) {
-      trace.update({ level: 'ERROR', statusMessage: e instanceof Error ? e.message : 'anthropic error' });
-      throw e;
+      // A / codex#2 / CSO-H1: NEVER write the raw Anthropic e.message (or cause)
+      // into the Langfuse trace — a QA synthesis carries the query + retrieved
+      // chunks in variableSuffix, and a provider error can echo request content.
+      // Use a STATIC status string plus the safe numeric provider status only.
+      const providerStatus =
+        typeof (e as { status?: unknown }).status === 'number' ? (e as { status: number }).status : undefined;
+      trace.update({
+        level: 'ERROR',
+        statusMessage:
+          providerStatus !== undefined
+            ? `anthropic request failed (status ${providerStatus})`
+            : 'anthropic request failed',
+      });
+      // R1 (codex re-gate P1 / CSO-H1 second half): do NOT re-throw the raw
+      // provider error — its message/body/cause can echo the request content
+      // (the query + retrieved chunks in variableSuffix, or paste content on the
+      // extract path), which a forwarding caller (e.g. the paste router) would
+      // surface to tRPC/Sentry UNSCRUBBED. Throw a STATIC AppError with the safe
+      // numeric provider status only, no message text, no cause — closing the leak
+      // at the chokepoint for EVERY caller. (AI_DAILY_CAP_EXCEEDED is unaffected:
+      // it is thrown earlier from reserveWithinDailyCap, never inside this catch.)
+      throw new AppError('anthropic request failed', {
+        code: 'AI_PROVIDER_ERROR',
+        ...(providerStatus !== undefined ? { status: providerStatus } : {}),
+      });
     }
   }
 
-  // ── First attempt ──
-  let res = await call(baseMessages);
-  trace.update({
-    metadata: {
-      cacheWrite: res.usage.cache_creation_input_tokens,
-      cacheRead: res.usage.cache_read_input_tokens,
-      inputTokens: res.usage.input_tokens,
-      outputTokens: res.usage.output_tokens,
-      model,
-    },
-  });
-
-  let parsed = opts.schema.safeParse(extractToolArgs(res));
-  if (parsed.success) return parsed.data;
-
-  // ── One repair retry ──
-  logger.warn('ai/client: structured output failed validation — attempting one repair retry', {
-    taskClass: opts.taskClass,
-  });
-  const repairMessages: Anthropic.Messages.MessageParam[] = [
-    ...baseMessages,
-    { role: 'assistant', content: res.content },
-    {
-      role: 'user',
-      content: `Your previous output failed schema validation: ${parsed.error.message}. Call the ${TOOL_NAME} tool again with output that conforms to the schema.`,
-    },
-  ];
-  res = await call(repairMessages);
-  trace.update({
-    metadata: {
-      cacheWrite: res.usage.cache_creation_input_tokens,
-      cacheRead: res.usage.cache_read_input_tokens,
-      inputTokens: res.usage.input_tokens,
-      outputTokens: res.usage.output_tokens,
-      model,
-      repair: true,
-    },
-  });
-  parsed = opts.schema.safeParse(extractToolArgs(res));
-  if (parsed.success) return parsed.data;
-
-  // ── Still failing: config-flagged OpenAI fallback, else throw ──
-  if (env.AI_FALLBACK_ENABLED === true) {
-    return fallbackToOpenAI<T>({
-      taskClass: opts.taskClass,
-      stablePrefix: opts.stablePrefix,
-      variableSuffix: opts.variableSuffix,
-      schema: opts.schema,
-    });
+  // ── Cost cap (Plan 02-07 / OD-3 / P1-A / P2-C) ──
+  // When costContext is present, RESERVE the upper-bound cost of the WHOLE invocation
+  // BEFORE the first Anthropic attempt, then SETTLE-or-REFUND in the `finally`. The
+  // reserve measures the COMPLETE billed input surface (system blocks + variableSuffix +
+  // the forced-tool input_schema + tool_choice — cycle-4) as a UTF-8 byte ceiling and
+  // prices the input at the cache-write rate; the OpenAI fallback is DISABLED below so the
+  // metered call prices only the (≤2) Anthropic attempts (a provable bound).
+  const metered = opts.costContext !== undefined;
+  let reservation: Reservation | undefined;
+  const attempts: AnthropicAttemptUsage[] = [];
+  if (metered) {
+    const systemBlocksText = system.map((b) => b.text).join('');
+    const variableSuffixText = userContent;
+    const inputTokenCeiling = Buffer.byteLength(
+      systemBlocksText + variableSuffixText + JSON.stringify(tools) + JSON.stringify(toolChoice),
+      'utf8',
+    );
+    const est = estAnthropicReserveMicroUsd({ inputTokenCeiling, maxTokens });
+    reservation = await reserveWithinDailyCap(opts.costContext!.accountId, est);
   }
-  trace.update({ level: 'ERROR', statusMessage: 'structured output failed validation' });
-  throw new AppError('AI structured output failed validation (after one repair retry).', {
-    code: 'AI_STRUCTURED_OUTPUT_INVALID',
-  });
+
+  try {
+    // ── First attempt ──
+    let res = await call(baseMessages);
+    if (metered) attempts.push(res.usage);
+    trace.update({
+      metadata: {
+        cacheWrite: res.usage.cache_creation_input_tokens,
+        cacheRead: res.usage.cache_read_input_tokens,
+        inputTokens: res.usage.input_tokens,
+        outputTokens: res.usage.output_tokens,
+        model,
+      },
+    });
+
+    let parsed = opts.schema.safeParse(extractToolArgs(res));
+    if (parsed.success) return parsed.data;
+
+    // ── One repair retry ──
+    logger.warn('ai/client: structured output failed validation — attempting one repair retry', {
+      taskClass: opts.taskClass,
+    });
+    const repairMessages: Anthropic.Messages.MessageParam[] = [
+      ...baseMessages,
+      { role: 'assistant', content: res.content },
+      {
+        role: 'user',
+        content: `Your previous output failed schema validation: ${parsed.error.message}. Call the ${TOOL_NAME} tool again with output that conforms to the schema.`,
+      },
+    ];
+    res = await call(repairMessages);
+    if (metered) attempts.push(res.usage);
+    trace.update({
+      metadata: {
+        cacheWrite: res.usage.cache_creation_input_tokens,
+        cacheRead: res.usage.cache_read_input_tokens,
+        inputTokens: res.usage.input_tokens,
+        outputTokens: res.usage.output_tokens,
+        model,
+        repair: true,
+      },
+    });
+    parsed = opts.schema.safeParse(extractToolArgs(res));
+    if (parsed.success) return parsed.data;
+
+    // ── Still failing ──
+    // P1-A(3): under a cost context the OpenAI fallback is DISABLED — a metered call
+    // trades the rare resiliency fallback for a PROVABLE spend bound (acceptable for the
+    // Q&A path). A double-validation failure throws AI_STRUCTURED_OUTPUT_INVALID (qa-rag
+    // maps it to a deterministic "I don't know"/typed error) and NEVER calls fallbackToOpenAI.
+    if (!metered && env.AI_FALLBACK_ENABLED === true) {
+      return await fallbackToOpenAI<T>({
+        taskClass: opts.taskClass,
+        stablePrefix: opts.stablePrefix,
+        variableSuffix: opts.variableSuffix,
+        schema: opts.schema,
+      });
+    }
+    trace.update({ level: 'ERROR', statusMessage: 'structured output failed validation' });
+    throw new AppError('AI structured output failed validation (after one repair retry).', {
+      code: 'AI_STRUCTURED_OUTPUT_INVALID',
+    });
+  } finally {
+    // SETTLE-or-REFUND, keyed on the reservation token's usageDate (P2-C). If no Anthropic
+    // attempt fired (a pre-call throw) → full REFUND; otherwise SETTLE to the actual that
+    // already billed (even on a post-call structured-validation throw — the provider spend
+    // happened, do not refund it).
+    if (reservation) {
+      if (attempts.length === 0) {
+        await refundReservation(reservation);
+      } else {
+        await settleSpend(reservation, actualAnthropicMicroUsd(attempts));
+      }
+    }
+  }
 }

@@ -1,0 +1,98 @@
+=== CLAUDE CONTEXT — HELIX (commercial-construction SaaS) ===
+Last updated: April this year. Use this whenever I ask for help with deck edits, investor outreach, customer interview frameworks, or pricing math. I will paste over the top half each time we hit a real milestone.
+
+---
+
+# Company
+
+Helix is a vertical SaaS for mid-market commercial general contractors (GCs). We replace the spreadsheet-and-email mess that GCs use to track subcontractor compliance docs (insurance certs, W-9s, safety training records, lien waivers) with a single dashboard that auto-chases the subs and flags expired docs before they become a jobsite shutdown risk.
+
+Legal name: Helix Compliance, Inc. Delaware C-Corp, incorporated August 2023. HQ on paper is Wilmington (registered agent only). Real HQ is Austin TX — that's where I sit, where Marcus sits, and where 2 of our 4 employees sit. The other two are remote in Denver and Toronto.
+
+Stage: Seed. We closed a $1.4M seed in March 2024 led by Lerer Hippeau, with participation from Construct Capital and ~$200k of angel money from former Procore execs. Pre-money was $7M, post was $8.4M, with a 12% post-close option pool. Standard YC SAFE conversion from our pre-seed checks. Burn is $98k/month right now, runway is just over 12 months but we've started top-of-funnel conversations on a Series A at $30M pre. Realistic timeline for the A is Q4 this year if MRR keeps trending.
+
+# Founders
+
+- Me (Jordan Vasquez). 33. CEO. Background: 5 years as a project engineer at Turner Construction, then 3 years as a product manager at Procore (left as a Senior PM, Compliance team). I know this buyer cold — I've sat in the trailer at 6am with the field super hunting down the missing certs. 39% post-Seed.
+- Marcus Liang. 36. CTO. Background: 11 years at Salesforce, last 4 as a staff engineer on Vlocity (vertical-cloud platform for industries Salesforce wanted to be in). He shipped the Construction Cloud rules engine before we left and stole the design pattern. 39% post-Seed.
+- We left 12% in option pool, founders are vesting 4/1 from August 2023. Option pool is mostly unallocated — we've granted maybe 3% across the four employees so far. The next 9% gets eaten by the senior eng hire I keep failing to close (more on that below).
+
+# Advisors
+
+Three people on the cap table for advisor shares (0.25% each, 2-year vest, 6-mo cliff):
+
+1. Tooey Courtemanche — yes, the Procore CEO. Confidential — do not name him in any deck or public copy until I tell you to. He gave us 4 hours of strategy time in November and another 6 hours over Q1. He's not active, but the signal is enormous for the Series A.
+2. Wendy Coffey — former CRO at PlanGrid (acquired by Autodesk in 2018 for $875M). Active. Coaches me on enterprise pricing twice a month.
+3. Salima Patel — former VP Eng at Bridgit. Active. Recruiting advisor mostly.
+
+# Customers + traction
+
+This is the section where I keep contradicting myself in pitches. Two different numbers floating around. Read both, decide which to use.
+
+## What I told my seed investors at the Q1 update (March)
+
+"Q1 has been the strongest stretch we've had since launch. We closed 11 new logos in the quarter — all mid-market GCs between $50M and $400M annual revenue. The biggest is a $370M ENR Top-400 GC out of Denver who replaced their existing point solution (will not name them on a public-facing channel). Net new ARR added in Q1 was $312,000. Total ARR closed at $483k as of March 31. **MRR exit-March was $40,250.** Gross retention 96%, net retention 119% on the cohort that's now been with us 12+ months. NPS from our March customer survey was 68 (n=43 of 51 active accounts responded). We have 28 active pilots in flight, of which we expect to convert ~16 by end of Q2 at our current 57% pilot-to-paid rate. Pipeline coverage on the Q2 plan is 3.8x. We feel good."
+
+## What's actually happening as of mid-April
+
+The honest read on where we are right now, which is what I need to walk into the Series A conversation with and not the rosier March update:
+
+We lost two of our top 5 accounts in April. Both were mid-market GCs (one $180M ARR, one $240M ARR) and both churned for the same reason — Procore's Construction Cloud quietly shipped a feature that overlaps about 70% of our subcontractor-compliance workflow, and their existing Procore subscription made the switching cost basically zero. Combined ARR loss was $186,000. So current MRR is $24,750 as of this past Friday, and current ARR is more like $297k. The Q1 update is now 4 weeks stale and significantly overstates the run-rate.
+
+I have not corrected this with the seed investors yet. I'm planning to do it on the May monthly update, with a frame around what we're doing about it (faster product velocity on the workflows Procore can't easily copy — specifically the field-mobile sub-onboarding flow and the bilingual Spanish-language sub portal, which Procore doesn't have on its roadmap).
+
+When you draft Series-A outreach for me, please use the current $24,750 MRR / $297k ARR number, NOT the March $40,250 number. I want the conversation to start from the real position so a partner doesn't catch the gap in diligence and lose trust.
+
+# Product
+
+Core features:
+- Sub directory with compliance status per sub (insurance, W-9, safety, lien waivers)
+- Auto-chase: configurable email + SMS reminders to subs when their docs are within 30 / 14 / 7 days of expiring
+- Field-mobile sub-onboarding (the differentiator — a sub can complete a full document upload + verification in 6 minutes on their phone in the field)
+- Bilingual sub portal (Spanish-language; we'll add Portuguese before Series A)
+- Integrations with Procore and Sage 300 CRE; QuickBooks Enterprise integration shipping in May
+- Lien-waiver generation + e-signature (built on top of Anvil for the templating, DocuSign for the signing — switching to internal e-sign Q3)
+
+The bilingual sub portal is our moat against Procore. ~40% of the field workforce on commercial construction jobsites in the US Southwest is Spanish-first. Procore's portal is English-only and would require a top-down product reorg to internationalize. We shipped Spanish in 4 weeks because we built it that way from day one.
+
+# Why now
+
+Three macro forces:
+
+1. **Subcontractor default risk is rising.** Construction subcontractor bankruptcies hit a 10-year high in 2024 (per Levelset's data). When a sub defaults, the GC is on the hook for unpaid labor + materials liens. The fastest way to avoid this is rigorous up-front and ongoing compliance verification — exactly what we do.
+2. **OSHA enforcement is tightening.** The 2024 OSHA budget added 200 inspectors and shifted enforcement priorities toward construction. Citations for missing safety-training documentation rose 31% YoY in 2024. The cost of a jobsite shutdown for a documentation gap is now $40–80k per day for mid-market GCs.
+3. **The Spanish-speaking sub workforce is the demographic reality.** Per BLS, ~36% of construction laborers in the US are Hispanic; in the Southwest it's over 50%. Software that doesn't meet them in their language is leaving compliance gaps on every job.
+
+# Why us
+
+- I lived the buyer's job for 5 years at Turner. I know the precise moment in a project lifecycle when subcontractor compliance becomes the bottleneck (it's the 3-week window between award and mobilization, when the project engineer is chasing 40 subs for 6 documents each and is also trying to set up the field office). Our product is shaped around that 3-week window because I lived it.
+- I shipped compliance product at Procore for 3 years. I know the exact gap in their portfolio because I tried to fill it from the inside and couldn't get the resourcing.
+- Marcus knows vertical-cloud at Salesforce scale. The infra decisions we're making (multi-tenant Postgres with row-level security, per-tenant compliance audit logs, SOC 2 Type II ready by Series A) are decisions he's made before for buyers ten times our size.
+
+# Pricing
+
+Per-project + per-sub + platform fee model:
+- $1,200/mo platform fee per GC (covers up to 5 active projects)
+- $6/sub/month for each tracked sub above the included 50 subs
+- $400/mo per additional active project above 5
+- Average ACV across our 19 paying accounts: $26k. Top decile: $58k. The big Denver GC is $94k ARR.
+
+Pricing is the lever I'm most uncertain about. Wendy Coffey is pushing me to move to a pure platform-fee model ($2,400/mo flat, includes everything) because the per-sub line item creates friction in the procurement conversation. I think she's right; we're A/B testing it on new pilots in May.
+
+# Pipeline
+
+28 active pilots as of today. 16 of those are >50% likely to convert per our internal scoring. Top 3 by ACV:
+- A $290M GC out of Phoenix (pilot started Feb, decision committee in late April, projected $42k ACV)
+- A $410M GC out of Dallas (pilot started March, projected $51k ACV — biggest pilot in flight)
+- A $180M GC out of Calgary (pilot started April, projected $31k ACV; CAD billing, FX exposure is small but real)
+
+# Risks I'd want you to push on
+
+1. The Procore overlap. Their next move could close the bilingual gap. What's my defensible 24-month wedge?
+2. Pricing model change is risky. If the platform-fee A/B test hurts ACV on net, I lose 4 weeks of cycle time and probably 2–3 pilots.
+3. Cash on hand is $1.18M, burn $98k/mo, runway 12 months — but the post-Procore-churn ARR cut means I need to either hit Series A by November or cut burn fast. I have not modeled the burn-cut scenario in detail yet.
+4. The senior eng hire I keep failing to close. Two strong candidates dropped out in the past 6 weeks (one to OpenAI, one to a Stripe rotation). My recruiter says the comp band needs to move 18% to clear; that math eats into the runway.
+
+# What I want from you
+
+Push back hard. Treat me like a partner who's seen 200 vertical SaaS pitches and finds the seams. I'd rather get the hard read here than in the partner meeting.

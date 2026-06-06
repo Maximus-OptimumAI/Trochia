@@ -1,0 +1,150 @@
+name: Eval Harness
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # `pull-requests: write` re-added at Plan 02-05 / T03 (FOLLOWUP-EVAL-PR-COMMENT-01).
+  # The PR-comment step below posts the sanitized eval summary on pull_request
+  # events via actions/github-script + the default GITHUB_TOKEN. On fork PRs the
+  # token is read-only regardless of this block (GitHub's fork-PR model); the
+  # LIVE step that holds secrets never runs on pull_request (T-02-05-04).
+  pull-requests: write
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+
+      # ── PR eval step (fast + free) ─────────────────────────────────────────
+      # Scoped to pull_request (C2 NEW-MED) so it never double-runs before the
+      # LIVE step on schedule/dispatch. NO ANTHROPIC_API_KEY / Langfuse secrets
+      # and EVAL_LIVE_REQUIRED unset → the live-AI checks (extraction-floor,
+      # cache-hit) env-skip (return 'skip', non-failing). PRs stay deterministic.
+      - name: Run eval suite (PR — live checks env-skip)
+        id: eval_pr
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          NODE_ENV: test
+          # src/lib/env.ts requires these two URL vars UNCONDITIONALLY (not
+          # prodRequired) and validates at import — the eval checks now import
+          # env.ts transitively, so eval:run crashes without them. The PR step
+          # is SECRET-FREE (/codex P2 + /cso L1): use LITERAL localhost, never
+          # secrets.*. The PR run env-skips the live checks, so this URL only
+          # satisfies env.ts import validation; it is never used meaningfully.
+          NEXT_PUBLIC_SITE_URL: 'http://localhost:3000'
+          NEXT_PUBLIC_APP_URL: 'http://localhost:3000'
+        run: npm run eval:run
+
+      # ── LIVE eval step (nightly + manual) ──────────────────────────────────
+      # Runs on schedule (UTC 04:00 nightly) + workflow_dispatch. Sets
+      # EVAL_LIVE_REQUIRED=1 + the secrets so the live-AI checks truly execute;
+      # in that context a 'skip' is a FAILURE (exit 1), so a creds-misconfigured
+      # run is a RED gate, not a silent pass (C1-H1 / OD-A / OD-2).
+      - name: Run eval suite (LIVE — schedule/dispatch)
+        id: eval_live
+        if: ${{ github.event_name != 'pull_request' }}
+        env:
+          NODE_ENV: test
+          # Same unconditional env.ts URL requirement as the PR step above.
+          NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000' }}
+          NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL || 'http://localhost:3000' }}
+          EVAL_LIVE_REQUIRED: '1'
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+          LANGFUSE_HOST: ${{ secrets.LANGFUSE_HOST }}
+        run: npm run eval:run
+
+      - name: Upload eval report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report
+          path: eval-report.json
+          retention-days: 30
+
+      # ── PR comment step ────────────────────────────────────────────────────
+      # Posts (or updates, by a marker string) the sanitized eval summary on the
+      # PR. WHITELIST: the comment body carries ONLY each check's id, status,
+      # sanitized reason, metric, threshold, and the exit code — NEVER secrets,
+      # env values, or trace/paste/PII content. Uses the default GITHUB_TOKEN.
+      - name: Comment eval summary on PR
+        # Same-repo guard (/codex P1 + /cso L2): on FORK PRs the GITHUB_TOKEN is
+        # downgraded to read-only, so createComment 403s and would false-fail an
+        # otherwise-green PR. Only post when the PR head is from THIS repo (a
+        # branch push). Fork PRs skip the comment entirely — non-blocking.
+        if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const MARKER = '<!-- trochia-eval-report -->';
+
+            let report;
+            try {
+              report = JSON.parse(fs.readFileSync('eval-report.json', 'utf8'));
+            } catch (e) {
+              report = null;
+            }
+
+            // Build the comment body from a HARD WHITELIST of report fields only.
+            // Never echo secrets, env values, or trace/paste/PII content. Every
+            // cell is sanitized + truncated and `status` is allowlisted — even
+            // though `reason` is authored by our own check code, this is
+            // defense-in-depth against markdown/HTML injection if a PR alters a
+            // check's output (/codex P2 + /cso M1).
+            const ALLOWED_STATUS = new Set(['pass', 'fail', 'skip', 'pending']);
+            const cell = (v) =>
+              String(v ?? '—')
+                .replace(/[\r\n]+/g, ' ')   // no row/line breaks
+                .replace(/[`<>|]/g, '')      // strip backticks, angle brackets, pipes
+                .slice(0, 200);              // cap length
+            const numCell = (v) =>
+              typeof v === 'number' && Number.isFinite(v) ? String(v) : '—';
+            const lines = [
+              MARKER,
+              '## Trochia eval harness',
+              '',
+              '_Live-AI checks (extraction-floor, cache-hit) run nightly + on manual dispatch; on PRs they env-skip (non-blocking)._',
+              '',
+            ];
+            if (!report || !Array.isArray(report.checks)) {
+              lines.push('No valid `eval-report.json` produced for this run.');
+            } else {
+              lines.push('| Check | Status | Metric | Threshold | Reason |');
+              lines.push('|---|---|---|---|---|');
+              for (const c of report.checks) {
+                const status = ALLOWED_STATUS.has(c?.status) ? c.status : 'invalid';
+                lines.push(`| ${cell(c?.id)} | ${status} | ${numCell(c?.metric)} | ${numCell(c?.threshold)} | ${cell(c?.reason)} |`);
+              }
+              lines.push('');
+              lines.push(`**Exit code:** ${Number.isInteger(report.exitCode) ? report.exitCode : '?'}`);
+            }
+            const body = lines.join('\n');
+
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const existing = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+            });
+            const prior = existing.find((c) => c.body && c.body.includes(MARKER));
+            if (prior) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: prior.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }

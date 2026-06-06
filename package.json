@@ -2,10 +2,14 @@
   "name": "trochia",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "npm@11.12.1",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "postbuild": "node scripts/post-deploy-health-check.mjs",
+    "postbuild": "node scripts/assert-no-public-sourcemaps.mjs && node scripts/post-deploy-health-check.mjs",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
@@ -14,8 +18,10 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "check:banned": "node scripts/check-banned-strings.mjs",
+    "db:check": "drizzle-kit check",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
+    "eval:run": "tsx src/ai/eval/runner.ts",
     "gen:dpa-pdf": "tsx scripts/generate-dpa-pdf.ts"
   },
   "dependencies": {
@@ -72,6 +78,7 @@
     "@types/react-dom": "^19",
     "@vitest/coverage-v8": "^4.1.6",
     "@vitest/ui": "^4.1.6",
+    "dotenv": "^17.4.2",
     "drizzle-kit": "0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",

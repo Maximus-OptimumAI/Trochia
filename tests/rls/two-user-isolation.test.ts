@@ -61,6 +61,44 @@ d('two-user tenant isolation', () => {
         accountId: t.accountId,
         userId: t.userId,
       });
+      // ── Phase 2 tables ──
+      await adb.insert(schema.businessMemory).values({
+        accountId: t.accountId,
+        companyName: `tenant-${t.accountId.slice(0, 8)}`,
+      });
+      await adb.insert(schema.pipelineEntry).values({
+        accountId: t.accountId,
+        investorName: 'Test Capital',
+      });
+      await adb.insert(schema.interaction).values({
+        accountId: t.accountId,
+        userId: t.userId,
+        kind: 'qa_sidebar',
+      });
+      await adb.insert(schema.timelineEvent).values({
+        accountId: t.accountId,
+        sourceModule: 'memory',
+        sourceId: t.accountId, // ok — conventional FK only, no SQL FK
+        eventType: 'memory_confirmed',
+        summary: 'seed',
+      });
+      // 1024-zero vector — Voyage voyage-3-large dim. Real embeddings come
+      // from the Inngest pipeline (Plan 02-04); this is a fixture row.
+      await adb.insert(schema.embeddings).values({
+        accountId: t.accountId,
+        sourceType: 'memory',
+        sourceId: t.accountId,
+        chunkText: 'seed chunk',
+        chunkIdx: 0,
+        embedding: new Array(1024).fill(0) as number[],
+        embeddingModelVersion: 'voyage-3-large',
+      });
+      // Plan 02-07: the AI cost-cap ledger (tenant-scoped — one row per (tenant, UTC-day)).
+      await adb.insert(schema.aiUsageDaily).values({
+        accountId: t.accountId,
+        usageDate: '2026-06-02',
+        microUsdSpent: 0,
+      });
     };
     await seed(A);
     await seed(B);
@@ -83,7 +121,19 @@ d('two-user tenant isolation', () => {
       expect(accts.some((r) => r.id === A.accountId)).toBe(false);
 
       // Every child table: count A-owned rows visible to B → must be 0; B's own → ≥1.
-      for (const tbl of ['subscriptions', 'legal_acceptances', 'jobs', 'sessions']) {
+      for (const tbl of [
+        'subscriptions',
+        'legal_acceptances',
+        'jobs',
+        'sessions',
+        // ── Phase 2 tenant tables ──
+        'business_memory',
+        'pipeline_entry',
+        'interaction',
+        'timeline_event',
+        'embeddings',
+        'ai_usage_daily',
+      ]) {
         const aVisible = await tx.execute<{ n: string }>(
           sql`select count(*)::text as n from public.${sql.raw(tbl)} where account_id = ${A.accountId}`,
         );
@@ -102,7 +152,23 @@ d('two-user tenant isolation', () => {
   it('every tenant-scoped table from the live schema is covered by the isolation assertion', async () => {
     // Guard: if a future migration adds a tenant table, this forces an update.
     const tables = await tenantScopedTables();
-    const covered = new Set(['accounts', 'subscriptions', 'legal_acceptances', 'jobs', 'sessions', 'users']);
+    const covered = new Set([
+      // Phase 1
+      'accounts',
+      'subscriptions',
+      'legal_acceptances',
+      'jobs',
+      'sessions',
+      'users',
+      // Phase 2
+      'business_memory',
+      'pipeline_entry',
+      'interaction',
+      'timeline_event',
+      'embeddings',
+      // Plan 02-07
+      'ai_usage_daily',
+    ]);
     const uncovered = tables.filter((t) => !covered.has(t));
     expect(
       uncovered,

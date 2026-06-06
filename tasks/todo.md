@@ -97,3 +97,8 @@ If even one fails: **STOP. Do not advance to Phase 3.**
 ---
 
 *Authored 2026-05-19 by gsd-plan-phase orchestrator. Updated at every Week close.*
+
+## Week 3 carry-over (from Plan 02-02 T8)
+- [ ] UI: server-side getDraft pre-fetch on /onboarding/import/paste mount.
+      Without it, reload during the confirming state returns to empty paste.
+      Data persists at the DB layer (T9 proves it); just needs UI restore.

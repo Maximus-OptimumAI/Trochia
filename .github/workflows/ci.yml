@@ -31,7 +31,18 @@ jobs:
     env:
       NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000' }}
       NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL || 'http://localhost:3000' }}
-      DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql://localhost:5432/ci' }}
+      # DATABASE_URL is the RUNTIME (pooled) client used by getServiceClient().
+      # It MUST point at the same reachable test DB as TEST_DATABASE_URL so any test
+      # exercising the real runtime client (the cost-cap meter, cap.ts → getServiceClient
+      # → DATABASE_URL) hits a DB where the migrated tables exist — parity with local,
+      # where .env.local sets DATABASE_URL == TEST_DATABASE_URL. Previously this fell back
+      # to a dead `postgresql://localhost:5432/ci`, so the new cost-cap integration test
+      # (tests/integration/cost-cap.test.ts, first shipped 02-07) failed with
+      # AI_COST_METER_UNAVAILABLE in CI #73 while passing locally. The
+      # "Assert test-DB secret present" step above already fails the job if the secret is
+      # unset, so no localhost fallback is needed here. (Aliases to the TEST project only —
+      # never prod.)
+      DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
       DIRECT_URL: ${{ secrets.DIRECT_URL || 'postgresql://localhost:5432/ci' }}
       # RLS integration tests (tests/rls/**) run only when this is set:
       TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
@@ -45,6 +56,12 @@ jobs:
       # Required-in-prod by src/lib/env.ts (Plan 04 / 01-04 flipped ANTHROPIC_API_KEY).
       # The CI fallback keeps the production build green before the real key secret is added.
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY || 'ci-anthropic-key' }}
+      # Required-in-prod by src/lib/env.ts (Plan 02-04 / 02-04-T08 flipped VOYAGE_API_KEY).
+      # Voyage is only invoked at runtime by the embed pipeline; CI never calls Voyage,
+      # so the fallback is a non-secret literal placeholder that satisfies the
+      # `prodRequired(z.string())` non-empty check at build-time. Do not add a real
+      # GitHub secret here — the real key lives in Vercel production env only.
+      VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY || 'ci-placeholder-not-a-real-key' }}
       # Required-in-prod by src/lib/env.ts (Plan 05 / 01-05 flipped the observability + email vars).
       # Fallbacks keep the production build green before the real secrets are added.
       SENTRY_DSN: ${{ secrets.SENTRY_DSN || 'https://ci@ci.ingest.sentry.io/0' }}
@@ -66,10 +83,28 @@ jobs:
       STRIPE_PRICE_PRE_RAISE_ANNUAL: ${{ secrets.STRIPE_PRICE_PRE_RAISE_ANNUAL || 'price_ci_pre_raise_a' }}
       STRIPE_PRICE_ACTIVE_RAISE_MONTHLY: ${{ secrets.STRIPE_PRICE_ACTIVE_RAISE_MONTHLY || 'price_ci_active_raise_m' }}
       STRIPE_PRICE_ACTIVE_RAISE_ANNUAL: ${{ secrets.STRIPE_PRICE_ACTIVE_RAISE_ANNUAL || 'price_ci_active_raise_a' }}
+      STRIPE_PRICE_CLOSE_MODE_MONTHLY: ${{ secrets.STRIPE_PRICE_CLOSE_MODE_MONTHLY || 'price_ci_close_mode_m' }}
+      STRIPE_PRICE_CLOSE_MODE_ANNUAL: ${{ secrets.STRIPE_PRICE_CLOSE_MODE_ANNUAL || 'price_ci_close_mode_a' }}
+      STRIPE_PRICE_ALUMNI_MONTHLY: ${{ secrets.STRIPE_PRICE_ALUMNI_MONTHLY || 'price_ci_alumni_m' }}
+      STRIPE_PRICE_ALUMNI_ANNUAL: ${{ secrets.STRIPE_PRICE_ALUMNI_ANNUAL || 'price_ci_alumni_a' }}
       INNGEST_SIGNING_KEY: ${{ secrets.INNGEST_SIGNING_KEY || 'signkey-ci' }}
       INNGEST_EVENT_KEY: ${{ secrets.INNGEST_EVENT_KEY || 'eventkey-ci' }}
       PLAYWRIGHT_BASE_URL: ${{ secrets.PLAYWRIGHT_BASE_URL }}
     steps:
+      # FIRST step — fail loudly if the RLS-test secret is missing. Without it,
+      # tests/db/test-db.ts:34 sets HAS_TEST_DB=false and every RLS integration
+      # suite (rls-memory, memory-paste-rls, embed-pipeline-rls, two-user-
+      # isolation) hits `describe.skip` → CI green on silently-skipped tests
+      # (Codex P2-2 + /cso F1, cross-confirmed 2026-05-30). The HAS_TEST_DB
+      # skip pattern stays in place for local dev where the secret is unset
+      # by design; CI MUST have it.
+      - name: Assert test-DB secret present
+        run: |
+          if [ -z "$TEST_DATABASE_URL" ]; then
+            echo "::error::TEST_DATABASE_URL secret missing — RLS tests would skip silently"
+            exit 1
+          fi
+
       - uses: actions/checkout@v5
 
       - uses: actions/setup-node@v5

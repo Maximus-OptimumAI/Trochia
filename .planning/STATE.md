@@ -2,16 +2,26 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: completed
-stopped_at: Plan 01-09 complete — Phase 1 ready for verification
-last_updated: "2026-05-14T00:05:19.918Z"
-last_activity: 2026-05-14 -- Phase 01 marked complete
+status: executing
+stopped_at: |
+  02-07 built (T01-T05) + fix batch (05e4bf8) + residual batch (20fe4cd); re-gate over 726042f..20fe4cd
+  COMPLETE (/cso PASS, /codex APPROVE_WITH_FIXES — R1/R2 + CSO-H1/H2/L1 all CLOSED); re-gate finding
+  P1_extract_cap_mapping fixed + committed (eb5604a); FOLLOWUP-COST-RATES-RATIFY CLOSED (Opus rates
+  corrected 3× → published 4.6/4.7/4.8, absolute-rate test pinned, b12f601); FOLLOWUP-NODE-VERSION-SKEW-01
+  CLOSED (engines.node=24.x) + FOLLOWUP-SOURCEMAP-PROD-PUBLIC-HARDENING-01 CLOSED (productionBrowserSourceMaps:false
+  + postbuild .map assertion, verified via real build). NEW open: FOLLOWUP-SENTRY-BUILD-INTEGRATION-RESTORE-01
+  (withSentryConfig stripped by 16f29b2, never restored — build-time sourcemap upload OFF + CLIENT-side
+  Sentry capture inactive; server/edge capture intact). Verify-green, branch-only.
+  PENDING before merge: remaining T05 merge sequence (apply 0007 to prod, smoke test). PR #7 DRAFT;
+  main untouched at acfab36.
+last_updated: "2026-06-03T00:00:00.000Z"
+last_activity: 2026-06-03 -- Plan 02-07 merge-prep: FOLLOWUP-NODE-VERSION-SKEW-01 closed (engines.node 24.x) + FOLLOWUP-SOURCEMAP-PROD-PUBLIC-HARDENING-01 closed (productionBrowserSourceMaps:false + postbuild assertion, build-verified); opened FOLLOWUP-SENTRY-BUILD-INTEGRATION-RESTORE-01 (withSentryConfig stripped ~3wk ago; client-side Sentry capture currently OFF in prod, server/edge intact)
 progress:
-  total_phases: 11
+  total_phases: 12
   completed_phases: 1
-  total_plans: 9
-  completed_plans: 9
-  percent: 9
+  total_plans: 14
+  completed_plans: 13
+  percent: 8
 ---
 
 # Project State
@@ -27,8 +37,8 @@ See: .planning/PROJECT.md (updated 2026-05-11)
 
 Phase: 01 — COMPLETE
 Plan: 9 of 9
-Status: Phase 01 complete
-Last activity: 2026-05-14 -- Phase 01 marked complete
+Status: Ready to execute
+Last activity: 2026-05-29 -- Phase 02 planning complete
 
 Progress: [██████████] 100%
 

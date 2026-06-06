@@ -25,6 +25,13 @@
  * │   3. Inngest job functions   — carry an explicit tenantId and re-assert it      │
  * │                               (Plan 04).                                        │
  * │   4. Account deletion        — must reach every tenant's rows.                  │
+ * │   5. The AI cost meter       — src/ai/cost/cap.ts (Plan 02-07 / OD-3). Runs from │
+ * │                               BOTH the request path (qa-rag query embed +       │
+ * │                               synthesis) AND the Inngest path (embed-memory     │
+ * │                               document embed); the one client reachable from    │
+ * │                               both. Re-asserts an EXPLICIT account_id on EVERY  │
+ * │                               RESERVE/SETTLE/REFUND read+write — the explicit   │
+ * │                               predicate (not RLS) is its isolation control.     │
  * │ Never expose this to a user session; never put the secret/owner connection     │
  * │ string in a `NEXT_PUBLIC_*` var (env.ts validates `SUPABASE_SECRET_KEY` /      │
  * │ `DATABASE_URL` as server-only). Code Reviewer + CI grep for new callers.       │

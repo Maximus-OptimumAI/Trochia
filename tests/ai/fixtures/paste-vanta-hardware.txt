@@ -1,0 +1,107 @@
+VANTA ROBOTICS — Claude project background
+
+Pinned context. Use this whenever I'm drafting investor outreach, refining the deck, or stress-testing the technical claims. I'll refresh it before every quarterly update.
+
+================================
+ONE-LINE PITCH
+================================
+
+Vanta builds an autonomous warehouse-floor robot that does the one job no human warehouse worker likes doing — the overnight cycle count of pallet positions in high-bay racking — so distribution-center operators can know their inventory is right at 6am every morning without paying for a night shift.
+
+================================
+COMPANY BASICS
+================================
+
+Vanta Robotics Pty Ltd. Incorporated in Sydney, Australia on March 4 2024. We're an Australian proprietary limited company — the local equivalent of a US LLC, more or less. Our HQ is in a leased industrial unit in Alexandria, Sydney (8 minutes from a customer's DC, which has been crucial for iterating).
+
+We have NOT done a Delaware flip yet. We're planning to — probably right after the seed, once a US customer is signed and the IP-residency questions are easier to navigate. Our lawyer (a partner at Allens, Sydney) has flagged that an early flip will cost us roughly AUD 90k in cross-border tax structuring and we'd rather wait until the unit economics justify the spend.
+
+We started cutting hardware in May 2024, first robot rolled in our office in September 2024. We are pre-revenue. We have not generated a single dollar of recurring revenue yet. We have three paid pilots in flight (more below).
+
+================================
+FOUNDERS
+================================
+
+Two co-founders. We've known each other since university (UNSW, both in mechatronic engineering, class of 2017).
+
+- **Priya Reddy, CEO.** 30. Born in Hyderabad, raised in Sydney since age 7. Mechatronic eng degree from UNSW. Joined Marathon Targets (an Australian autonomous-robotics startup that sold to a US defense prime in 2019) straight out of uni — spent 4 years there as a systems engineer, then 2 years as a hardware lead at Kraken Robotics (autonomous underwater vehicles, also Australian). Left in March 2024 to start Vanta. I own 47%, vesting 4 years from incorporation with a 1-year cliff.
+- **Tom Donohue, CTO.** 31. Born in Cork, Ireland. Came to Sydney for grad school in 2018 and stayed. Mechatronic eng undergrad at UCD Dublin, Masters at UNSW. Spent 5 years at Boston Dynamics on the Stretch program (warehouse manipulation) before returning to Australia in late 2023. He is the reason we have any credibility in this space — the Stretch background opens every door. He owns 47%.
+- 6% in the option pool. We've granted 0% so far — we haven't made a hire yet other than a part-time hardware contractor who's working for equity at AUD-equivalent of $40/hour.
+
+================================
+WHAT WE'VE BUILT (PRODUCT)
+================================
+
+A 1.4m-tall autonomous mobile robot ("V1") that drives the aisles of a high-bay warehouse overnight, climbs an integrated telescoping mast to reach pallet positions up to 11m, and uses a fusion of LiDAR + RFID + camera-based label OCR to confirm what pallet is in each rack position. The robot reports back to the warehouse management system (WMS) by morning with a full cycle-count audit and a list of mis-positioned pallets.
+
+The painful problem we solve: every large DC runs a "cycle count" — a continuous audit of where every pallet actually is, vs. where the WMS thinks it is. Today this is done by humans on forklifts during the day shift, which is slow, expensive, and bumps the cycle count to about once every 90 days per pallet position. With Vanta running overnight, every pallet position in a 30,000-position DC gets counted every 4 nights. The inventory accuracy improvement is typically 4–6% — which on a $40M inventory holding is $1.6–2.4M of "found" inventory per year.
+
+V1 has done 47 nights of running in customer DCs as of this past Sunday. We've had one major failure (a battery thermal event that triggered our safety abort and shut down the robot mid-aisle — no damage, no injury, no DC downtime, but a humbling Monday morning). We've also had ~14 minor faults — mostly OCR misreads on damaged shipping labels, which is a known limitation we're solving in V1.2.
+
+================================
+PILOTS (THE NUMBERS I CAN CLAIM)
+================================
+
+Three paid pilots in flight:
+
+1. **Toll Group (Australia)** — a $5B AUD revenue Australian 3PL. Pilot started December 2024 at their Erskine Park DC (Western Sydney). 4-month pilot. Paid pilot: AUD 50,000 ($32,500 USD equivalent). Pilot ends end of April; conversion conversation is happening NOW. Their head of automation has indicated a 6-DC rollout is plausible if the pilot data comes in clean. Roughly AUD 800k–1.2M total contract value if it does.
+
+2. **Linfox (Australia)** — another large AU 3PL. Pilot started February 2025 at their Truganina DC (Melbourne). 3-month pilot. Paid pilot: AUD 35,000. Smaller scope but they've got 50+ DCs nationally so the expansion ceiling is enormous if it converts.
+
+3. **John Lewis Partnership (UK)** — through a UK-based introducer Tom knows from Boston Dynamics. Pilot at their Magna Park DC outside Milton Keynes. Pilot started March 2025. Paid pilot: GBP 20,000 (about USD 25,200 at current FX). 3 months. This is our only non-Australian customer; if it converts it changes the geography story for the seed conversation in a meaningful way.
+
+So: pilot revenue across the three engagements is roughly USD $85k aggregate, all booked, mostly recognized over Q1–Q2. This is NOT recurring revenue. There is no MRR. There is no ARR. We are a hardware company at a pre-revenue stage, with three paid validation pilots underway.
+
+The unit economics we're modeling for the seed pitch:
+
+- V1 manufacturing cost (at scale of 50 units): AUD 38,000 per unit (we're prototyping at AUD 71,000 per unit today; the path to AUD 38k is a known BOM optimization that requires a tooled injection-mold for two main housings — capex ~AUD 220k).
+- Recurring revenue model: Robotics-as-a-Service (RaaS) at AUD 4,500/month per robot per DC. So one robot generates AUD 54k/year in recurring revenue against an AUD 38k upfront cost, with the customer paying nothing up front and us depreciating the robot over 4 years.
+
+================================
+WHY NOW
+================================
+
+Three things converged:
+
+- Boston Dynamics shipped Stretch (their commercial warehouse robot) in 2022. That single product proved DC operators will pay for an autonomous robot if the ROI is real. Tom worked on Stretch — he knows what worked, what didn't, and where the gaps are.
+- LiDAR cost dropped 70% from 2019 to 2024. The unit we're using would have made our BOM untenable two years ago.
+- Distribution-center labor cost has climbed 36% in Australia and 31% in the US since 2021 (per the relevant industry surveys — I have the citations in the deck). Operators are now structurally short on cycle-count labor and structurally willing to invest in automation to fix it.
+
+================================
+WHY US
+================================
+
+- Tom worked on Stretch at Boston Dynamics for 5 years. The credential weight in this category is enormous. Every customer conversation we've had — including the UK one — opened on the strength of his CV.
+- Priya has 6 years of Australian autonomous-robotics experience including the entire commercial lifecycle (Marathon's exit, Kraken's commercial rollout). She runs the GTM and customer side.
+- We're physically close to the customer. Our 8-minute drive to Toll's Erskine Park DC meant we did 14 site visits in the first month of pilot — most US robotics startups would have done 2.
+
+================================
+RAISE
+================================
+
+We're talking to seed investors now. Target: AUD 4M (about USD 2.6M) on a SAFE with a USD 16M post cap. Lead is unconfirmed; Blackbird (Australia's largest) is in diligence and is the most likely lead. Square Peg is also in conversation. We have a US-based fund (Construct Capital, NY) doing a small follow-on if the AU lead lands.
+
+Cash on hand: AUD 280k (this is what's left of the AUD 600k pre-seed friends-and-family round we did in May 2024, plus the AUD 85k in pilot revenue, minus burn). Burn is AUD 95k/month. Without the seed we have ~3 months. With the seed we extend to 18 months and can execute the manufacturing scale-up to 50-unit cohort.
+
+We are NOT raising on revenue. We're raising on pilot signal + team + technical defensibility.
+
+================================
+NUMBERS THAT MATTER (FOR THE DECK)
+================================
+
+- 3 paid pilots, AUD 85k total pilot revenue (USD ~$55k equivalent)
+- 47 customer-DC nights logged
+- 4–6% inventory accuracy improvement measured at Toll, validated by their internal audit
+- 1 major fault (thermal abort, no damage), ~14 minor faults across 47 nights — manageable for a pre-V2 hardware platform
+- 2 founders, 1 part-time contractor — no full-time employees yet
+- Manufacturing path from AUD 71k/unit (today) to AUD 38k/unit (50-unit cohort) — known BOM, requires AUD 220k tooling capex
+
+================================
+THINGS I WANT YOU TO PUSH ON
+================================
+
+1. The Australian-domiciled story is going to come up with every US investor. What's the cleanest version — "we'll flip after seed" or "we're already a global company day one"?
+2. We're pre-revenue. We have pilots, not contracts. How aggressive can I be about converting pilot-to-LOI before the seed close? Two of the three pilots have indicated likely conversion but we don't have anything signed.
+3. The competitive landscape includes Locus Robotics, GreyOrange, Geek+, and Symbotic. None of them do the high-bay cycle-count overnight robot specifically. Is "no direct competitor in our exact niche" a strength signal or a market-size warning?
+4. The capital efficiency story — we built V1 with AUD 600k and two founders in 11 months. Tom thinks that's the headline number. I think it's a footnote. Who's right?
+5. Tom's compensation. He's underpaid relative to a Boston Dynamics-equivalent role in the US. We can't fix that today. How much risk is he going to walk?

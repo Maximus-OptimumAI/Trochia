@@ -50,4 +50,21 @@ d('RLS schema-scan', () => {
       expect(row!.policy_count, `no policy on ${t}`).toBeGreaterThanOrEqual(1);
     }
   });
+
+  it('the Phase-2 memory/timeline/embeddings tables are present and protected', async () => {
+    const rows = await rlsScan();
+    const byName = new Map(rows.map((r) => [r.table_name, r]));
+    for (const t of [
+      'business_memory',
+      'pipeline_entry',
+      'interaction',
+      'timeline_event',
+      'embeddings',
+    ]) {
+      const row = byName.get(t);
+      expect(row, `table ${t} missing`).toBeDefined();
+      expect(row!.rls_enabled, `RLS not enabled on ${t}`).toBe(true);
+      expect(row!.policy_count, `no policy on ${t}`).toBeGreaterThanOrEqual(1);
+    }
+  });
 });
