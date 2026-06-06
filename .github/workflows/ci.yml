@@ -31,7 +31,18 @@ jobs:
     env:
       NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000' }}
       NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL || 'http://localhost:3000' }}
-      DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql://localhost:5432/ci' }}
+      # DATABASE_URL is the RUNTIME (pooled) client used by getServiceClient().
+      # It MUST point at the same reachable test DB as TEST_DATABASE_URL so any test
+      # exercising the real runtime client (the cost-cap meter, cap.ts → getServiceClient
+      # → DATABASE_URL) hits a DB where the migrated tables exist — parity with local,
+      # where .env.local sets DATABASE_URL == TEST_DATABASE_URL. Previously this fell back
+      # to a dead `postgresql://localhost:5432/ci`, so the new cost-cap integration test
+      # (tests/integration/cost-cap.test.ts, first shipped 02-07) failed with
+      # AI_COST_METER_UNAVAILABLE in CI #73 while passing locally. The
+      # "Assert test-DB secret present" step above already fails the job if the secret is
+      # unset, so no localhost fallback is needed here. (Aliases to the TEST project only —
+      # never prod.)
+      DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
       DIRECT_URL: ${{ secrets.DIRECT_URL || 'postgresql://localhost:5432/ci' }}
       # RLS integration tests (tests/rls/**) run only when this is set:
       TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}

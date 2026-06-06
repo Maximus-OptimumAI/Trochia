@@ -667,3 +667,16 @@ Next: 6c (Install Cursor CLI to Windows PATH)
     2. **One source of truth, derive the rest.** Make the base input rate the single constant and derive cache-write (x1.25) / cache-read (x0.10) from it so the four numbers can never drift apart.
     3. **Record the source + date in the code.** A dated comment (`platform.claude.com/docs, pulled 2026-06-03, founder-ratified`) turns "ratify at convergence" from a TODO into an audit trail.
     4. **Re-verify rates at every prod-merge gate** — model price cards change between when a constant is authored and when it ships. (Phase 2 Plan 02-07 FOLLOWUP-COST-RATES-RATIFY, 2026-06-03.)
+
+---
+
+## CI / test environment (2026-06-06)
+
+- **Any test that exercises the REAL runtime client (`getServiceClient()` → `DATABASE_URL`) needs CI `DATABASE_URL` pointed at a reachable, migrated test DB — not a dummy localhost.** The cost-cap integration test (`tests/integration/cost-cap.test.ts`, first shipped in 02-07) drives the real meter (`cap.ts` → `getServiceClient()` → `DATABASE_URL`). Locally it passed because `.env.local` sets `DATABASE_URL == TEST_DATABASE_URL` (the throwaway test project). In CI it FAILED (#73, 6 tests, all `AI_COST_METER_UNAVAILABLE` 503) because `ci.yml` had `DATABASE_URL` falling back to a dead `postgresql://localhost:5432/ci` (the `DATABASE_URL` secret was unset) — so the meter could not reach a DB even though `migrateTestDb()` had created `ai_usage_daily` in `TEST_DATABASE_URL`. The two DBs were different. Fix: `DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}` in `ci.yml` (CI-config only).
+
+  **Why it hid until now:** CI #72 (on the pre-02-07 head) was green because no test had ever driven the real `getServiceClient()` against the DB before — every prior DB test used the RLS `tenantClient` (`TEST_DATABASE_URL`) or mocked `@/db/client`. The cost-cap meter was the first caller of the runtime service client in a test, so it was the first to expose the `DATABASE_URL`-vs-`TEST_DATABASE_URL` split in CI.
+
+  **Rules:**
+    1. **CI must mirror local DB wiring.** If local sets `DATABASE_URL == TEST_DATABASE_URL`, CI must too — a green local run does NOT prove CI parity when the two env vars diverge.
+    2. **A dummy/unreachable `DATABASE_URL` is a latent trap.** It works only while no test touches the runtime client. The moment one does, it fails-closed (correctly) and reads as a product bug. Point CI `DATABASE_URL` at the real test DB so the trap never arms.
+    3. **Distinguish the two clients in test review:** RLS tests use `tenantClient`/`TEST_DATABASE_URL`; anything using `getServiceClient()` uses `DATABASE_URL`. Both must be reachable + migrated in CI. (Phase 2 Plan 02-07, CI #73 diagnosis, 2026-06-06.)

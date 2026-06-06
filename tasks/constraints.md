@@ -52,6 +52,7 @@ Both URLs already read from `process.env.NEXT_PUBLIC_SITE_URL` / `NEXT_PUBLIC_AP
 |---|---|
 | **Node.js pinned to `24.x`** | `package.json` `engines.node = "24.x"` (FOLLOWUP-NODE-VERSION-SKEW-01, 2026-06-03). Rationale: Vercel Functions' current default + LTS, and already CI's version (`ci.yml` + `eval.yml` use `node-version: 24`). Aligns local / CI / Vercel upward — no 22-vs-24 skew. `next` requires `>=20.9.0`, so 24.x is in range. (`@types/node` stays `^20` — type defs only, not a runtime constraint; bump deferred as a separate change.) |
 | **No public browser source maps in prod** | `next.config.ts` sets `productionBrowserSourceMaps: false`; `scripts/assert-no-public-sourcemaps.mjs` runs in `postbuild` and FAILS the build if any `.map` appears under `.next/static/chunks/` (FOLLOWUP-SOURCEMAP-PROD-PUBLIC-HARDENING-01, 2026-06-03). Sentry build-time source-map upload remains OFF — see FOLLOWUP-SENTRY-BUILD-INTEGRATION-RESTORE-01. |
+| **CI `DATABASE_URL` must point at a reachable test DB** | In `ci.yml`, `DATABASE_URL` is set to `${{ secrets.TEST_DATABASE_URL }}` (NOT a dummy `localhost` fallback) so any test that drives the **real runtime client** (`getServiceClient()` → `DATABASE_URL`) hits a DB where the migrated tables exist — parity with local (`.env.local` sets `DATABASE_URL == TEST_DATABASE_URL`). The cost-cap meter (`cap.ts`) was the first such test; the dead fallback made CI #73 fail with `AI_COST_METER_UNAVAILABLE` while local passed (CI-config gap, 2026-06-06). `DATABASE_URL` aliases the TEST project only — never prod. |
 
 ---
 
