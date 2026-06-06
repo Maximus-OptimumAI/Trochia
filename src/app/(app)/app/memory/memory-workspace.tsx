@@ -1,6 +1,5 @@
 'use client';
 
-import * as React from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { PasteFlow } from '@/app/(app)/onboarding/import/paste/paste-flow';
@@ -19,13 +18,17 @@ import { useTRPC } from '@/lib/trpc-client';
  *   - no row                     → `<PasteFlow mode="app" />` (start at paste)
  *   - row, `confirmedAt === null` → `<PasteFlow mode="app" initialDraft={…} />`
  *                                   (resume confirming the existing draft here)
- *   - row, confirmed             → read-only confirmed view + "Update Business
- *                                   Memory" (re-import) affordance
+ *   - row, confirmed             → read-only confirmed view (terminal)
  *
- * Minimal by design (first post-launch patch): the confirmed view is read-only;
- * full inline field editing of a confirmed memory is a future plan. Extracting a
- * shared paste→confirm→save core out of `PasteFlow` is FOLLOWUP-MEMORY-SHARED-
- * CORE-01 — for now app mode reuses `PasteFlow` via the `mode` prop.
+ * Minimal by design (first post-launch patch): the confirmed view is read-only
+ * and terminal. There is intentionally NO re-import affordance — `extractFromPaste`'s
+ * upsert excludes confirmed rows (`ON CONFLICT … WHERE confirmedAt IS NULL`), so a
+ * confirmed row produces no unconfirmed draft and `confirmDraft` would dead-end at
+ * NOT_FOUND (codex HIGH-1). Re-opening a confirmed memory for update needs a server
+ * reimport contract — FOLLOWUP-MEMORY-REIMPORT-01 — tied to the deferred Week-3
+ * update/conflict work. Full inline field editing is likewise a future plan.
+ * Extracting a shared paste→confirm→save core out of `PasteFlow` is FOLLOWUP-MEMORY-
+ * SHARED-CORE-01 — for now app mode reuses `PasteFlow` via the `mode` prop.
  *
  * Voice (BRAND.md): Trochia drafts / cites / tracks. Brand tokens only.
  */
@@ -74,7 +77,7 @@ const CONFIRMED_FIELDS: Array<{ key: keyof MemoryRow; label: string }> = [
   { key: 'incorporationStatus', label: 'Incorporation status' },
 ];
 
-function ConfirmedView({ row, onReimport }: { row: MemoryRow; onReimport: () => void }) {
+function ConfirmedView({ row }: { row: MemoryRow }) {
   const populated = CONFIRMED_FIELDS.filter(
     (f) => typeof row[f.key] === 'string' && (row[f.key] as string).length > 0,
   );
@@ -83,8 +86,7 @@ function ConfirmedView({ row, onReimport }: { row: MemoryRow; onReimport: () => 
       <header className="flex flex-col gap-2">
         <h2 className="text-h3 text-ink">Business Memory confirmed</h2>
         <p className="text-body text-graphite">
-          Trochia reads this confirmed record across every module. Re-import to refresh it from a
-          new paste.
+          Trochia reads this confirmed record across every module.
         </p>
       </header>
 
@@ -96,12 +98,6 @@ function ConfirmedView({ row, onReimport }: { row: MemoryRow; onReimport: () => 
           </div>
         ))}
       </dl>
-
-      <div className="flex">
-        <Button variant="secondary" onClick={onReimport} data-testid="memory-reimport">
-          Update Business Memory
-        </Button>
-      </div>
     </section>
   );
 }
@@ -109,7 +105,6 @@ function ConfirmedView({ row, onReimport }: { row: MemoryRow; onReimport: () => 
 export function MemoryWorkspace() {
   const trpc = useTRPC();
   const draftQuery = useQuery(trpc.memory.getDraft.queryOptions());
-  const [reimport, setReimport] = React.useState(false);
 
   if (draftQuery.isLoading) {
     return (
@@ -137,12 +132,13 @@ export function MemoryWorkspace() {
 
   const row = (draftQuery.data as MemoryRow | null) ?? null;
 
-  // Re-import requested, or no row yet → start the paste flow in app mode.
-  if (reimport || !row) return <PasteFlow mode="app" />;
+  // No row yet → start the paste flow in app mode.
+  if (!row) return <PasteFlow mode="app" />;
 
   // Unconfirmed draft exists → resume confirming it here (no re-paste needed).
   if (row.confirmedAt == null) return <PasteFlow mode="app" initialDraft={rowToDraft(row)} />;
 
-  // Confirmed → read-only summary + re-import affordance.
-  return <ConfirmedView row={row} onReimport={() => setReimport(true)} />;
+  // Confirmed → terminal read-only summary. No re-import: see HIGH-1 note above
+  // (FOLLOWUP-MEMORY-REIMPORT-01).
+  return <ConfirmedView row={row} />;
 }

@@ -109,6 +109,21 @@ The intermittent `extractFromPaste` 500: the metered path (`costContext`) disabl
 `npm run gate` (typecheck, lint, check:banned, full vitest) → expect prior 2 known domain-regex fails ONLY + the new tests green; `eval:run` PR-sim exit 0; schema-lock; drizzle-kit. Then `/codex` (correctness — touches persist) + `/cso` (data-flow — the confirm payload + embed trigger). Then PR → squash-merge → prod deploy → re-run the smoke test (paste → confirm → save → Q&A returns a cited ClockPay answer).
 
 ## Open questions for founder review
-1. **T3 shape:** parameterize `PasteFlow` with a `mode` prop, OR factor a shared paste→confirm→save core? (Affects whether `paste-flow.tsx` changes.)
-2. **T3 confirmed-user state:** minimal = show confirmed memory + "re-import" affordance, OR full inline edit of the confirmed memory now? (Recommend minimal for the first patch.)
+1. **T3 shape:** parameterize `PasteFlow` with a `mode` prop, OR factor a shared paste→confirm→save core? (Affects whether `paste-flow.tsx` changes.) → **RESOLVED:** `mode` prop; shared-core deferred as FOLLOWUP-MEMORY-SHARED-CORE-01.
+2. **T3 confirmed-user state:** minimal = show confirmed memory + "re-import" affordance, OR full inline edit of the confirmed memory now? (Recommend minimal for the first patch.) → **RESOLVED + REVISED post-review:** minimal read-only summary, and the re-import affordance is **removed** (see "Post-review: codex HIGH-1" below).
 3. **T2c:** want me to add the server-side `confirmDraft` re-validation backstop in THIS patch, or as a fast-follow?
+
+---
+
+## Post-review: codex HIGH-1 (confirmed→reimport dead-end) — resolved in this branch
+
+**Review outcome of the implemented patch:** `/cso` APPROVE (0 findings); `/codex` REQUEST_CHANGES with one HIGH.
+
+**HIGH-1** (`src/app/(app)/app/memory/memory-workspace.tsx`): the "Update Business Memory" CTA on the confirmed read-only view dead-ended. `extractFromPaste`'s upsert excludes confirmed rows (`ON CONFLICT … WHERE confirmedAt IS NULL`), so for a confirmed row re-pasting writes **no** unconfirmed draft; `PasteFlow` still advanced to confirm; on submit `confirmDraft` returned `NOT_FOUND`. The first-time and unconfirmed-draft-resume flows were CLEAN — only the confirmed→reimport branch was broken (confirmed by codex).
+
+**Decision — Option 1 (minimal, in scope):** HIDE the re-import CTA so the confirmed state is honest terminal read-only. Did NOT build a server reimport path in this patch.
+- `ConfirmedView` no longer takes `onReimport` / renders no "Update Business Memory" button; header copy dropped the "Re-import to refresh…" promise.
+- `MemoryWorkspace` dropped the now-dead `reimport` state; the confirmed branch renders `<ConfirmedView row={row} />` (terminal).
+- The dead-end is recorded as **FOLLOWUP-MEMORY-REIMPORT-01** (server reimport/update contract: a mutation that re-opens an unconfirmed draft from a confirmed row + `confirmDraft` able to confirm it) — tied to the deferred Week-3 update/conflict work. See `tasks/lessons.md`.
+
+Committed as one pre-push commit citing HIGH-1.
