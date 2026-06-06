@@ -680,3 +680,23 @@ Next: 6c (Install Cursor CLI to Windows PATH)
     1. **CI must mirror local DB wiring.** If local sets `DATABASE_URL == TEST_DATABASE_URL`, CI must too — a green local run does NOT prove CI parity when the two env vars diverge.
     2. **A dummy/unreachable `DATABASE_URL` is a latent trap.** It works only while no test touches the runtime client. The moment one does, it fails-closed (correctly) and reads as a product bug. Point CI `DATABASE_URL` at the real test DB so the trap never arms.
     3. **Distinguish the two clients in test review:** RLS tests use `tenantClient`/`TEST_DATABASE_URL`; anything using `getServiceClient()` uses `DATABASE_URL`. Both must be reachable + migrated in CI. (Phase 2 Plan 02-07, CI #73 diagnosis, 2026-06-06.)
+
+---
+
+## Form-to-mutation seams + prod smoke-test fixes (2026-06-06)
+
+- **A green test suite did NOT prove the onboarding flow worked — the form-to-mutation seam was never driven.** "Save and continue" was a silent no-op in prod: `confirmation-form.tsx` built its react-hook-form resolver as `zodResolver(businessMemoryConfirmedSchema.transform((v) => ({ payload: v })))`, but the form VALUE is wrapped (`{ payload: ... }`). `.transform` rewrites the parsed OUTPUT, not the shape the parser EXPECTS — so it validated the wrapped value against the UNWRAPPED schema and ALWAYS failed on the two required top-level keys (`provenance`, `confirmedAt`). `form.handleSubmit(onValid)` (no `onInvalid`) then swallowed every submit → `confirmDraft` never fired → no `memory.confirmed` → no embed → Q&A empty. `errorCount` only walked rendered-card paths, so the failure was invisible.
+  **Two `as never` casts hid the shape error from tsc** — the exact mismatch a type would have caught. Fix: `zodResolver(z.object({ payload: businessMemoryConfirmedSchema }))`, casts dropped (it now typechecks honestly), plus an `onInvalid` arm + a form-level error surface so a blocked submit is never silent again.
+  **Rules:**
+    1. **Every form that persists via a mutation needs a seam test** that renders the real form, drives it to submit, and asserts the mutation handler fires with a schema-valid payload — not just that cards render. A component test asserting rendered UI is NOT a working-submit test.
+    2. **Never `as never` around `zodResolver`.** If the resolver needs a cast to fit `useForm<T>`, the schema shape and the form-value shape disagree — that IS the bug. Make them match instead.
+    3. **`handleSubmit` always takes an `onInvalid` arg** for any form whose schema can fail on non-rendered paths; surface a form-level error so a blocked submit is visible.
+
+- **MEMORY-NAV-WIRING-01 (fixed here):** `/app/memory` shipped in merged main as the Plan-01-09 "coming in Phase 2" stub even though Phase 2 shipped — the real paste/confirm flow lived only at `/onboarding/import/paste`, and the dashboard CTA + sidebar both linked to the stub. Fixed: `/app/memory` now renders `<MemoryWorkspace/>` (paste / resume-draft / confirmed-read-only); the existing links resolve correctly with no link change. Lesson: a route that is a placeholder must be tracked to its real-UI replacement at the phase that ships the feature — a placeholder in merged main reads as "feature missing."
+
+### Follow-ups opened
+- **FOLLOWUP-EXTRACT-500-RETRY-01** — the intermittent `extractFromPaste` 500: the metered path (`costContext`) disables the OpenAI fallback, so a transient structured-output validation miss throws `AI_STRUCTURED_OUTPUT_INVALID` → 500; retry succeeds. Optional bounded in-agent re-roll on `AI_STRUCTURED_OUTPUT_INVALID` for the extract path before surfacing a 500. Not a launch blocker.
+- **FOLLOWUP-MEMORY-SHARED-CORE-01** — `PasteFlow` is reused at `/app/memory` via a `mode` prop (onboarding kept byte-identical). A future plan can factor the shared paste->confirm->save core out of `PasteFlow` rather than branch on `mode`.
+- **FOLLOWUP-MEMORY-APP-E2E-01** — authed Playwright paste->confirm->save E2E (the durable seam guard) needs the test-user-mint helper (deferred from P4.5). The unit seam test (`tests/components/memory/confirmation-form.test.tsx`) is the guard until then.
+
+(Prod smoke-test fix batch, fix/prod-smoke-blockers off main @ 923cae0, 2026-06-06.)

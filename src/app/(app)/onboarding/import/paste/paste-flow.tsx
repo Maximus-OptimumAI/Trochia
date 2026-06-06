@@ -106,6 +106,7 @@ const COPY = {
   doneBody:
     'Your confirmed Business Memory is the source of truth for every later module. Continue when ready.',
   doneCta: 'Continue to deck upload',
+  doneCtaApp: 'Go to dashboard',
   errorTooShort:
     'That paste is too short. Trochia needs at least 500 characters to draft a useful Business Memory.',
   errorTooLong:
@@ -238,12 +239,33 @@ function redactionsDetailCopy(n: number, byType: Record<string, number>): string
     : `${n} unrelated-party PII items redacted from the draft.`;
 }
 
-export function PasteFlow() {
+export interface PasteFlowProps {
+  /**
+   * 'onboarding' (default) — the /onboarding/import/paste stepper surface;
+   * byte-identical to the original flow (done → /onboarding/deck).
+   * 'app' — the /app/memory surface: no stepper, done returns to the dashboard.
+   */
+  mode?: 'onboarding' | 'app';
+  /**
+   * App mode only — an existing UNCONFIRMED draft (confirmedAt === null) loaded
+   * by /app/memory so the founder can confirm it here without re-pasting. When
+   * provided the flow opens directly in the `confirming` state.
+   */
+  initialDraft?: BusinessMemoryDraft;
+}
+
+export function PasteFlow({ mode = 'onboarding', initialDraft }: PasteFlowProps = {}) {
   const router = useRouter();
   const trpc = useTRPC();
 
   const [paste, setPaste] = React.useState('');
-  const [state, setState] = React.useState<FlowState>({ kind: 'paste' });
+  const [state, setState] = React.useState<FlowState>(
+    // app mode seeds the confirming state from a loaded draft; onboarding mode
+    // (default, no initialDraft) is unchanged — starts at `paste`.
+    initialDraft
+      ? { kind: 'confirming', draft: initialDraft, injectionFlagged: false, pii: null }
+      : { kind: 'paste' },
+  );
   const [extractError, setExtractError] = React.useState<string | null>(null);
   const [confirmError, setConfirmError] = React.useState<string | null>(null);
   // Plan 02-03 / Task 12 — redactions-applied banner dismiss flag. Resets to
@@ -352,7 +374,9 @@ export function PasteFlow() {
   };
 
   const onContinue = () => {
-    router.push('/onboarding/deck');
+    // onboarding: continue the stepper to deck upload (byte-identical to before).
+    // app: /app/memory has no stepper — return to the dashboard.
+    router.push(mode === 'app' ? '/app' : '/onboarding/deck');
   };
 
   // ── State 1: paste ────────────────────────────────────────────────────
@@ -589,7 +613,7 @@ export function PasteFlow() {
       <p className="text-body text-graphite">{COPY.doneBody}</p>
       <div className="flex">
         <Button variant="primary" onClick={onContinue} data-testid="paste-flow-continue">
-          {COPY.doneCta}
+          {mode === 'app' ? COPY.doneCtaApp : COPY.doneCta}
         </Button>
       </div>
     </section>

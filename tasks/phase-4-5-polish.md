@@ -180,7 +180,8 @@ FOLLOWUP-CORPUS-SYNC-01; the 5 seed docs are inert at Phase 2 runtime.
 
 ---
 
-## P4.5-POLISH-14: OAuth callback redirects to wrong preview deployment
+## P4.5-POLISH-14: OAuth callback redirects to wrong preview deployment — CLOSED 2026-06-06
+**Resolution (2026-06-06):** Root cause confirmed = the Supabase project Auth **Site URL** was set to the stale `…phase-1-foundation….vercel.app` preview, and the apex callback was not in the **Redirect URLs** allow-list — so Supabase ignored the app's correct `redirectTo` (`${APP_URL}/auth/callback`, built from `NEXT_PUBLIC_APP_URL`, code verified clean) and fell back to the stale Site URL (landing at `…vercel.app/?code=…`, root not `/auth/callback` — the tell). **Fix was a Supabase Dashboard config change (Site URL = apex + add `https://trochia.asranest.com/auth/callback` to Redirect URLs) — NOT code.** Sign-in now lands on the apex. No code change was required or made.
 **Symptom**: Initiating Google OAuth from Phase 2 preview URL
 (trochia-git-phase-2-knowle-*.vercel.app) redirects callback to Phase 1
 preview URL (trochia-git-phase-1-foundation-*.vercel.app) with
