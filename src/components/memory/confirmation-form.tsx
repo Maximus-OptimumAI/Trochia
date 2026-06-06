@@ -8,6 +8,7 @@ import {
   type FieldErrors,
 } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 
 import {
   businessMemoryConfirmedSchema,
@@ -125,6 +126,10 @@ const COPY = {
   // no apology. Renders only post-submit (form.formState.isSubmitted).
   errorBannerOne: '1 field needs attention',
   errorBannerMany: (n: number) => `${n} fields need attention`,
+  // BLOCKER-1 — form-level error surface for a blocked submit (e.g. a schema
+  // failure on a non-card path). Operator voice; no field content echoed.
+  formError:
+    "Trochia couldn't save this Business Memory. Re-confirm each field and try again, or contact support if this persists.",
   // Conflict-resolver gate — appended to the existing summary line when any
   // multi-candidate field has not been resolved. "1 conflict unresolved" /
   // "N conflicts unresolved" reads cleanly across N≥1.
@@ -420,10 +425,17 @@ export function ConfirmationForm({
   }
 
   const form = useForm<FormShape>({
-    resolver: zodResolver(
-      // Wrap the payload schema so rhf operates on { payload: ... }.
-      businessMemoryConfirmedSchema.transform((v) => ({ payload: v })) as never,
-    ) as never,
+    // BLOCKER-1 fix (prod smoke test). The form VALUE is wrapped — `{ payload:
+    // BusinessMemoryConfirmed }` (see `defaultValues` + every `setValue('payload',
+    // …)`). The resolver must therefore validate that WRAPPED shape. The prior
+    // `zodResolver(businessMemoryConfirmedSchema.transform((v) => ({ payload: v })))`
+    // was backwards: `.transform` rewrites the parsed OUTPUT, not the shape the
+    // parser EXPECTS — so it validated `{ payload }` against the UNWRAPPED schema
+    // and ALWAYS failed on the two required top-level keys (`provenance`,
+    // `confirmedAt`). `form.handleSubmit` (no `onInvalid`) then silently swallowed
+    // every submit → `onSubmit`/`confirmDraft` never fired → no `memory.confirmed`
+    // → no embed. The `as never` casts hid the shape mismatch from tsc.
+    resolver: zodResolver(z.object({ payload: businessMemoryConfirmedSchema })),
     defaultValues: {
       payload: {
         ...initialDraft,
@@ -432,6 +444,10 @@ export function ConfirmationForm({
     },
     mode: 'onSubmit',
   });
+
+  // BLOCKER-1: a blocked submit must never be silent again. Surfaced below the
+  // form; cleared on a successful submit (the `onValid` arm of `handleSubmit`).
+  const [formError, setFormError] = React.useState<string | null>(null);
 
   // Counts for the summary line + the submit-gate predicate.
   const counts = React.useMemo(() => {
@@ -736,10 +752,21 @@ export function ConfirmationForm({
     return out;
   }, [initialDraft, fields, stateMap, resolvedProvenance]);
 
-  const handleSubmit = form.handleSubmit(async () => {
-    const payload = buildPayload();
-    await onSubmit(payload);
-  });
+  const handleSubmit = form.handleSubmit(
+    async () => {
+      setFormError(null);
+      const payload = buildPayload();
+      await onSubmit(payload);
+    },
+    () => {
+      // BLOCKER-1 — never-silent gate. `errorCount` (below) only covers the
+      // rendered cards; a validation failure on a NON-card path (provenance.* /
+      // confirmedAt / a team|traction|narrative leaf) would otherwise show
+      // nothing while the submit no-ops. Surface a content-blind form-level
+      // message so the founder always gets feedback.
+      setFormError(COPY.formError);
+    },
+  );
 
   // Mirror the assembled payload into the rhf state on every status change so
   // zodResolver validates the right shape on submit. Depends on
@@ -889,6 +916,19 @@ export function ConfirmationForm({
           {errorCount === 1
             ? COPY.errorBannerOne
             : COPY.errorBannerMany(errorCount)}
+        </p>
+      )}
+
+      {/* BLOCKER-1 — form-level error. Fires from `handleSubmit`'s `onInvalid`
+          arm so a blocked submit (incl. failures on non-card paths the per-card
+          banner above cannot see) is never a silent no-op. */}
+      {formError && (
+        <p
+          className="text-body-sm text-danger"
+          role="alert"
+          data-testid="confirmation-form-form-error"
+        >
+          {formError}
         </p>
       )}
     </form>

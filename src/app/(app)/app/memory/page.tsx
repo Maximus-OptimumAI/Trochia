@@ -1,18 +1,21 @@
 import { redirect } from 'next/navigation';
 
 import { AppShell } from '@/components/shell/app-shell';
-import { EmptyState } from '@/components/primitives/empty-state';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 
+import { MemoryWorkspace } from './memory-workspace';
+
 /**
- * `/app/memory` — Business Memory placeholder (Plan 01-09).
+ * `/app/memory` — Business Memory (MEMORY-NAV-WIRING-01, prod smoke-test fix).
  *
- * Phase 1 ships a thin "Coming in Phase 2" empty-state inside the app shell so
- * the sidebar nav resolves and the EmptyDashboard CTA ("Start Business
- * Memory") leads somewhere coherent. Real Memory UI lands in Phase 2 (the
- * Knowledge Layer plan).
+ * Previously a Plan-01-09 "coming in Phase 2" stub even though Phase 2 shipped:
+ * the real paste/confirm/save flow lived only at `/onboarding/import/paste`, and
+ * the dashboard CTA + sidebar both linked here, to the stub. This route now
+ * serves the REAL Business Memory experience via `<MemoryWorkspace/>` — which
+ * loads the tenant's row and renders paste / confirm / confirmed-read-only as
+ * appropriate — so those existing links resolve correctly with no link change.
  */
-export default async function MemoryPlaceholderPage() {
+export default async function MemoryPage() {
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },
@@ -26,12 +29,7 @@ export default async function MemoryPlaceholderPage() {
       userName={user.user_metadata?.full_name as string | undefined}
       userEmail={user.email ?? undefined}
     >
-      <EmptyState
-        heading="Business Memory — coming in Phase 2"
-        body="Trochia will turn your existing AI context into a confirmed Business Memory that every module reads from. Paste your ChatGPT or Claude context, confirm each field, resolve conflicts."
-        primaryCtaLabel="Back to dashboard"
-        primaryCtaHref="/app"
-      />
+      <MemoryWorkspace />
     </AppShell>
   );
 }
