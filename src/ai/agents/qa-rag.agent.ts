@@ -216,11 +216,23 @@ export async function askQa(input: AskQaInput, ctx: AskQaCtx): Promise<AskQaResu
   const retrievedKeySet = new Set(candidates.map((c) => citationKey(c.sourceId, c.chunkIdx)));
   const retrievedKeys = [...retrievedKeySet];
 
+  // The strongest-scoring candidate — (sourceId, chunkIdx) + score ONLY, no text
+  // (the debug surface stays counts/scores/keys per P2-D). Eval observability:
+  // maps to a human label via the deterministic seed so a wrong-chunk top-hit
+  // ("what sector?" hitting the Problem chunk) is visible.
+  const topCandidate = candidates.reduce<Candidate | null>(
+    (best, c) => ((c.vectorScore ?? -1) > (best?.vectorScore ?? -1) ? c : best),
+    null,
+  );
+  const topHit = topCandidate
+    ? { sourceId: topCandidate.sourceId, chunkIdx: topCandidate.chunkIdx, vectorScore: topCandidate.vectorScore ?? -1 }
+    : null;
+
   // 2. Stage-1 grounding floor — no Opus call on weak retrieval (cost guarantee).
   if (maxVectorScore < GROUNDING_THRESHOLD) {
     return {
       answer: iDontKnowAnswer(),
-      debug: { droppedCitationCount: 0, maxVectorScore, retrievedKeys },
+      debug: { droppedCitationCount: 0, maxVectorScore, retrievedKeys, topHit },
     };
   }
 
@@ -276,7 +288,7 @@ export async function askQa(input: AskQaInput, ctx: AskQaCtx): Promise<AskQaResu
 
   return {
     answer,
-    debug: { droppedCitationCount: dropped.length, maxVectorScore, retrievedKeys },
+    debug: { droppedCitationCount: dropped.length, maxVectorScore, retrievedKeys, topHit },
   };
 }
 

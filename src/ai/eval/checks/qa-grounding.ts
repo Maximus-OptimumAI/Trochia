@@ -13,6 +13,11 @@
  *     so the eval OBSERVES the drop, it does not rely on a hidden internal drop.
  *   - criterion 6 ("I don't know" on out-of-scope): every deliberately
  *     out-of-scope Q returns `result.answer.grounded === false`.
+ *   - cosine separation (memory-answerable T2): the weakest in-scope
+ *     `maxVectorScore` sits above the strongest out-of-scope one
+ *     (`min(in-scope) > max(out-of-scope)`) — so the threshold decision is
+ *     eval-backed, not guessed. A per-question top-hit chunk_idx/label sweep is
+ *     written to stdout so wrong-chunk matches are visible.
  *
  * `metric = droppedCitationCount` (summed across in-scope Qs), `threshold = 0`.
  *
@@ -43,6 +48,7 @@ import {
   QA_GROUNDING_FIXTURE_PATHS,
   loadQaGroundingFixtures,
 } from '../fixtures';
+import { evalChunkLabels } from '../fixtures/eval-corpus';
 import type { EvalCheck } from '../types';
 
 /** Zero-fabrication threshold (Phase 2 exit gate criterion 7). */
@@ -72,6 +78,7 @@ export const qaGrounding: EvalCheck = {
     const { getRequestClientFromClaims } = await import('@/db/client');
 
     const fixtures = loadQaGroundingFixtures(QA_GROUNDING_FIXTURE_PATHS);
+    const labels = evalChunkLabels(); // chunk_idx → human label (deterministic seed)
 
     let droppedTotal = 0;
     let inScopeCount = 0;
@@ -81,6 +88,14 @@ export const qaGrounding: EvalCheck = {
     // know" run would pass criterion 7 vacuously (droppedTotal===0) — count
     // in-scope Qs that did NOT come back grounded with ≥1 citation as misses.
     let inScopeMisses = 0;
+
+    // Cosine sweep (memory-answerable T2): collect per-bucket maxVectorScore so
+    // the threshold decision is eval-backed — keep 0.6 iff min(in-scope) clears
+    // it with margin over max(out-of-scope). Plus a per-question top-hit
+    // chunk_idx/label log so wrong-chunk matches are visible.
+    const inScopeScores: number[] = [];
+    const outScopeScores: number[] = [];
+    const sweep: string[] = [];
 
     for (const fx of fixtures) {
       // The REAL read path is request-scoped — build an rls runner for the eval
@@ -99,12 +114,23 @@ export const qaGrounding: EvalCheck = {
       const ctx = { rls: rls as unknown as AskQaCtx['rls'] };
       const result = await askQa({ accountId: fx.accountId, query: fx.question }, ctx);
 
+      const topHit = result.debug.topHit;
+      const topLabel = topHit ? (labels[topHit.chunkIdx] ?? `#${topHit.chunkIdx}`) : '(none)';
+      // Synthetic fixture question + field label only — no founder content. This
+      // is the validation-time top-hit visibility log (T2 decision 4).
+      sweep.push(
+        `  ${fx.isOutOfScope ? 'OUT' : 'in '} maxVS=${result.debug.maxVectorScore.toFixed(4)} ` +
+          `topHit=[idx ${topHit?.chunkIdx ?? '-'} "${topLabel}"] grounded=${result.answer.grounded} :: ${fx.question}`,
+      );
+
       if (fx.isOutOfScope) {
         outOfScopeCount += 1;
+        outScopeScores.push(result.debug.maxVectorScore);
         // criterion 6: out-of-scope must return grounded:false ("I don't know").
         if (result.answer.grounded !== false) outOfScopeMisses += 1;
       } else {
         inScopeCount += 1;
+        inScopeScores.push(result.debug.maxVectorScore);
         // criterion 7: zero fabricated citations — read the type-separated debug.
         droppedTotal += result.debug.droppedCitationCount;
         // codex#5: an in-scope Q must actually be answered grounded + cited.
@@ -112,17 +138,38 @@ export const qaGrounding: EvalCheck = {
       }
     }
 
-    const pass = droppedTotal === DROPPED_THRESHOLD && outOfScopeMisses === 0 && inScopeMisses === 0;
+    // Cosine separation: the in-scope floor must sit cleanly above the
+    // out-of-scope ceiling. Empty buckets are non-blocking (±Infinity guards).
+    const minInScope = inScopeScores.length ? Math.min(...inScopeScores) : Infinity;
+    const maxOutScope = outScopeScores.length ? Math.max(...outScopeScores) : -Infinity;
+    const separation = minInScope > maxOutScope;
+
+    // Emit the sweep + top-hit log to stdout (synthetic data; not the eval
+    // report's content-blind `reason`). This is the artifact the threshold
+    // decision is read from.
+    process.stdout.write(
+      `\n[qa-grounding sweep] min(in-scope)=${Number.isFinite(minInScope) ? minInScope.toFixed(4) : 'n/a'} ` +
+        `max(out-of-scope)=${Number.isFinite(maxOutScope) ? maxOutScope.toFixed(4) : 'n/a'} ` +
+        `separation=${separation} (floor GROUNDING_THRESHOLD applied inside askQa)\n` +
+        sweep.join('\n') +
+        '\n',
+    );
+
+    const pass =
+      droppedTotal === DROPPED_THRESHOLD &&
+      outOfScopeMisses === 0 &&
+      inScopeMisses === 0 &&
+      separation;
     const status = pass ? ('pass' as const) : ('fail' as const);
 
-    // reason carries ONLY counts — no question / answer / chunk text.
+    // reason carries ONLY counts + scores — no question / answer / chunk text.
     return {
       id: this.id,
       description: this.description,
       status,
       metric: droppedTotal,
       threshold: DROPPED_THRESHOLD,
-      reason: `dropped citations ${droppedTotal} across ${inScopeCount} in-scope Qs (threshold ${DROPPED_THRESHOLD}); in-scope grounded+cited ${inScopeCount - inScopeMisses}/${inScopeCount}; out-of-scope grounded:false ${outOfScopeCount - outOfScopeMisses}/${outOfScopeCount}`,
+      reason: `dropped citations ${droppedTotal} across ${inScopeCount} in-scope Qs (threshold ${DROPPED_THRESHOLD}); in-scope grounded+cited ${inScopeCount - inScopeMisses}/${inScopeCount}; out-of-scope grounded:false ${outOfScopeCount - outOfScopeMisses}/${outOfScopeCount}; cosine min(in)=${Number.isFinite(minInScope) ? minInScope.toFixed(4) : 'n/a'} max(out)=${Number.isFinite(maxOutScope) ? maxOutScope.toFixed(4) : 'n/a'} separation=${separation}`,
     };
   },
 };
