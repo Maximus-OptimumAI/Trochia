@@ -48,20 +48,24 @@
  *   tenants, never touches rows under a different model version (rolling
  *   re-embed contract from Plan 02-01 preserved).
  *
- * What gets embedded:
- *   The function flattens business_memory into a chunkable surface. For Phase 2,
- *   the surface is the concatenated narrative.* + traction.{growth,runway} text
- *   (the PII-redacted text from 02-03's invariant). Scalar fields (companyName,
- *   sector, stage, geography) are NOT embedded — they live in business_memory
- *   for relational query, and Phase 2's hybrid retrieval (Plan 02-06) uses FTS
- *   for the relational side, not pgvector.
+ * What gets embedded (memory-answerable T1 — DESIGN REVERSAL):
+ *   `buildMemoryChunks(row)` emits one LABELED chunk per populated field —
+ *   scalar facets (companyName, oneLiner, sector, stage, geography,
+ *   incorporationStatus, foundingDate) PLUS the narrative beats and traction
+ *   metrics. The earlier design embedded ONLY narrative.* + traction.{growth,
+ *   runway} as a single concatenated blob and deliberately EXCLUDED the scalars
+ *   ("FTS handles the relational side"). That was the root cause of the
+ *   unanswerable Q&A: facet queries scored 0.42-0.49 cosine against the diluted
+ *   blob (under the 0.6 floor), and the excluded scalars were absent from every
+ *   chunk_text so the FTS side couldn't match them either. Labels now lift BOTH
+ *   the vector score (short single-fact chunks) AND the FTS keyword match. See
+ *   src/ai/chunking/memory-chunks.ts.
  */
 import * as Sentry from '@sentry/nextjs';
 import { and, eq } from 'drizzle-orm';
 
-import { chunkText, DEFAULT_CHUNK_OPTIONS } from '@/ai/chunking/chunk';
+import { buildMemoryChunks } from '@/ai/chunking/memory-chunks';
 import { voyage } from '@/ai/integrations/voyage.adapter';
-import type { Narrative, Traction } from '@/ai/schemas/business-memory.zod';
 // Canonical Inngest db pattern (cycle-6 fix HIGH H2): src/db/client.ts exports
 // `getServiceClient(): DrizzleDb` — there is no `db` named export. Inngest job
 // functions are documented legitimate callers of the RLS-bypassing service client
@@ -115,37 +119,25 @@ export const embedMemory = inngest.createFunction(
         return [];
       }
 
-      // Flatten narrative.* + traction.{growth,runway} — the PII-redacted text surface.
-      // Canonical narrative shape per src/ai/schemas/business-memory.zod.ts:348-355
-      // (narrativeSchema) + src/db/schema/memory.ts:148 (narrative jsonb column comment):
-      // { problem, solution, why_now, why_us } — NOT mission/vision/differentiation/market.
-      // Cycle-6 fix HIGH H4 (silent-failure class): plan drafts 1-5 used the wrong field
-      // names, which would have compiled cleanly, run "successfully," and embedded ZERO
-      // content from any real business_memory row. Worst possible bug — green CI,
-      // semantically broken pipeline.
-      // Cycle-7 fix HIGH H2 (Drizzle jsonb type strictness): row.narrative and
-      // row.traction are typed `unknown` by Drizzle until the schema gets
-      // `.$type<T>()` annotations (deferred to FOLLOWUP-DRIZZLE-TYPE-ANNOTATION-01
-      // since src/db/schema/memory.ts is git-frozen at baseline 29228e8 by the
-      // T01 schema-lock guard). Localized cast at the access site lets this code
-      // compile under strict: true today; the schema annotation will replace the
-      // cast post-Phase-2 schema-lock release.
-      // Traction fields (traction.growth, traction.runway) verified against
-      // src/ai/schemas/business-memory.zod.ts:330-341 (tractionSchema) — unchanged.
-      const narrative = row.narrative as Narrative | null;
-      const traction = row.traction as Traction | null;
-      const narrativeText = [
-        narrative?.problem,
-        narrative?.solution,
-        narrative?.why_now,
-        narrative?.why_us,
-        traction?.growth,
-        traction?.runway,
-      ]
-        .filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
-        .join('\n\n');
+      // Build field-aligned, LABELED chunks (memory-answerable T1 — replaces the
+      // old single-blob flatten). The prior surface concatenated narrative.* +
+      // traction.{growth,runway} into ONE string and embedded NO scalar facets
+      // (sector/stage/companyName/geography) — so the narrative collapsed to a
+      // single ~3200-char chunk (measured facet cosine 0.42-0.49, under the 0.6
+      // grounding floor) AND "what sector/stage?" landed in no chunk_text, so the
+      // FTS side (which reads chunk_text) couldn't match them either.
+      // buildMemoryChunks now emits one LABELED chunk per populated field
+      // ("Stage: Pre-seed", "What the company does: …"), long prose fields
+      // sub-chunked + relabeled — so a short facet query aligns to a short
+      // single-fact chunk on BOTH the vector and FTS sides. See
+      // src/ai/chunking/memory-chunks.ts.
+      // Drizzle types row.narrative/.traction as `unknown` (the `.$type<T>()`
+      // schema annotation is deferred to FOLLOWUP-DRIZZLE-TYPE-ANNOTATION-01);
+      // buildMemoryChunks casts at its own access sites so this compiles under
+      // strict:true without touching the git-frozen schema.
+      const all = buildMemoryChunks(row);
 
-      if (narrativeText.length === 0) {
+      if (all.length === 0) {
         Sentry.addBreadcrumb({
           category: 'embed-memory',
           message: 'EMBED_NOTHING_TO_EMBED',
@@ -154,8 +146,6 @@ export const embedMemory = inngest.createFunction(
         });
         return [];
       }
-
-      const all = chunkText(narrativeText, DEFAULT_CHUNK_OPTIONS);
 
       // Hard cap — defensive bound; flag overflow at observability boundary
       if (all.length > 64) {
