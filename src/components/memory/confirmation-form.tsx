@@ -100,9 +100,10 @@ import {
  *      via `form.trigger`.
  *
  *   4. **fallbackInputType wiring.** Numeric traction fields (`traction.mrr`,
- *      `traction.arr`, `traction.valuation`, `traction.customers`,
- *      `traction.burn`) pass `fallbackInputType="number"` down to the resolver
- *      so the custom-override input renders as a number arm with NaN guard.
+ *      `traction.arr`, `traction.valuation`, `traction.burn`) pass
+ *      `fallbackInputType="number"` down to the resolver so the custom-override
+ *      input renders as a number arm with NaN guard. `traction.customers` is
+ *      free-text (T4a) and stays on the text arm.
  *
  * Audit boundary: this component imports ONLY from `@/ai/schemas/**`. NEVER
  * from `@/ai/agents/**`, `@/ai/client`, `@/server/*`, or `@anthropic-ai/sdk`.
@@ -811,11 +812,12 @@ export function ConfirmationForm({
             state.status === 'confirmed' ||
             state.status === 'rejected' ||
             state.status === 'edited';
-          // Numeric arm for the resolver's custom-override input. Currency
-          // + count traction leaves use the number input + NaN guard; every
-          // other field stays on text.
+          // Numeric arm for the resolver's custom-override input. The number
+          // metrics (mrr/arr/valuation/burn) use the number input + NaN guard;
+          // `customers` is now free-text (T4a — "150 Businesses", ranges), and
+          // every other field stays on text.
           const fallbackInputType: 'text' | 'number' =
-            /^traction\.(mrr|arr|valuation|customers|burn)$/.test(f.key)
+            /^traction\.(mrr|arr|valuation|burn)$/.test(f.key)
               ? 'number'
               : 'text';
           return (

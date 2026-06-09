@@ -38,7 +38,7 @@ export const EVAL_MEMORY: ChunkableMemoryRow = {
   traction: {
     mrr: 42000,
     arr: 504000,
-    customers: 120,
+    customers: '120',
     currency: 'USD',
     growth: '20% month over month for the last two quarters',
     runway: '20 months at the current burn rate',

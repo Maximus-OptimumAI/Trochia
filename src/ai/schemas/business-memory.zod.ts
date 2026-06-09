@@ -320,19 +320,24 @@ export const teamSchema = z
 export type Team = z.infer<typeof teamSchema>;
 
 /**
- * `traction` jsonb shape. All numeric metrics are optional; currency is a
- * sibling ISO 4217 code so mixed-currency MRR/ARR is representable (the
- * fintech fixture deliberately ships both $ and £ figures — Week 3 conflict
- * resolver picks the canonical one). Growth + runway are free-form strings
- * because founders write them as ranges or qualitative phrases ("3x YoY",
- * "~18 months at current burn").
+ * `traction` jsonb shape. Most numeric metrics are optional numbers.
+ *
+ * `currency` and `customers` are FREE-TEXT strings (memory-answerable T4a):
+ *   - `currency` was a strict 3-char ISO code (`.length(3)`), which rejected
+ *     real founder input like "USD, NGN", "USDc", or "USDT". It is now an
+ *     unconstrained string so multi-currency / stablecoin tickers round-trip.
+ *   - `customers` was `z.number()` with no coercion, so the confirmation form's
+ *     string inputs ("150", "150 Businesses") always failed. It is now a string
+ *     so founders can write a count, a range, or a qualitative phrase.
+ * Both live in this jsonb column, so this is a Zod-only relaxation — NO migration.
+ * Growth + runway stay free-form strings ("3x YoY", "~18 months at current burn").
  */
 export const tractionSchema = z
   .object({
     mrr: z.number().optional(),
     arr: z.number().optional(),
-    currency: z.string().length(3).optional(),
-    customers: z.number().optional(),
+    currency: z.string().optional(),
+    customers: z.string().optional(),
     growth: z.string().optional(),
     runway: z.string().optional(),
     valuation: z.number().optional(),
