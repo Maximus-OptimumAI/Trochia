@@ -19,5 +19,26 @@
     "isOutOfScope": false,
     "accountId": "e7a1c0de-0000-4000-8000-000000000001",
     "expectedRetrievableMarker": "stage"
+  },
+  {
+    "question": "What sector is the company in?",
+    "expectedGrounded": true,
+    "isOutOfScope": false,
+    "accountId": "e7a1c0de-0000-4000-8000-000000000001",
+    "expectedRetrievableMarker": "sector"
+  },
+  {
+    "question": "What is the business name?",
+    "expectedGrounded": true,
+    "isOutOfScope": false,
+    "accountId": "e7a1c0de-0000-4000-8000-000000000001",
+    "expectedRetrievableMarker": "companyName"
+  },
+  {
+    "question": "What does the company do?",
+    "expectedGrounded": true,
+    "isOutOfScope": false,
+    "accountId": "e7a1c0de-0000-4000-8000-000000000001",
+    "expectedRetrievableMarker": "oneLiner"
   }
 ]

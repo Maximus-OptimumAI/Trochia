@@ -157,7 +157,7 @@ function buildMockDraft() {
     traction: {
       mrr: 28000,
       currency: 'USD',
-      customers: 14,
+      customers: '14',
       runway: '12 months at $98k burn',
       growth: 'Top-of-funnel building on Series A at $30M pre',
     },

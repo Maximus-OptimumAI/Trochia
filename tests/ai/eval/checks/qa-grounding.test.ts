@@ -38,7 +38,12 @@ const ORIGINAL_KEY = process.env.ANTHROPIC_API_KEY;
 function grounded(dropped = 0): AskQaResult {
   return {
     answer: { answer: 'an answer', citations: [{ sourceType: 'memory', sourceId: 'm1', chunkIdx: 0 }], grounded: true },
-    debug: { droppedCitationCount: dropped, maxVectorScore: 0.8, retrievedKeys: ['m1|0'] },
+    debug: {
+      droppedCitationCount: dropped,
+      maxVectorScore: 0.8,
+      retrievedKeys: ['m1|0'],
+      topHit: { sourceId: 'm1', chunkIdx: 0, vectorScore: 0.8 },
+    },
   };
 }
 
@@ -46,7 +51,7 @@ function grounded(dropped = 0): AskQaResult {
 function iDontKnow(): AskQaResult {
   return {
     answer: { answer: "I don't have that…", citations: [], grounded: false },
-    debug: { droppedCitationCount: 0, maxVectorScore: 0.2, retrievedKeys: [] },
+    debug: { droppedCitationCount: 0, maxVectorScore: 0.2, retrievedKeys: [], topHit: null },
   };
 }
 
@@ -64,9 +69,13 @@ afterEach(() => {
 
 describe('qaGrounding.run', () => {
   it('every in-scope drop===0 + out-of-scope grounded:false → pass, metric 0', async () => {
-    // The fixture Q-set is 3 in-scope + 2 out-of-scope. In-scope → grounded
-    // (zero drop), out-of-scope → "I don't know".
+    // The fixture Q-set is 6 in-scope + 2 out-of-scope. In-scope → grounded
+    // (zero drop, maxVS 0.8), out-of-scope → "I don't know" (maxVS 0.2) → clean
+    // cosine separation (0.8 > 0.2).
     askQa
+      .mockResolvedValueOnce(grounded(0))
+      .mockResolvedValueOnce(grounded(0))
+      .mockResolvedValueOnce(grounded(0))
       .mockResolvedValueOnce(grounded(0))
       .mockResolvedValueOnce(grounded(0))
       .mockResolvedValueOnce(grounded(0))
@@ -85,6 +94,9 @@ describe('qaGrounding.run', () => {
       .mockResolvedValueOnce(grounded(1)) // fabricated-then-dropped
       .mockResolvedValueOnce(grounded(0))
       .mockResolvedValueOnce(grounded(0))
+      .mockResolvedValueOnce(grounded(0))
+      .mockResolvedValueOnce(grounded(0))
+      .mockResolvedValueOnce(grounded(0))
       .mockResolvedValueOnce(iDontKnow())
       .mockResolvedValueOnce(iDontKnow());
 
@@ -95,6 +107,9 @@ describe('qaGrounding.run', () => {
 
   it('an out-of-scope Q returning grounded:true → fail (criterion 6)', async () => {
     askQa
+      .mockResolvedValueOnce(grounded(0))
+      .mockResolvedValueOnce(grounded(0))
+      .mockResolvedValueOnce(grounded(0))
       .mockResolvedValueOnce(grounded(0))
       .mockResolvedValueOnce(grounded(0))
       .mockResolvedValueOnce(grounded(0))
@@ -116,6 +131,9 @@ describe('qaGrounding.run', () => {
       .mockResolvedValueOnce(iDontKnow()) // in-scope but NOT grounded → inScopeMiss
       .mockResolvedValueOnce(grounded(0))
       .mockResolvedValueOnce(grounded(0))
+      .mockResolvedValueOnce(grounded(0))
+      .mockResolvedValueOnce(grounded(0))
+      .mockResolvedValueOnce(grounded(0))
       .mockResolvedValueOnce(iDontKnow())
       .mockResolvedValueOnce(iDontKnow());
 
@@ -123,7 +141,7 @@ describe('qaGrounding.run', () => {
     expect(r.status).toBe('fail');
     // dropped total is still 0 — the fail is from the in-scope grounding miss.
     expect(r.metric).toBe(0);
-    expect(r.reason).toContain('in-scope grounded+cited 2/3');
+    expect(r.reason).toContain('in-scope grounded+cited 5/6');
   });
 
   it('ANTHROPIC_API_KEY absent → skip, askQa NOT called', async () => {
@@ -136,6 +154,9 @@ describe('qaGrounding.run', () => {
 
   it('reason carries only counts — no question/answer/chunk text', async () => {
     askQa
+      .mockResolvedValueOnce(grounded(0))
+      .mockResolvedValueOnce(grounded(0))
+      .mockResolvedValueOnce(grounded(0))
       .mockResolvedValueOnce(grounded(0))
       .mockResolvedValueOnce(grounded(0))
       .mockResolvedValueOnce(grounded(0))

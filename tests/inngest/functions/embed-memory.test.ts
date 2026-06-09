@@ -542,8 +542,12 @@ describe('embed-memory Inngest function (Plan 02-04 / T04)', () => {
     });
     const before = store.embeddings.slice();
     expect(before.length).toBeGreaterThan(0);
-    const beforeIdx0Text = before.find((r) => r.chunkIdx === 0)?.chunkText;
-    expect(beforeIdx0Text).toContain('ORIGINAL-PROBLEM');
+    // T1 invariant (ORDER-INDEPENDENT — do NOT assume chunk_idx 0): the Problem
+    // field is embedded as its OWN "Problem:"-labeled chunk carrying the field
+    // content, never folded into a different field's chunk.
+    const beforeProblem = before.find((r) => r.chunkText.startsWith('Problem:'));
+    expect(beforeProblem, 'Problem field must have its own labeled chunk').toBeDefined();
+    expect(beforeProblem?.chunkText).toContain('ORIGINAL-PROBLEM');
 
     // Bump narrative to MUCH SHORTER content + bump lastUpdatedAt.
     store.businessMemory[0].narrative = { problem: 'New shorter problem only.' };
@@ -560,11 +564,14 @@ describe('embed-memory Inngest function (Plan 02-04 / T04)', () => {
     // Fewer chunks because content is shorter.
     expect(after.length).toBeLessThan(before.length);
     expect(after.length).toBeGreaterThan(0);
-    // chunk_idx 0's text DIFFERS from the prior run (DELETE-then-INSERT actually replaced).
-    const afterIdx0Text = after.find((r) => r.chunkIdx === 0)?.chunkText;
-    expect(afterIdx0Text).not.toBe(beforeIdx0Text);
-    expect(afterIdx0Text).toContain('New shorter problem');
-    // ORIGINAL-* sentinels are GONE
+    // The Problem field is STILL its own labeled chunk after re-fire, and the
+    // DELETE-then-INSERT actually replaced it — same label, new content, and the
+    // prior long Problem chunk text is gone (order-independent).
+    const afterProblem = after.find((r) => r.chunkText.startsWith('Problem:'));
+    expect(afterProblem, 'Problem field must still be embedded after re-fire').toBeDefined();
+    expect(afterProblem?.chunkText).toContain('New shorter problem');
+    expect(afterProblem?.chunkText).not.toBe(beforeProblem?.chunkText);
+    // ORIGINAL-* sentinels are GONE across ALL rows (clean replace, no orphans).
     expect(after.every((r) => !r.chunkText.includes('ORIGINAL-PROBLEM'))).toBe(true);
     expect(after.every((r) => !r.chunkText.includes('ORIGINAL-SOLUTION'))).toBe(true);
   });

@@ -312,7 +312,7 @@ async function buildDraftForMosaicMarketplace(): Promise<{
     },
     traction: {
       growth: '41% QoQ GMV growth',
-      customers: 491,
+      customers: '491',
     },
     narrative: {
       problem: 'Designer trade discovery + custom-furniture lead times broken between Instagram DMs and big-brand showrooms',
@@ -389,7 +389,7 @@ async function buildDraftForTributaryHealthtech(): Promise<{
     traction: {
       arr: 1940000,
       currency: 'USD',
-      customers: 11,
+      customers: '11',
       runway: '9 months without bridge, 16 months with',
     },
     narrative: {
@@ -463,7 +463,7 @@ async function buildDraftForVantaHardware(): Promise<{
     traction: {
       // Intentionally NO mrr or arr — pre-revenue. Pilot revenue is in AUD/GBP
       // mix and is not recurring; surface it via narrative + customers count.
-      customers: 3,
+      customers: '3',
       runway: '~3 months without seed; 18 months with seed',
     },
     narrative: {

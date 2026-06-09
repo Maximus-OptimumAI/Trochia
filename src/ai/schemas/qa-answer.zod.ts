@@ -71,5 +71,12 @@ export type AskQaResult = {
     maxVectorScore: number;
     /** The retrieved candidate keys ("sourceId|chunkIdx") for this turn. */
     retrievedKeys: string[];
+    /**
+     * The strongest-scoring retrieved candidate — its `(sourceId, chunkIdx)` +
+     * cosine score, NO chunk text (the eval maps chunkIdx → a human label from
+     * the deterministic seed). Lets the eval surface WHICH chunk a query top-hit
+     * so wrong-chunk matches are visible. `null` when retrieval returned nothing.
+     */
+    topHit: { sourceId: string; chunkIdx: number; vectorScore: number } | null;
   };
 };

@@ -160,11 +160,11 @@ export const qaRouter = router({
       throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Q&A synthesis failed.' });
     }
 
-    // STRIP the debug surface BEFORE the tRPC boundary (P2-D). `debug` is
-    // destructured here purely so it CANNOT be forwarded — the client only
-    // ever receives `answer`. The retrievedKeys/scores/counts stay server-side.
-    const { answer, debug: _debug } = result;
-    void _debug;
+    // STRIP the debug surface BEFORE the tRPC boundary (P2-D). `debug` is read
+    // here for the server-side observability log ONLY — it is NEVER forwarded;
+    // the client only ever receives `answer` (see the `return answer` below).
+    // The retrievedKeys/scores/counts stay server-side.
+    const { answer, debug } = result;
 
     const latencyMs = Date.now() - startedAt;
 
@@ -206,7 +206,12 @@ export const qaRouter = router({
       });
     }
 
-    // Content-blind success log — counts + flags only, NEVER query/answer.
+    // Content-blind success log — counts + flags + scores only, NEVER query/answer.
+    // `maxVectorScore` is the strongest retrieved cosine similarity (a bare float
+    // ∈ [-1, 1], no content); logging it makes the grounding-floor decision
+    // (askQa returns the deterministic "I don't know" when maxVectorScore < the
+    // 0.6 GROUNDING_THRESHOLD) observable in prod without exposing it to the
+    // client. It does NOT cross the tRPC boundary — only this server log.
     logger.info('qa.ask: ok', {
       accountId: ctx.tenantId,
       userId: ctx.session.user.id,
@@ -214,6 +219,7 @@ export const qaRouter = router({
       latencyMs,
       grounded: answer.grounded,
       citationCount: answer.citations.length,
+      maxVectorScore: debug.maxVectorScore,
     });
 
     // Return the stripped answer ONLY (P2-D). No debug surface crosses here.
