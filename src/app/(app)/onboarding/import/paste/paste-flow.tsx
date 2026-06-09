@@ -9,6 +9,7 @@ import type {
   BusinessMemoryDraft,
 } from '@/ai/schemas/business-memory.zod';
 import { ConfirmationForm } from '@/components/memory/confirmation-form';
+import { SkeletonCard } from '@/components/primitives/skeleton-card';
 import { Button } from '@/components/ui/button';
 import { logger } from '@/lib/logger';
 import { useTRPC } from '@/lib/trpc-client';
@@ -475,9 +476,7 @@ export function PasteFlow({ mode = 'onboarding', initialDraft }: PasteFlowProps 
           {COPY.draftingTitle}
         </h2>
         <p className="text-body text-graphite">{COPY.draftingBody}</p>
-        <p className="font-mono text-mono-sm text-graphite" aria-hidden>
-          Drafting…
-        </p>
+        <SkeletonCard lines={4} />
       </section>
     );
   }

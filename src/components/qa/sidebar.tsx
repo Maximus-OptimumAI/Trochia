@@ -5,6 +5,7 @@ import { useMutation } from '@tanstack/react-query';
 
 import type { QaAnswer } from '@/ai/schemas/qa-answer.zod';
 import { CitationChip } from '@/components/qa/citation-chip';
+import { SkeletonCard } from '@/components/primitives/skeleton-card';
 import { Button } from '@/components/ui/button';
 import { useTRPC } from '@/lib/trpc-client';
 import { cn } from '@/lib/utils';
@@ -188,13 +189,11 @@ export function QaSidebar() {
       {/* ── State 1: loading ───────────────────────────────────────────── */}
       {isPending && (
         <div
-          className="flex flex-col gap-2 rounded-lg border border-stone bg-paper p-4"
+          className="flex flex-col gap-3 rounded-lg border border-stone bg-paper p-4"
           data-testid="qa-sidebar-loading"
         >
           <p className="text-body-sm text-graphite">{COPY.loadingBody}</p>
-          <p className="font-mono text-mono-sm text-graphite" aria-hidden>
-            Grounding…
-          </p>
+          <SkeletonCard lines={3} />
         </div>
       )}
 

@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { PasteFlow } from '@/app/(app)/onboarding/import/paste/paste-flow';
 import type { BusinessMemoryDraft } from '@/ai/schemas/business-memory.zod';
 import { SkeletonBlock } from '@/components/primitives/skeleton-block';
+import { SkeletonCard } from '@/components/primitives/skeleton-card';
 import { Button } from '@/components/ui/button';
 import { useTRPC } from '@/lib/trpc-client';
 
@@ -109,9 +110,12 @@ export function MemoryWorkspace() {
   if (draftQuery.isLoading) {
     return (
       <div className="flex w-full flex-col gap-4" data-testid="memory-loading">
+        <div className="sr-only" role="status" aria-live="polite">
+          Loading your Business Memory.
+        </div>
         <SkeletonBlock className="h-8 w-64" />
-        <SkeletonBlock className="h-40 w-full" />
-        <SkeletonBlock className="h-40 w-full" />
+        <SkeletonCard />
+        <SkeletonCard />
       </div>
     );
   }
