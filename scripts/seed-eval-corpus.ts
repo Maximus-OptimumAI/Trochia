@@ -31,12 +31,46 @@ import { accounts, embeddings, users } from '@/db/schema';
 const EVAL_OWNER_USER_ID = 'e7a1c0de-0000-4000-8000-0000000000b1';
 const EVAL_OWNER_EMAIL = `${EVAL_OWNER_USER_ID}@eval.local`;
 
+/** The PROD Supabase project ref — this seed must NEVER write to it (cso-MEDIUM). */
+const PROD_DB_PROJECT_REF = 'xnzyhjwalphcykjwoxdw';
+
 async function main(): Promise<void> {
+  // Env-gate FIRST (preserves the CI-PR / no-key non-blocking skip → exit 0).
   if (!process.env.DATABASE_URL || !process.env.VOYAGE_API_KEY) {
     console.log(
       '[seed-eval-corpus] skipped — DATABASE_URL / VOYAGE_API_KEY not set (env-unavailable, non-blocking)',
     );
     return;
+  }
+
+  // cso-MEDIUM (eval-seed-prod-guard): this seed makes RLS-bypassing raw writes
+  // to auth.users / accounts / embeddings. A dev or CI job with a PROD DB env
+  // could otherwise create those rows in production. HARD-refuse (exit 1) if the
+  // target looks like prod, even with the opt-in set.
+  const dbUrl = process.env.DATABASE_URL;
+  if (
+    dbUrl.includes(PROD_DB_PROJECT_REF) ||
+    process.env.VERCEL_ENV === 'production' ||
+    process.env.NODE_ENV === 'production'
+  ) {
+    console.error(
+      '[seed-eval-corpus] REFUSED — target looks like PRODUCTION (DATABASE_URL prod project / VERCEL_ENV / NODE_ENV=production). ' +
+        'This seed makes raw auth.users/accounts/embeddings writes and must NEVER touch prod.',
+    );
+    process.exit(1);
+  }
+
+  // Explicit opt-in required (so eval:run cannot silently auto-seed any reachable
+  // DB). Satisfied by EVAL_SEED_ALLOW=1 OR a `--allow` arg; `npm run eval:seed`
+  // (and therefore `eval:run`) passes `--allow`. cross-env isn't a dep, so the
+  // flag keeps it cross-platform.
+  const optedIn = process.env.EVAL_SEED_ALLOW === '1' || process.argv.includes('--allow');
+  if (!optedIn) {
+    console.error(
+      '[seed-eval-corpus] REFUSED — explicit opt-in required. Set EVAL_SEED_ALLOW=1 or pass --allow ' +
+        '(npm run eval:seed / eval:run pass --allow).',
+    );
+    process.exit(1);
   }
 
   const db = getServiceClient();

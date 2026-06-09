@@ -97,7 +97,7 @@ export const qaGrounding: EvalCheck = {
     const outScopeScores: number[] = [];
     const sweep: string[] = [];
 
-    for (const fx of fixtures) {
+    for (const [fxIdx, fx] of fixtures.entries()) {
       // The REAL read path is request-scoped — build an rls runner for the eval
       // tenant from raw claims (no Supabase JWT secret needed; live runs carry
       // DATABASE_URL). askQa drives real hybridRetrieve + runAgent.
@@ -116,11 +116,14 @@ export const qaGrounding: EvalCheck = {
 
       const topHit = result.debug.topHit;
       const topLabel = topHit ? (labels[topHit.chunkIdx] ?? `#${topHit.chunkIdx}`) : '(none)';
-      // Synthetic fixture question + field label only — no founder content. This
-      // is the validation-time top-hit visibility log (T2 decision 4).
+      // CONTENT-BLIND validation-time top-hit log (codex+cso LOW, eval-sweep-
+      // question-log): identify the fixture by INDEX + its expectedRetrievableMarker
+      // — NEVER the question text — so the sweep doesn't leak fixture content into
+      // CI logs if a future fixture becomes sensitive. Keeps maxVS, chunkIdx, label.
       sweep.push(
         `  ${fx.isOutOfScope ? 'OUT' : 'in '} maxVS=${result.debug.maxVectorScore.toFixed(4)} ` +
-          `topHit=[idx ${topHit?.chunkIdx ?? '-'} "${topLabel}"] grounded=${result.answer.grounded} :: ${fx.question}`,
+          `topHit=[idx ${topHit?.chunkIdx ?? '-'} "${topLabel}"] grounded=${result.answer.grounded} ` +
+          `:: fixture#${fxIdx} marker=${fx.expectedRetrievableMarker || '(none)'}`,
       );
 
       if (fx.isOutOfScope) {

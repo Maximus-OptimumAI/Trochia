@@ -102,6 +102,12 @@ function collectFields(row: ChunkableMemoryRow): Field[] {
   const narrative = (row.narrative ?? null) as Narrative | null;
   const traction = (row.traction ?? null) as Traction | null;
 
+  // NOTE: `team` (founders / advisors) is INTENTIONALLY not chunked yet — so
+  // "Who are the founders?" is not answerable from labeled chunks. Deferred as
+  // FOLLOWUP-MEMORY-TEAM-CHUNKS-01 (render labeled chunks for founder/advisor
+  // name/role/background/equity). `team` stays on ChunkableMemoryRow for the
+  // structural row match; collectFields deliberately does not read it.
+
   // "What the company does" — oneLiner, falling back to the solution beat so the
   // most common facet ("what do you do?") always has a short, dense target chunk.
   const whatItDoes = str(row.oneLiner) ?? str(narrative?.solution);
