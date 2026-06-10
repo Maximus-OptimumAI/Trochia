@@ -82,5 +82,12 @@
     "isOutOfScope": false,
     "accountId": "e7a1c0de-0000-4000-8000-000000000001",
     "expectedRetrievableMarker": "oneLiner"
+  },
+  {
+    "question": "Who is the founder?",
+    "expectedGrounded": true,
+    "isOutOfScope": false,
+    "accountId": "e7a1c0de-0000-4000-8000-000000000001",
+    "expectedRetrievableMarker": "team.founders"
   }
 ]

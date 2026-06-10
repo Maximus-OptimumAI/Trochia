@@ -140,4 +140,39 @@ describe('buildMemoryChunks', () => {
     const a = JSON.stringify(buildMemoryChunks(row));
     for (let i = 0; i < 50; i++) expect(JSON.stringify(buildMemoryChunks(row))).toBe(a);
   });
+
+  it('T4: renders one labeled chunk per founder + advisor, EXCLUDING equity_pct', () => {
+    const row: ChunkableMemoryRow = {
+      ...fullRow(),
+      team: {
+        founders: [
+          { name: 'Ada Stone', role: 'CEO', background: 'Built payments infra before.', equity_pct: 55 },
+          { name: 'Lee Park' }, // name-only → no separator / trailing detail
+        ],
+        advisors: [{ name: 'Mira Vale', background: 'Former fintech CFO.' }],
+      },
+    };
+    const chunks = buildMemoryChunks(row);
+
+    const founders = chunks.filter((c) => labelOf(c.text) === 'Founder').map((c) => c.text);
+    expect(founders).toHaveLength(2);
+    expect(founders[0]).toBe(
+      'Founder (who is the founder, who founded the company, founding team): Ada Stone — CEO. Built payments infra before.',
+    );
+    expect(founders[1]).toBe(
+      'Founder (who is the founder, who founded the company, founding team): Lee Park',
+    );
+
+    const advisor = chunks.find((c) => labelOf(c.text) === 'Advisor');
+    expect(advisor?.text).toBe('Advisor (who advises us, advisory board): Mira Vale — Former fintech CFO.');
+
+    // equity_pct is NEVER embedded (sensitive cap-table data; no chunk carries "55").
+    for (const c of chunks) expect(c.text).not.toContain('55');
+  });
+
+  it('T4: a row with no team yields no Founder/Advisor chunks (correct no-data)', () => {
+    const chunks = buildMemoryChunks(fullRow()); // team: null
+    expect(chunks.some((c) => labelOf(c.text) === 'Founder')).toBe(false);
+    expect(chunks.some((c) => labelOf(c.text) === 'Advisor')).toBe(false);
+  });
 });

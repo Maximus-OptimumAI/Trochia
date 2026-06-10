@@ -34,7 +34,24 @@ export const EVAL_MEMORY: ChunkableMemoryRow = {
   geography: 'United States',
   incorporationStatus: 'Delaware C-Corp',
   foundingDate: '2024-02-01T00:00:00.000Z',
-  team: null,
+  // team populated (qa-robustness T4 + EVAL SEED) so the "Who is the founder?"
+  // in-scope fixture has a labeled Founder chunk to ground against. equity_pct is
+  // deliberately absent here — buildMemoryChunks never embeds it regardless.
+  team: {
+    founders: [
+      {
+        name: 'Jordan Rivera',
+        role: 'CEO and co-founder',
+        background: 'Led reconciliation infrastructure at two prior payments companies.',
+      },
+    ],
+    advisors: [
+      {
+        name: 'Priya Anand',
+        background: 'Former CFO who scaled finance operations at a public fintech.',
+      },
+    ],
+  },
   traction: {
     mrr: 42000,
     arr: 504000,
