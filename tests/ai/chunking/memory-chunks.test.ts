@@ -33,39 +33,63 @@ function fullRow(): ChunkableMemoryRow {
 const labels = (row: ChunkableMemoryRow) => buildMemoryChunks(row).map((c) => labelOf(c.text));
 
 describe('buildMemoryChunks', () => {
-  it('emits one labeled chunk per populated field, with the label as a "Label: value" prefix', () => {
+  it('emits one labeled chunk per populated field, with an aliased "Label (aliases): value" prefix', () => {
     const chunks = buildMemoryChunks(fullRow());
     const byLabel = new Map(chunks.map((c) => [labelOf(c.text), c.text]));
-    expect(byLabel.get('Company name')).toBe('Company name: ClockPay');
-    expect(byLabel.get('Stage')).toBe('Stage: Pre-seed');
-    expect(byLabel.get('Sector')).toBe('Sector: Fintech / crypto payments');
+    // qa-robustness T2: the label carries a curated alias clause; the value is verbatim.
+    expect(byLabel.get('Company name')).toBe('Company name (business name, what we are called, company): ClockPay');
+    expect(byLabel.get('Stage')).toBe('Stage (funding stage, fundraising stage, what round we are raising): Pre-seed');
+    expect(byLabel.get('Sector')).toBe('Sector (industry, market, vertical): Fintech / crypto payments');
     // every chunk is "Label: value" shaped
     for (const c of chunks) expect(c.text).toContain(': ');
   });
 
   it('EMBEDS THE SCALAR FACETS that the old single-blob pipeline excluded (root-cause fix)', () => {
     const got = labels(fullRow());
-    // sector + stage + company name + "what does it do" — the measured failures
+    // sector + stage + company name + "what does it do" — the measured failures.
+    // The what-it-does facet leads with the bare colloquial phrasing ("What we do")
+    // so terse queries align (qa-robustness T2 strengthen); labelOf strips the alias.
     expect(got).toEqual(
-      expect.arrayContaining(['Sector', 'Stage', 'Company name', 'What the company does']),
+      expect.arrayContaining(['Sector', 'Stage', 'Company name', 'What we do']),
     );
   });
 
-  it('"What the company does" uses oneLiner, falling back to narrative.solution', () => {
-    const withOneLiner = buildMemoryChunks(fullRow()).find((c) => labelOf(c.text) === 'What the company does');
+  it('the what-it-does facet ("What we do") uses oneLiner, falling back to narrative.solution', () => {
+    const withOneLiner = buildMemoryChunks(fullRow()).find((c) => labelOf(c.text) === 'What we do');
     expect(withOneLiner?.text).toContain('normal business operations');
+    // Leading token is the bare colloquial phrasing (the lever for terse queries).
+    expect(withOneLiner?.text.startsWith('What we do (')).toBe(true);
 
     const noOneLiner = { ...fullRow(), oneLiner: null };
-    const fellBack = buildMemoryChunks(noOneLiner).find((c) => labelOf(c.text) === 'What the company does');
+    const fellBack = buildMemoryChunks(noOneLiner).find((c) => labelOf(c.text) === 'What we do');
     expect(fellBack?.text).toContain('reconciles crypto'); // == narrative.solution
   });
 
   it('renders foundingDate as YYYY-MM-DD and numeric metrics as their value', () => {
     const byLabel = new Map(buildMemoryChunks(fullRow()).map((c) => [labelOf(c.text), c.text]));
-    expect(byLabel.get('Founded')).toBe('Founded: 2024-03-01');
-    expect(byLabel.get('MRR')).toBe('MRR: 50000');
-    expect(byLabel.get('Customers')).toBe('Customers: 150');
-    expect(byLabel.get('Currency')).toBe('Currency: USD');
+    expect(byLabel.get('Founded')).toBe('Founded (founding date, when we started): 2024-03-01');
+    expect(byLabel.get('MRR')).toBe('MRR (monthly recurring revenue, monthly revenue): 50000');
+    expect(byLabel.get('Customers')).toBe('Customers (how many customers we have, customer count, users): 150');
+    expect(byLabel.get('Currency')).toBe('Currency (reporting currency, what currency we use): USD');
+  });
+
+  it('T2: labelOf strips the alias clause; the alias stays in chunk_text; the value is verbatim', () => {
+    const chunks = buildMemoryChunks(fullRow());
+    const mrr = chunks.find((c) => labelOf(c.text) === 'MRR');
+    expect(mrr).toBeDefined();
+    // labelOf returns the CLEAN facet label (no parenthetical) for the eval sweep…
+    expect(labelOf(mrr!.text)).toBe('MRR');
+    // …while the embedded chunk_text keeps the generic alias phrasings…
+    expect(mrr!.text).toContain('(monthly recurring revenue, monthly revenue)');
+    // …and the field value is preserved verbatim after the colon (RAIL: aliases
+    // never contaminate the value).
+    expect(mrr!.text.endsWith(': 50000')).toBe(true);
+    // RAIL: every aliased label is a generic phrasing — no company name leaks into
+    // any label (the value carries content, the label carries only synonyms).
+    for (const c of chunks) {
+      const head = c.text.slice(0, c.text.indexOf(':'));
+      expect(head).not.toContain('ClockPay');
+    }
   });
 
   it('skips empty / whitespace-only / null fields', () => {
@@ -104,10 +128,11 @@ describe('buildMemoryChunks', () => {
       incorporationStatus: null, foundingDate: null, team: null, traction: null,
       narrative: { problem: null, solution: longSolution, why_now: null, why_us: null } as unknown,
     };
-    const solutionChunks = buildMemoryChunks(row).filter((c) => labelOf(c.text).startsWith('Solution'));
+    const solutionChunks = buildMemoryChunks(row).filter((c) => labelOf(c.text) === 'Solution');
     expect(solutionChunks.length).toBeGreaterThan(1);
-    expect(solutionChunks[0].text.startsWith('Solution: ')).toBe(true);
-    expect(solutionChunks.slice(1).every((c) => c.text.startsWith('Solution (cont.): '))).toBe(true);
+    // first piece keeps the full aliased label; continuations are relabeled "(cont.)"
+    expect(solutionChunks[0].text).toMatch(/^Solution \(how we solve it, our approach\): A processor/);
+    expect(solutionChunks.slice(1).every((c) => c.text.includes('(cont.): '))).toBe(true);
   });
 
   it('is deterministic — same row yields byte-identical chunks across calls', () => {

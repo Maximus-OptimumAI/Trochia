@@ -66,10 +66,15 @@ type Field = { label: string; value: string };
 
 /** Extract the field label (the text before the first ':') from a labeled chunk's text.
  *  Used by the eval to map a top-hit chunk_idx → a human label WITHOUT putting chunk
- *  text on the agent's debug surface (which is contractually counts/scores/keys only). */
+ *  text on the agent's debug surface (which is contractually counts/scores/keys only).
+ *  Strips the curated alias clause "(…)" (qa-robustness T2) so the eval top-hit sweep
+ *  shows the clean facet label, not the embedded synonym phrasings — the alias text
+ *  stays in chunk_text; only this DISPLAY label is cleaned. */
 export function labelOf(chunkTextValue: string): string {
-  const i = chunkTextValue.indexOf(':');
-  return (i === -1 ? chunkTextValue : chunkTextValue.slice(0, i)).trim();
+  const colon = chunkTextValue.indexOf(':');
+  const head = colon === -1 ? chunkTextValue : chunkTextValue.slice(0, colon);
+  const paren = head.indexOf('(');
+  return (paren === -1 ? head : head.slice(0, paren)).trim();
 }
 
 /** Normalize a possibly-empty scalar to a trimmed non-empty string, else null. */
@@ -112,26 +117,33 @@ function collectFields(row: ChunkableMemoryRow): Field[] {
   // most common facet ("what do you do?") always has a short, dense target chunk.
   const whatItDoes = str(row.oneLiner) ?? str(narrative?.solution);
 
+  // Each label carries a curated ALIAS CLAUSE (qa-robustness T2): 2–3 short generic
+  // question-phrasings / synonyms, embedded BEFORE the colon so they lift both the
+  // vector cosine (a short colloquial query like "what do we do" aligns to a chunk
+  // that literally contains "what we do") AND the FTS lexemes. RAIL: aliases are
+  // generic phrasings ONLY — never company-specific text, never content not already
+  // implied by the field. The VALUE after the colon is unchanged + verbatim.
+  // `labelOf` strips the "(…)" so the eval display label stays clean.
   const candidates: Field[] = [
-    { label: 'Company name', value: str(row.companyName) ?? '' },
-    { label: 'What the company does', value: whatItDoes ?? '' },
-    { label: 'Sector', value: str(row.sector) ?? '' },
-    { label: 'Stage', value: str(row.stage) ?? '' },
-    { label: 'Geography', value: str(row.geography) ?? '' },
-    { label: 'Incorporation status', value: str(row.incorporationStatus) ?? '' },
-    { label: 'Founded', value: foundingDateValue(row.foundingDate) ?? '' },
-    { label: 'Problem', value: str(narrative?.problem) ?? '' },
-    { label: 'Solution', value: str(narrative?.solution) ?? '' },
-    { label: 'Why now', value: str(narrative?.why_now) ?? '' },
-    { label: 'Why us', value: str(narrative?.why_us) ?? '' },
-    { label: 'Growth', value: str(traction?.growth) ?? '' },
-    { label: 'Runway', value: str(traction?.runway) ?? '' },
-    { label: 'MRR', value: metricValue(traction?.mrr) ?? '' },
-    { label: 'ARR', value: metricValue(traction?.arr) ?? '' },
-    { label: 'Customers', value: metricValue(traction?.customers) ?? '' },
-    { label: 'Currency', value: metricValue(traction?.currency) ?? '' },
-    { label: 'Valuation', value: metricValue(traction?.valuation) ?? '' },
-    { label: 'Burn', value: metricValue(traction?.burn) ?? '' },
+    { label: 'Company name (business name, what we are called, company)', value: str(row.companyName) ?? '' },
+    { label: 'What we do (what this company does, our product, our offering)', value: whatItDoes ?? '' },
+    { label: 'Sector (industry, market, vertical)', value: str(row.sector) ?? '' },
+    { label: 'Stage (funding stage, fundraising stage, what round we are raising)', value: str(row.stage) ?? '' },
+    { label: 'Geography (location, where we are based)', value: str(row.geography) ?? '' },
+    { label: 'Incorporation status (legal entity, how we are incorporated)', value: str(row.incorporationStatus) ?? '' },
+    { label: 'Founded (founding date, when we started)', value: foundingDateValue(row.foundingDate) ?? '' },
+    { label: 'Problem (what problem we solve, the pain point)', value: str(narrative?.problem) ?? '' },
+    { label: 'Solution (how we solve it, our approach)', value: str(narrative?.solution) ?? '' },
+    { label: 'Why now (timing, why this moment)', value: str(narrative?.why_now) ?? '' },
+    { label: 'Why us (our edge, why our team)', value: str(narrative?.why_us) ?? '' },
+    { label: 'Growth (traction, growth rate, momentum)', value: str(traction?.growth) ?? '' },
+    { label: 'Runway (how long our cash lasts, months of runway)', value: str(traction?.runway) ?? '' },
+    { label: 'MRR (monthly recurring revenue, monthly revenue)', value: metricValue(traction?.mrr) ?? '' },
+    { label: 'ARR (annual recurring revenue, yearly revenue)', value: metricValue(traction?.arr) ?? '' },
+    { label: 'Customers (how many customers we have, customer count, users)', value: metricValue(traction?.customers) ?? '' },
+    { label: 'Currency (reporting currency, what currency we use)', value: metricValue(traction?.currency) ?? '' },
+    { label: 'Valuation (company valuation, what we are valued at)', value: metricValue(traction?.valuation) ?? '' },
+    { label: 'Burn (burn rate, monthly spend, cash burn)', value: metricValue(traction?.burn) ?? '' },
   ];
 
   return candidates.filter((f) => f.value.length > 0);
