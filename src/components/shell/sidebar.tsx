@@ -127,7 +127,10 @@ export function Sidebar({
             <DropdownMenuItem render={<Link href="/app/billing" />}>Billing</DropdownMenuItem>
             <DropdownMenuSeparator />
             <form action="/sign-out" method="post" className="w-full">
-              <DropdownMenuItem render={<button type="submit" />} className="w-full">
+              {/* `nativeButton`: the render target IS a real <button>, so Base UI
+                  stays on its native-button path — Enter-key submit works and the
+                  non-native-button a11y warning is gone (codex P2, sidebar.tsx:130). */}
+              <DropdownMenuItem nativeButton render={<button type="submit" />} className="w-full">
                 Sign out
               </DropdownMenuItem>
             </form>

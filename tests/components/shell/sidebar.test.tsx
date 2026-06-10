@@ -13,6 +13,13 @@ import { Sidebar } from '@/components/shell/sidebar';
 
 afterEach(cleanup);
 
+// NOTE: the Sign out control (a POST <form action="/sign-out"> wrapping a submit
+// button via DropdownMenuItem, with `nativeButton` per codex P2) lives inside a
+// Base UI <DropdownMenu> portal that only mounts on open. Opening it in jsdom needs
+// ResizeObserver/matchMedia polyfills not present in tests/setup.ts — adding them to
+// shared infra for one markup assertion is disproportionate. The sign-out *behavior*
+// (POST → signOut → 303 → '/') is covered by tests/auth/sign-out.test.ts; the
+// form+button markup is validated manually post-deploy.
 describe('Sidebar', () => {
   it('C1: the brand logo links to /app (not the marketing hero) and renders at height 32', () => {
     render(<Sidebar activeHref="/app" />);
