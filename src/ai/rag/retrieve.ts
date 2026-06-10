@@ -43,6 +43,18 @@
  * set to one founder's chunks (dozens–low hundreds), so a query-time tsvector is
  * sub-millisecond. The stored-column + GIN index is deferred to
  * FOLLOWUP-FTS-GIN-INDEX-01 (lands when per-tenant chunk counts reach thousands).
+ *
+ * ## Stop-word-only queries (qa-robustness T3)
+ *
+ * A stop-word-only question ("what do we do") parses to an EMPTY tsquery, so the
+ * FTS leg matches nothing and contributes zero candidates — retrieval correctly
+ * degrades to VECTOR-ONLY (the leg NO-OPS; Postgres emits a benign
+ * cleanup_tsquery_stopwords NOTICE, never a tx-aborting error). We detect the
+ * empty tsquery up front with a numnode() probe (parse-only, no table scan) and
+ * SKIP the keyword scan, emitting a CONTENT-BLIND degradation log
+ * (`qa.retrieve: fts-content-blind`, accountId + static reason ONLY — never the
+ * query). No savepoint is used: there is no abort to isolate, and a real
+ * statement error inside this tx cannot be "caught and continued" anyway.
  */
 import { and, cosineDistance, eq, inArray, sql } from 'drizzle-orm';
 import type { PgTransaction } from 'drizzle-orm/pg-core';
@@ -50,6 +62,7 @@ import type { PgTransaction } from 'drizzle-orm/pg-core';
 import { voyage } from '@/ai/integrations/voyage.adapter';
 import { embeddings } from '@/db/schema/embeddings';
 import { AppError } from '@/lib/errors';
+import { logger } from '@/lib/logger';
 
 // ────────────────────────────────────────────────────────────────────────────
 // Constants (documented)
@@ -215,29 +228,52 @@ export async function hybridRetrieve(
       // runtime value is a bound parameter (websearch_to_tsquery safely parses
       // arbitrary user text and never errors on malformed input — T-02-06-03). The
       // tenant + source_type + model-version filters match the vector side exactly.
-      const ftsResult = await tx.execute(sql`
-        select
-          ${embeddings.id} as id,
-          ${embeddings.sourceType} as source_type,
-          ${embeddings.sourceId} as source_id,
-          ${embeddings.chunkIdx} as chunk_idx,
-          ${embeddings.chunkText} as chunk_text,
-          ts_rank_cd(to_tsvector('english', ${embeddings.chunkText}), q) as rank
-        from ${embeddings}, websearch_to_tsquery('english', ${query}) q
-        where ${embeddings.accountId} = ${accountId}
-          and ${embeddings.sourceType} in (${sql.join(
-            SOURCE_TYPES.map((s) => sql`${s}`),
-            sql`, `,
-          )})
-          and ${embeddings.embeddingModelVersion} = ${EMBEDDING_MODEL_VERSION}
-          and to_tsvector('english', ${embeddings.chunkText}) @@ q
-        order by rank desc
-        limit ${pool}
-      `);
-      return { vectorRows: vRows, ftsRows: ftsResult as unknown as FtsRow[] };
+      //
+      // STOPWORD-SAFE (qa-robustness T3): a stop-word-only question parses to an
+      // EMPTY tsquery. Probe numnode() first (parse-only, no table scan); when it
+      // is 0 the keyword scan is SKIPPED entirely (ftsRows stays []) and the leg
+      // degrades cleanly to vector-only, flagged for a content-blind log below.
+      const nodeProbe = (await tx.execute(
+        sql`select numnode(websearch_to_tsquery('english', ${query})) as n`,
+      )) as unknown as Array<{ n: number | string }>;
+      const tsNodeCount = Number(nodeProbe[0]?.n ?? 0);
+
+      let fRows: FtsRow[] = [];
+      if (tsNodeCount > 0) {
+        const ftsResult = await tx.execute(sql`
+          select
+            ${embeddings.id} as id,
+            ${embeddings.sourceType} as source_type,
+            ${embeddings.sourceId} as source_id,
+            ${embeddings.chunkIdx} as chunk_idx,
+            ${embeddings.chunkText} as chunk_text,
+            ts_rank_cd(to_tsvector('english', ${embeddings.chunkText}), q) as rank
+          from ${embeddings}, websearch_to_tsquery('english', ${query}) q
+          where ${embeddings.accountId} = ${accountId}
+            and ${embeddings.sourceType} in (${sql.join(
+              SOURCE_TYPES.map((s) => sql`${s}`),
+              sql`, `,
+            )})
+            and ${embeddings.embeddingModelVersion} = ${EMBEDDING_MODEL_VERSION}
+            and to_tsvector('english', ${embeddings.chunkText}) @@ q
+          order by rank desc
+          limit ${pool}
+        `);
+        fRows = ftsResult as unknown as FtsRow[];
+      }
+      return { vectorRows: vRows, ftsRows: fRows, ftsContentBlind: tsNodeCount === 0 };
     });
     vectorRows = rows.vectorRows;
     ftsRows = rows.ftsRows;
+    if (rows.ftsContentBlind) {
+      // Content-blind degradation log (qa-robustness T3): the FTS leg was skipped
+      // because the query is stop-word-only. ONLY accountId + a static reason —
+      // NEVER the query, the tsquery, or chunk text (privacy contract above).
+      logger.info('qa.retrieve: fts-content-blind', {
+        accountId,
+        reason: 'stopword-only-query',
+      });
+    }
   } catch {
     // CSO-H1 / codex P1-1: the Drizzle/postgres error can carry the bound ${query}
     // in its message/params. The query is CONFIDENTIAL and would reach Sentry

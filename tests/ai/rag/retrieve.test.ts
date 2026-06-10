@@ -41,6 +41,8 @@
  *       ∈ [1,50]; the serialized LIMIT param is the clamped integer * pool factor.
  *   (k) DB/FTS failure is REDACTED (CSO-H1 / codex P1-1): the thrown error carries
  *       neither the query nor the original cause; code = RETRIEVE_QUERY_FAILED.
+ *   (l) T3 stop-word-only query (numnode=0) → FTS scan SKIPPED, vector-only result
+ *       survives, content-blind log fired (no query text), no throw.
  */
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { drizzle } from 'drizzle-orm/postgres-js';
@@ -128,6 +130,9 @@ type Captured = {
 function makeCtx(opts: {
   vectorRows: VectorFixtureRow[];
   ftsRows: FtsFixtureRow[];
+  /** numnode(websearch_to_tsquery(...)) the stopword-safe probe (T3) sees. 0 =
+   *  stop-word-only → FTS scan skipped. Defaults to a positive value (FTS runs). */
+  tsNodeCount?: number;
 }): { ctx: HybridRetrieveCtx; captured: Captured } {
   const captured: Captured = { vectorQuery: null, ftsQuery: null };
 
@@ -157,7 +162,13 @@ function makeCtx(opts: {
   const tx = {
     select: (proj?: unknown) => wrapVectorBuilder(mockDb.select(proj as never) as never),
     execute: async (frag: SQL) => {
-      captured.ftsQuery = dialect.sqlToQuery(frag);
+      const serialized = dialect.sqlToQuery(frag);
+      // The stopword-safe FTS leg (T3) probes numnode() FIRST — answer that probe
+      // separately and do NOT record it as the FTS query.
+      if (serialized.sql.includes('numnode')) {
+        return [{ n: opts.tsNodeCount ?? 3 }] as unknown;
+      }
+      captured.ftsQuery = serialized;
       return opts.ftsRows as unknown;
     },
   };
@@ -446,6 +457,35 @@ describe('hybridRetrieve (Plan 02-06 / KNW-05a)', () => {
     expect(thrown!.message).not.toContain(SENSITIVE_QUERY);
     // No cause chain re-attaching the original (query-bearing) error.
     expect(thrown!.cause).toBeUndefined();
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Case (l) — T3 stop-word-only query: FTS leg skipped, vector-only survives
+  // ──────────────────────────────────────────────────────────────────────────
+  it('(l) a stop-word-only query (numnode=0) SKIPS the FTS scan, returns vector-only, logs content-blind, no throw', async () => {
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const STOPWORD_QUERY = 'what do we do';
+    const { ctx, captured } = makeCtx({
+      vectorRows: [vec('v-stop', 0.3)],
+      ftsRows: [fts('should-not-run', 9)], // present but must be ignored when skipped
+      tsNodeCount: 0, // websearch_to_tsquery → empty tsquery (every lexeme a stop word)
+    });
+
+    const result = await hybridRetrieve({ accountId: ACCOUNT_ID, query: STOPWORD_QUERY, topK: 8 }, ctx);
+
+    // The FTS scan was never issued — only the numnode probe ran — so ftsQuery is
+    // uncaptured and the fts-only fixture never entered the fused result.
+    expect(captured.ftsQuery).toBeNull();
+    expect(result.find((c) => c.sourceId === 'src-should-not-run')).toBeUndefined();
+    // Vector-only retrieval SURVIVED (the leg degraded, it did not fail).
+    expect(result).toHaveLength(1);
+    expect(result[0].sourceId).toBe('src-v-stop');
+    expect(result[0].ftsScore).toBeNull();
+    // Content-blind log fired with accountId + a static reason, NEVER the query text.
+    const blindCall = infoSpy.mock.calls.find((c) => String(c[0]).includes('fts-content-blind'));
+    expect(blindCall).toBeDefined();
+    expect(JSON.stringify(blindCall)).toContain(ACCOUNT_ID);
+    expect(JSON.stringify(blindCall)).not.toContain(STOPWORD_QUERY);
   });
 
   // ──────────────────────────────────────────────────────────────────────────
