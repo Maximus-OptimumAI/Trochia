@@ -4,9 +4,10 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { AppShell } from '@/components/shell/app-shell';
 import { CtaCards } from '@/components/dashboard/cta-cards';
 import { EmptyDashboard } from '@/components/dashboard/empty-dashboard';
+import { MemorySummaryCard } from '@/components/dashboard/memory-summary-card';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getServiceClient } from '@/db/client';
-import { accounts } from '@/db/schema';
+import { accounts, businessMemory } from '@/db/schema';
 import { entitlements } from '@/modules/billing/entitlements';
 import { TIERS } from '@/modules/billing/tiers';
 import { DashboardViewedTracker } from './tracker';
@@ -56,12 +57,15 @@ export default async function AppDashboardPage() {
     ? new Date(account.currentPeriodEnd).toISOString().slice(0, 10)
     : null;
 
-  // TODO(Phase 2): when the businesses table exists, gate the EmptyDashboard
-  // render on `!hasBusinessMemory` instead of rendering it unconditionally.
-  // Phase 1 (D-03) doesn't have a businesses table so we always show the
-  // empty-dashboard state — the EmptyDashboard's "Start Business Memory" CTA
-  // is the entry point Phase 2 wires up.
-  const hasBusinessMemory = false;
+  // Memory-aware dashboard CTA (fix/ui-bundle C3): once the founder confirms
+  // their Business Memory (`confirmed_at` stamped), swap the "Start Business
+  // Memory" empty state for the confirmed summary. One row per tenant keyed on
+  // account_id; this service-client read is scoped to the resolved account.
+  const memory = await service.query.businessMemory.findFirst({
+    where: eq(businessMemory.accountId, account.id),
+    columns: { confirmedAt: true, companyName: true },
+  });
+  const hasConfirmedMemory = Boolean(memory?.confirmedAt);
 
   return (
     <AppShell
@@ -87,7 +91,11 @@ export default async function AppDashboardPage() {
           </p>
         )}
 
-        {!hasBusinessMemory && <EmptyDashboard />}
+        {hasConfirmedMemory ? (
+          <MemorySummaryCard companyName={memory?.companyName ?? null} />
+        ) : (
+          <EmptyDashboard />
+        )}
 
         <CtaCards />
       </div>
