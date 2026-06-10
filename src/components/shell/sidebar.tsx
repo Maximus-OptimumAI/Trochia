@@ -126,7 +126,11 @@ export function Sidebar({
             <DropdownMenuItem render={<Link href="/app/settings" />}>Settings</DropdownMenuItem>
             <DropdownMenuItem render={<Link href="/app/billing" />}>Billing</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem render={<Link href="/sign-out" />}>Sign out</DropdownMenuItem>
+            <form action="/sign-out" method="post" className="w-full">
+              <DropdownMenuItem render={<button type="submit" />} className="w-full">
+                Sign out
+              </DropdownMenuItem>
+            </form>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
