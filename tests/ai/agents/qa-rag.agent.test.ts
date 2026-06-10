@@ -3,7 +3,7 @@
  *
  * The agent's PUBLIC contract:
  *   1. Retrieve via hybridRetrieve (mocked) under ctx.rls.
- *   2. Stage-1 floor: max vectorScore < 0.6 → deterministic "I don't know",
+ *   2. Stage-1 floor: max vectorScore < 0.52 → deterministic "I don't know",
  *      runAgent NOT called (the no-Opus-on-weak cost guarantee).
  *   3. Synthesize via runAgent('reason', costContext) (mocked) with the query +
  *      chunks screened/delimited in variableSuffix (never stablePrefix.system).
@@ -116,10 +116,11 @@ describe('validateCitations (pure)', () => {
 });
 
 describe('askQa — stage-1 grounding floor', () => {
-  it('weak retrieval (max vectorScore < 0.6) → "I don\'t know" and runAgent NOT called', async () => {
+  it('weak retrieval (max vectorScore < 0.52) → "I don\'t know" and runAgent NOT called', async () => {
+    // Boundary straddles the 0.52 floor: max here is 0.51 (just below) → reject.
     hybridRetrieveMock.mockResolvedValueOnce([
       candidate({ vectorScore: 0.41 }),
-      candidate({ sourceId: 'mem-2', vectorScore: 0.55 }),
+      candidate({ sourceId: 'mem-2', vectorScore: 0.51 }),
     ]);
 
     const result = await askQa({ accountId: ACCOUNT_ID, query: QUERY }, ctx);
@@ -129,7 +130,7 @@ describe('askQa — stage-1 grounding floor', () => {
     expect(result.answer.citations).toEqual([]);
     expect(result.answer.answer).toMatch(/don't have that in your knowledge/i);
     expect(result.debug.droppedCitationCount).toBe(0);
-    expect(result.debug.maxVectorScore).toBeCloseTo(0.55, 5);
+    expect(result.debug.maxVectorScore).toBeCloseTo(0.51, 5);
   });
 
   it('empty retrieval → below floor → "I don\'t know", runAgent NOT called, maxVectorScore -1', async () => {
@@ -141,8 +142,8 @@ describe('askQa — stage-1 grounding floor', () => {
     expect(result.debug.retrievedKeys).toEqual([]);
   });
 
-  it('GROUNDING_THRESHOLD is 0.6 (the 02-CONTEXT floor)', () => {
-    expect(GROUNDING_THRESHOLD).toBe(0.6);
+  it('GROUNDING_THRESHOLD is 0.52 (eval-recalibrated 0.60→0.55→0.52; qa-robustness 2026-06-09)', () => {
+    expect(GROUNDING_THRESHOLD).toBe(0.52);
   });
 });
 

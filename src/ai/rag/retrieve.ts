@@ -13,7 +13,7 @@
  * NO Anthropic synthesis, assembles NO citations, and makes NO "I don't know"
  * decision — those belong to Plan 02-07's qa-rag agent (KNW-05c). This module
  * returns the EVIDENCE (ranked `Candidate[]` with `vectorScore`/`ftsScore`/
- * `rrfScore`); 02-07 applies the 0.6-cosine grounding floor against those scores
+ * `rrfScore`); 02-07 applies the 0.52-cosine grounding floor against those scores
  * WITHOUT re-querying (02-CONTEXT.md). A weak query (vector returns far rows, FTS
  * empty) returns vector-only candidates with `ftsScore: null` — the grounding
  * call is 02-07's, never a vector-side cutoff here.
@@ -92,7 +92,7 @@ export type HybridRetrieveArgs = {
  * One ranked retrieval candidate.
  *
  * - `vectorScore` is cosine SIMILARITY (= 1 - cosineDistance) ∈ [-1, 1], higher =
- *   better — NOT a distance. This is the scale 02-07's 0.6-cosine floor compares
+ *   better — NOT a distance. This is the scale 02-07's 0.52-cosine floor compares
  *   against directly. `null` when the candidate was an FTS-only hit (F-4).
  * - `ftsScore` is the raw `ts_rank_cd` value (unbounded, higher = better). `null`
  *   when the candidate was a vector-only hit.

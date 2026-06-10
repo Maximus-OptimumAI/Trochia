@@ -12,5 +12,19 @@
     "isOutOfScope": true,
     "accountId": "e7a1c0de-0000-4000-8000-000000000001",
     "expectedRetrievableMarker": ""
+  },
+  {
+    "question": "Who are our target users?",
+    "expectedGrounded": false,
+    "isOutOfScope": true,
+    "accountId": "e7a1c0de-0000-4000-8000-000000000001",
+    "expectedRetrievableMarker": ""
+  },
+  {
+    "question": "Who are our likely competitors?",
+    "expectedGrounded": false,
+    "isOutOfScope": true,
+    "accountId": "e7a1c0de-0000-4000-8000-000000000001",
+    "expectedRetrievableMarker": ""
   }
 ]

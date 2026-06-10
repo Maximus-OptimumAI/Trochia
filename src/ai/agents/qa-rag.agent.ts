@@ -6,7 +6,7 @@
  * ## Two-stage grounding (OD-7 + Codex P2-D/P2-E)
  *
  * Stage 1 (PRE-synthesis floor): if the strongest retrieved candidate's cosine
- * similarity is below GROUNDING_THRESHOLD (0.6), the agent returns a
+ * similarity is below GROUNDING_THRESHOLD (0.52), the agent returns a
  * DETERMINISTIC "I don't know" answer WITHOUT calling Opus — zero fabrication on
  * weak retrieval, and the cheapest path under the $5/day cap (no Opus spend).
  * The comparison is against `vectorScore` (cosine SIMILARITY ∈ [-1, 1] from the
@@ -79,9 +79,20 @@ import { logger } from '@/lib/logger';
 /**
  * The pre-synthesis grounding floor (OD-7 stage 1). Compared DIRECTLY against
  * `max(candidate.vectorScore ?? -1)` — cosine SIMILARITY ∈ [-1, 1] from the
- * 02-06 retriever. Tune via the qa-grounding eval. 02-CONTEXT starting value.
+ * 02-06 retriever. Tune via the qa-grounding eval. Two eval-backed recalibrations
+ * (.planning/fixes/2026-06-09-qa-robustness-PLAN.md):
+ *   - 0.60 → 0.55: 2026-06-09 prod ClockPay sweep — 0.60 false-rejected
+ *     stage/problem/solution paraphrases at 0.579–0.596 while the no-field controls
+ *     (target users, competitors) sat at 0.450–0.461.
+ *   - 0.55 → 0.52: 2026-06-09 post-alias COMPLETE synthetic sweep — controls
+ *     measured 0.4668/0.4821, the terse-query crux "What do we do?" at 0.5397
+ *     (cleanly above controls, just below 0.55). The safe gap (0.4821, 0.5397] →
+ *     0.52 grounds the crux with +0.020 margin and rejects both controls with
+ *     +0.038 margin.
+ * FINAL for this cycle: a remaining prod miss on ClockPay's real oneLiner is an
+ * alias/data followup, NOT a third threshold move.
  */
-export const GROUNDING_THRESHOLD = 0.6;
+export const GROUNDING_THRESHOLD = 0.52;
 
 /** Token budget for the synthesis output. Answer + citations JSON is small. */
 const SYNTHESIS_MAX_TOKENS = 1024;
@@ -182,7 +193,7 @@ function iDontKnowAnswer(): QaAnswer {
  *
  * Flow:
  *   1. Retrieve tenant-scoped candidates via hybridRetrieve (under ctx.rls).
- *   2. Stage-1 floor: max vectorScore < 0.6 → deterministic "I don't know"
+ *   2. Stage-1 floor: max vectorScore < 0.52 → deterministic "I don't know"
  *      WITHOUT calling Opus.
  *   3. Synthesize via runAgent('reason' → Opus) with the grounding system
  *      instruction (cached) + the screened/delimited query+chunks in

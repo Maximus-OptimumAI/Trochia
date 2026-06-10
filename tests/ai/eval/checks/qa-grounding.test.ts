@@ -30,9 +30,18 @@ vi.mock('@/db/client', () => ({
 }));
 
 import { qaGrounding } from '@/ai/eval/checks/qa-grounding';
+import { QA_GROUNDING_FIXTURE_PATHS, loadQaGroundingFixtures } from '@/ai/eval/fixtures';
 import type { AskQaResult } from '@/ai/schemas/qa-answer.zod';
 
 const ORIGINAL_KEY = process.env.ANTHROPIC_API_KEY;
+
+// Drive the mock by FIXTURE SCOPE, not by call count, so growing the fixture set
+// (qa-robustness T1/T4) never re-breaks these tests. Loaded the SAME way the check
+// loads them, so in/out-of-scope partitioning matches the run exactly.
+const FIXTURES = loadQaGroundingFixtures(QA_GROUNDING_FIXTURE_PATHS);
+const IN_SCOPE = FIXTURES.filter((f) => !f.isOutOfScope);
+const IN_SCOPE_COUNT = IN_SCOPE.length;
+const OUT_OF_SCOPE_QUESTIONS = new Set(FIXTURES.filter((f) => f.isOutOfScope).map((f) => f.question));
 
 /** Build an AskQaResult for a grounded, zero-drop answer. */
 function grounded(dropped = 0): AskQaResult {
@@ -55,6 +64,16 @@ function iDontKnow(): AskQaResult {
   };
 }
 
+/**
+ * A scope-driven mock impl: in-scope queries → grounded(0), out-of-scope → "I don't
+ * know". `over(query)` may return a per-question override (else null falls through).
+ * Count-independent — adding fixtures cannot exhaust a queue.
+ */
+function byScope(over: (q: string) => AskQaResult | null = () => null) {
+  return ({ query }: { query: string }): AskQaResult =>
+    over(query) ?? (OUT_OF_SCOPE_QUESTIONS.has(query) ? iDontKnow() : grounded(0));
+}
+
 beforeEach(() => {
   askQa.mockReset();
   // Ensure the env-gate passes by default (the fixture-driven path runs).
@@ -69,18 +88,9 @@ afterEach(() => {
 
 describe('qaGrounding.run', () => {
   it('every in-scope drop===0 + out-of-scope grounded:false → pass, metric 0', async () => {
-    // The fixture Q-set is 6 in-scope + 2 out-of-scope. In-scope → grounded
-    // (zero drop, maxVS 0.8), out-of-scope → "I don't know" (maxVS 0.2) → clean
-    // cosine separation (0.8 > 0.2).
-    askQa
-      .mockResolvedValueOnce(grounded(0))
-      .mockResolvedValueOnce(grounded(0))
-      .mockResolvedValueOnce(grounded(0))
-      .mockResolvedValueOnce(grounded(0))
-      .mockResolvedValueOnce(grounded(0))
-      .mockResolvedValueOnce(grounded(0))
-      .mockResolvedValueOnce(iDontKnow())
-      .mockResolvedValueOnce(iDontKnow());
+    // In-scope → grounded (zero drop, maxVS 0.8), out-of-scope → "I don't know"
+    // (maxVS 0.2) → clean cosine separation (0.8 > 0.2).
+    askQa.mockImplementation(byScope());
 
     const r = await qaGrounding.run();
     expect(r.status).toBe('pass');
@@ -90,15 +100,8 @@ describe('qaGrounding.run', () => {
 
   it('P2-D — a turn with droppedCitationCount > 0 makes the eval FAIL', async () => {
     // One in-scope Q fabricates a citation → debug.droppedCitationCount = 1.
-    askQa
-      .mockResolvedValueOnce(grounded(1)) // fabricated-then-dropped
-      .mockResolvedValueOnce(grounded(0))
-      .mockResolvedValueOnce(grounded(0))
-      .mockResolvedValueOnce(grounded(0))
-      .mockResolvedValueOnce(grounded(0))
-      .mockResolvedValueOnce(grounded(0))
-      .mockResolvedValueOnce(iDontKnow())
-      .mockResolvedValueOnce(iDontKnow());
+    const fabricated = IN_SCOPE[0].question;
+    askQa.mockImplementation(byScope((q) => (q === fabricated ? grounded(1) : null)));
 
     const r = await qaGrounding.run();
     expect(r.status).toBe('fail');
@@ -106,15 +109,9 @@ describe('qaGrounding.run', () => {
   });
 
   it('an out-of-scope Q returning grounded:true → fail (criterion 6)', async () => {
-    askQa
-      .mockResolvedValueOnce(grounded(0))
-      .mockResolvedValueOnce(grounded(0))
-      .mockResolvedValueOnce(grounded(0))
-      .mockResolvedValueOnce(grounded(0))
-      .mockResolvedValueOnce(grounded(0))
-      .mockResolvedValueOnce(grounded(0))
-      .mockResolvedValueOnce(grounded(0)) // out-of-scope but grounded:true → miss
-      .mockResolvedValueOnce(iDontKnow());
+    // One out-of-scope Q comes back grounded:true (the miss) instead of "I don't know".
+    const oos = FIXTURES.find((f) => f.isOutOfScope)!.question;
+    askQa.mockImplementation(byScope((q) => (q === oos ? grounded(0) : null)));
 
     const r = await qaGrounding.run();
     expect(r.status).toBe('fail');
@@ -127,21 +124,14 @@ describe('qaGrounding.run', () => {
     // first in-scope Q comes back as an "I don't know" (grounded:false, 0
     // citations). Pre-codex#5 this passed vacuously; now it FAILS because the
     // in-scope answer was not actually grounded + cited.
-    askQa
-      .mockResolvedValueOnce(iDontKnow()) // in-scope but NOT grounded → inScopeMiss
-      .mockResolvedValueOnce(grounded(0))
-      .mockResolvedValueOnce(grounded(0))
-      .mockResolvedValueOnce(grounded(0))
-      .mockResolvedValueOnce(grounded(0))
-      .mockResolvedValueOnce(grounded(0))
-      .mockResolvedValueOnce(iDontKnow())
-      .mockResolvedValueOnce(iDontKnow());
+    const miss = IN_SCOPE[0].question; // in-scope but returns "I don't know"
+    askQa.mockImplementation(byScope((q) => (q === miss ? iDontKnow() : null)));
 
     const r = await qaGrounding.run();
     expect(r.status).toBe('fail');
     // dropped total is still 0 — the fail is from the in-scope grounding miss.
     expect(r.metric).toBe(0);
-    expect(r.reason).toContain('in-scope grounded+cited 5/6');
+    expect(r.reason).toContain(`in-scope grounded+cited ${IN_SCOPE_COUNT - 1}/${IN_SCOPE_COUNT}`);
   });
 
   it('ANTHROPIC_API_KEY absent → skip, askQa NOT called', async () => {
@@ -153,15 +143,7 @@ describe('qaGrounding.run', () => {
   });
 
   it('reason carries only counts — no question/answer/chunk text', async () => {
-    askQa
-      .mockResolvedValueOnce(grounded(0))
-      .mockResolvedValueOnce(grounded(0))
-      .mockResolvedValueOnce(grounded(0))
-      .mockResolvedValueOnce(grounded(0))
-      .mockResolvedValueOnce(grounded(0))
-      .mockResolvedValueOnce(grounded(0))
-      .mockResolvedValueOnce(iDontKnow())
-      .mockResolvedValueOnce(iDontKnow());
+    askQa.mockImplementation(byScope());
     const r = await qaGrounding.run();
     expect(r.reason).toContain('dropped citations');
     expect(r.reason).not.toContain('MRR');
