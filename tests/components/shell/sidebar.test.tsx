@@ -26,4 +26,23 @@ describe('Sidebar', () => {
     const img = screen.getByAltText('Trochia') as HTMLImageElement;
     expect(img.getAttribute('height')).toBe('32');
   });
+
+  it('C2: exposes a "Dashboard" nav link pointing at /app', () => {
+    render(<Sidebar activeHref="/app" />);
+    const dashboard = screen.getByRole('link', { name: 'Dashboard' });
+    expect(dashboard.getAttribute('href')).toBe('/app');
+  });
+
+  it('C2: the Dashboard item is active on /app and inactive elsewhere (exact-match)', () => {
+    // Active state paints the standalone `bg-stone` class (NavLink); the inactive
+    // class also carries `hover:bg-stone/50`, so match on exact class tokens.
+    const tokens = (name: string) =>
+      screen.getByRole('link', { name }).className.split(/\s+/);
+
+    const { rerender } = render(<Sidebar activeHref="/app" />);
+    expect(tokens('Dashboard')).toContain('bg-stone');
+
+    rerender(<Sidebar activeHref="/app/memory" />);
+    expect(tokens('Dashboard')).not.toContain('bg-stone');
+  });
 });

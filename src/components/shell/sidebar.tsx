@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import {
+  LayoutDashboard,
   Brain,
   Presentation,
   Network,
@@ -37,6 +38,7 @@ type NavItem = {
 };
 
 const NAV: NavItem[] = [
+  { label: 'Dashboard', href: '/app', icon: LayoutDashboard },
   { label: 'Business Memory', href: '/app/memory', icon: Brain },
   { label: 'Pitch Lab', href: '/app/pitch', icon: Presentation },
   { label: 'Pipeline', href: '/app/pipeline', icon: Network },
