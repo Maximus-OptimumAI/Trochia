@@ -238,3 +238,9 @@ After the T2 "what-it-does" alias was **strengthened** (label leads with the bar
 5. **Re-embed contract + TOCTOU — confirmed.** Delete-by-source (no `chunk_idx` predicate) then insert, in one tx under the `lastUpdatedAt FOR SHARE` re-read (`embed-memory.ts:210-273`); mismatch → `EMBED_TOCTOU_STALE` no-op (`:226-239`). T5's "read current `lastUpdatedAt` first, emit with exact `emittedAt`" is required and correct. ✓
 6. **Eval harness already enforces separation — confirmed.** `qa-grounding.ts` reads `result.debug.maxVectorScore`, computes `min(in-scope) > max(out-of-scope)` (`:146-148`), and gates on grounded+cited / out-of-scope-rejected / separation (`:161-165`). No new check logic needed — only fixtures + the 0.55 floor. ✓
 7. **Synthetic-corpus parity — confirmed.** `EVAL_MEMORY` flows through `buildMemoryChunks` (`eval-corpus.ts:16,59`), so T2 alias enrichment + T4 team chunks are automatically exercised by `eval:run`; `EVAL_MEMORY.team` is currently `null` (`:37`) so T4 needs a team added for founder-question coverage. ✓
+
+---
+
+## Erratum (2026-06-10)
+
+**Corrects the "ClockPay caveat (FOUNDER-CONFIRMED)" at §T4 (lines ~156 and ~171).** The claim that *"ClockPay's prod confirmed memory has NO `team` data"* was **wrong** — the missing founder chunk reflected the **old chunker's `team` deferral** (`FOLLOWUP-MEMORY-TEAM-CHUNKS-01`), not absent data. Verified 2026-06-10 post re-embed: ClockPay has **14 chunks including 1 Founder chunk**, and *"Who is the founder?"* **grounds at 0.539 in prod** (above the 0.52 floor). The T4/T5 "correct-reject (no data)" expectation for that question no longer holds — it now correctly grounds, and `FOLLOWUP-MEMORY-REIMPORT-01` was never the blocker for it.
