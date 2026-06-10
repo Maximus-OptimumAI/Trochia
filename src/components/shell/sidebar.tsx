@@ -96,7 +96,7 @@ export function Sidebar({
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-stone bg-paper">
       <div className="p-6">
-        <Logo height={26} />
+        <Logo href="/app" height={32} />
       </div>
       <nav className="flex flex-1 flex-col gap-1 px-3">
         {NAV.map((item) => (
