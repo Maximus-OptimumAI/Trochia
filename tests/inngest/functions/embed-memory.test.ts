@@ -545,7 +545,7 @@ describe('embed-memory Inngest function (Plan 02-04 / T04)', () => {
     // T1 invariant (ORDER-INDEPENDENT — do NOT assume chunk_idx 0): the Problem
     // field is embedded as its OWN "Problem:"-labeled chunk carrying the field
     // content, never folded into a different field's chunk.
-    const beforeProblem = before.find((r) => r.chunkText.startsWith('Problem:'));
+    const beforeProblem = before.find((r) => r.chunkText.startsWith('Problem ('));
     expect(beforeProblem, 'Problem field must have its own labeled chunk').toBeDefined();
     expect(beforeProblem?.chunkText).toContain('ORIGINAL-PROBLEM');
 
@@ -567,7 +567,7 @@ describe('embed-memory Inngest function (Plan 02-04 / T04)', () => {
     // The Problem field is STILL its own labeled chunk after re-fire, and the
     // DELETE-then-INSERT actually replaced it — same label, new content, and the
     // prior long Problem chunk text is gone (order-independent).
-    const afterProblem = after.find((r) => r.chunkText.startsWith('Problem:'));
+    const afterProblem = after.find((r) => r.chunkText.startsWith('Problem ('));
     expect(afterProblem, 'Problem field must still be embedded after re-fire').toBeDefined();
     expect(afterProblem?.chunkText).toContain('New shorter problem');
     expect(afterProblem?.chunkText).not.toBe(beforeProblem?.chunkText);

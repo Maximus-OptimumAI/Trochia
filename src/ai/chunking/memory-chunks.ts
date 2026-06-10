@@ -35,7 +35,7 @@
  * already supports N rows.
  */
 import { chunkText, DEFAULT_CHUNK_OPTIONS, type Chunk } from '@/ai/chunking/chunk';
-import type { Narrative, Traction } from '@/ai/schemas/business-memory.zod';
+import type { Narrative, Team, Traction } from '@/ai/schemas/business-memory.zod';
 
 /** Heuristic mirror of chunk.ts: 1 token ≈ 4 chars (English). tokenCount is an estimate. */
 const TOKENS_PER_CHAR = 1 / 4;
@@ -66,10 +66,15 @@ type Field = { label: string; value: string };
 
 /** Extract the field label (the text before the first ':') from a labeled chunk's text.
  *  Used by the eval to map a top-hit chunk_idx → a human label WITHOUT putting chunk
- *  text on the agent's debug surface (which is contractually counts/scores/keys only). */
+ *  text on the agent's debug surface (which is contractually counts/scores/keys only).
+ *  Strips the curated alias clause "(…)" (qa-robustness T2) so the eval top-hit sweep
+ *  shows the clean facet label, not the embedded synonym phrasings — the alias text
+ *  stays in chunk_text; only this DISPLAY label is cleaned. */
 export function labelOf(chunkTextValue: string): string {
-  const i = chunkTextValue.indexOf(':');
-  return (i === -1 ? chunkTextValue : chunkTextValue.slice(0, i)).trim();
+  const colon = chunkTextValue.indexOf(':');
+  const head = colon === -1 ? chunkTextValue : chunkTextValue.slice(0, colon);
+  const paren = head.indexOf('(');
+  return (paren === -1 ? head : head.slice(0, paren)).trim();
 }
 
 /** Normalize a possibly-empty scalar to a trimmed non-empty string, else null. */
@@ -102,39 +107,80 @@ function collectFields(row: ChunkableMemoryRow): Field[] {
   const narrative = (row.narrative ?? null) as Narrative | null;
   const traction = (row.traction ?? null) as Traction | null;
 
-  // NOTE: `team` (founders / advisors) is INTENTIONALLY not chunked yet — so
-  // "Who are the founders?" is not answerable from labeled chunks. Deferred as
-  // FOLLOWUP-MEMORY-TEAM-CHUNKS-01 (render labeled chunks for founder/advisor
-  // name/role/background/equity). `team` stays on ChunkableMemoryRow for the
-  // structural row match; collectFields deliberately does not read it.
-
   // "What the company does" — oneLiner, falling back to the solution beat so the
   // most common facet ("what do you do?") always has a short, dense target chunk.
   const whatItDoes = str(row.oneLiner) ?? str(narrative?.solution);
 
+  // Each label carries a curated ALIAS CLAUSE (qa-robustness T2): 2–3 short generic
+  // question-phrasings / synonyms, embedded BEFORE the colon so they lift both the
+  // vector cosine (a short colloquial query like "what do we do" aligns to a chunk
+  // that literally contains "what we do") AND the FTS lexemes. RAIL: aliases are
+  // generic phrasings ONLY — never company-specific text, never content not already
+  // implied by the field. The VALUE after the colon is unchanged + verbatim.
+  // `labelOf` strips the "(…)" so the eval display label stays clean.
   const candidates: Field[] = [
-    { label: 'Company name', value: str(row.companyName) ?? '' },
-    { label: 'What the company does', value: whatItDoes ?? '' },
-    { label: 'Sector', value: str(row.sector) ?? '' },
-    { label: 'Stage', value: str(row.stage) ?? '' },
-    { label: 'Geography', value: str(row.geography) ?? '' },
-    { label: 'Incorporation status', value: str(row.incorporationStatus) ?? '' },
-    { label: 'Founded', value: foundingDateValue(row.foundingDate) ?? '' },
-    { label: 'Problem', value: str(narrative?.problem) ?? '' },
-    { label: 'Solution', value: str(narrative?.solution) ?? '' },
-    { label: 'Why now', value: str(narrative?.why_now) ?? '' },
-    { label: 'Why us', value: str(narrative?.why_us) ?? '' },
-    { label: 'Growth', value: str(traction?.growth) ?? '' },
-    { label: 'Runway', value: str(traction?.runway) ?? '' },
-    { label: 'MRR', value: metricValue(traction?.mrr) ?? '' },
-    { label: 'ARR', value: metricValue(traction?.arr) ?? '' },
-    { label: 'Customers', value: metricValue(traction?.customers) ?? '' },
-    { label: 'Currency', value: metricValue(traction?.currency) ?? '' },
-    { label: 'Valuation', value: metricValue(traction?.valuation) ?? '' },
-    { label: 'Burn', value: metricValue(traction?.burn) ?? '' },
+    { label: 'Company name (business name, what we are called, company)', value: str(row.companyName) ?? '' },
+    { label: 'What we do (what this company does, our product, our offering)', value: whatItDoes ?? '' },
+    { label: 'Sector (industry, market, vertical)', value: str(row.sector) ?? '' },
+    { label: 'Stage (funding stage, fundraising stage, what round we are raising)', value: str(row.stage) ?? '' },
+    { label: 'Geography (location, where we are based)', value: str(row.geography) ?? '' },
+    { label: 'Incorporation status (legal entity, how we are incorporated)', value: str(row.incorporationStatus) ?? '' },
+    { label: 'Founded (founding date, when we started)', value: foundingDateValue(row.foundingDate) ?? '' },
+    { label: 'Problem (what problem we solve, the pain point)', value: str(narrative?.problem) ?? '' },
+    { label: 'Solution (how we solve it, our approach)', value: str(narrative?.solution) ?? '' },
+    { label: 'Why now (timing, why this moment)', value: str(narrative?.why_now) ?? '' },
+    { label: 'Why us (our edge, why our team)', value: str(narrative?.why_us) ?? '' },
+    { label: 'Growth (traction, growth rate, momentum)', value: str(traction?.growth) ?? '' },
+    { label: 'Runway (how long our cash lasts, months of runway)', value: str(traction?.runway) ?? '' },
+    { label: 'MRR (monthly recurring revenue, monthly revenue)', value: metricValue(traction?.mrr) ?? '' },
+    { label: 'ARR (annual recurring revenue, yearly revenue)', value: metricValue(traction?.arr) ?? '' },
+    { label: 'Customers (how many customers we have, customer count, users)', value: metricValue(traction?.customers) ?? '' },
+    { label: 'Currency (reporting currency, what currency we use)', value: metricValue(traction?.currency) ?? '' },
+    { label: 'Valuation (company valuation, what we are valued at)', value: metricValue(traction?.valuation) ?? '' },
+    { label: 'Burn (burn rate, monthly spend, cash burn)', value: metricValue(traction?.burn) ?? '' },
   ];
 
-  return candidates.filter((f) => f.value.length > 0);
+  // Team chunks (qa-robustness T4 / FOLLOWUP-MEMORY-TEAM-CHUNKS-01) appended after
+  // the scalar/narrative/traction fields, in a deterministic order so chunk_idx is
+  // stable across re-embeds. Makes "who is the founder?" answerable.
+  return [...candidates, ...collectTeamFields(row.team)].filter((f) => f.value.length > 0);
+}
+
+/**
+ * Render `team.founders` + `team.advisors` into labeled Fields (qa-robustness T4).
+ * One Field per person, founders then advisors, each in stored array order. Founder/
+ * advisor name + role + background are business memory the founder WANTS retrievable
+ * ("who is the founder?"). `equity_pct` is DELIBERATELY excluded — sensitive cap-table
+ * data (Phase 8 owns it) and not needed to answer the question. The labels carry
+ * generic alias clauses (same T2 rail: question-phrasings only, no PII in the label).
+ */
+function collectTeamFields(teamValue: unknown): Field[] {
+  const team = (teamValue ?? null) as Team | null;
+  if (!team) return [];
+
+  const fields: Field[] = [];
+
+  for (const f of team.founders ?? []) {
+    const name = str(f?.name);
+    if (!name) continue;
+    const detail = [str(f?.role), str(f?.background)].filter(Boolean).join('. ');
+    fields.push({
+      label: 'Founder (who is the founder, who founded the company, founding team)',
+      value: detail ? `${name} — ${detail}` : name,
+    });
+  }
+
+  for (const a of team.advisors ?? []) {
+    const name = str(a?.name);
+    if (!name) continue;
+    const background = str(a?.background);
+    fields.push({
+      label: 'Advisor (who advises us, advisory board)',
+      value: background ? `${name} — ${background}` : name,
+    });
+  }
+
+  return fields;
 }
 
 /**

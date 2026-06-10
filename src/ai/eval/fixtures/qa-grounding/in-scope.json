@@ -40,5 +40,54 @@
     "isOutOfScope": false,
     "accountId": "e7a1c0de-0000-4000-8000-000000000001",
     "expectedRetrievableMarker": "oneLiner"
+  },
+  {
+    "question": "What stage are we raising at?",
+    "expectedGrounded": true,
+    "isOutOfScope": false,
+    "accountId": "e7a1c0de-0000-4000-8000-000000000001",
+    "expectedRetrievableMarker": "stage"
+  },
+  {
+    "question": "What stage is our fundraising at?",
+    "expectedGrounded": true,
+    "isOutOfScope": false,
+    "accountId": "e7a1c0de-0000-4000-8000-000000000001",
+    "expectedRetrievableMarker": "stage"
+  },
+  {
+    "question": "What problem are we solving?",
+    "expectedGrounded": true,
+    "isOutOfScope": false,
+    "accountId": "e7a1c0de-0000-4000-8000-000000000001",
+    "expectedRetrievableMarker": "narrative.problem"
+  },
+  {
+    "question": "What solution do we provide?",
+    "expectedGrounded": true,
+    "isOutOfScope": false,
+    "accountId": "e7a1c0de-0000-4000-8000-000000000001",
+    "expectedRetrievableMarker": "narrative.solution"
+  },
+  {
+    "question": "How many customers do we have?",
+    "expectedGrounded": true,
+    "isOutOfScope": false,
+    "accountId": "e7a1c0de-0000-4000-8000-000000000001",
+    "expectedRetrievableMarker": "traction.customers"
+  },
+  {
+    "question": "What do we do?",
+    "expectedGrounded": true,
+    "isOutOfScope": false,
+    "accountId": "e7a1c0de-0000-4000-8000-000000000001",
+    "expectedRetrievableMarker": "oneLiner"
+  },
+  {
+    "question": "Who is the founder?",
+    "expectedGrounded": true,
+    "isOutOfScope": false,
+    "accountId": "e7a1c0de-0000-4000-8000-000000000001",
+    "expectedRetrievableMarker": "team.founders"
   }
 ]

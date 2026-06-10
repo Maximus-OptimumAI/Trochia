@@ -90,7 +90,7 @@ export const qaGrounding: EvalCheck = {
     let inScopeMisses = 0;
 
     // Cosine sweep (memory-answerable T2): collect per-bucket maxVectorScore so
-    // the threshold decision is eval-backed — keep 0.6 iff min(in-scope) clears
+    // the threshold decision is eval-backed — keep 0.52 iff min(in-scope) clears
     // it with margin over max(out-of-scope). Plus a per-question top-hit
     // chunk_idx/label log so wrong-chunk matches are visible.
     const inScopeScores: number[] = [];
