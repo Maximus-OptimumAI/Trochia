@@ -25,11 +25,11 @@ Every `/gsd-plan-phase` and every UI/architecture subagent reads these in order:
 | `.planning/intel/Trochia_AI_Strategy_v1.md` | Strategic context |
 | `.planning/intel/Trochia_AI_Build_Stack_v2.md` | Build tooling + per-phase skill priorities |
 | `.planning/intel/Trochia_AI_PRD_v2.docx` | Full product spec |
-| `docs/BRAND.md` | Brand system spec (tokens, typography, voice) |
-| `docs/DESIGN-REFERENCE.md` | Harmonic + Firecrawl aesthetic distilled into design decisions |
+| `docs/BRAND.md` | Brand system spec (tokens, typography, voice) — v1.1 |
+| `docs/design/DESIGN.md` | **Canonical design system** — Dialog layout/experience system on Trochia tokens: components, motion, conflict register. Supersedes `docs/DESIGN-REFERENCE.md` (deprecated, history only). |
 | `docs/BRAND-PACK-README.md` | Asset inventory + install/usage notes |
 
-**Any UI-track subagent that does not read both `BRAND.md` AND `DESIGN-REFERENCE.md` before planning is in violation.**
+**Any UI-track subagent that does not read both `BRAND.md` AND `docs/design/DESIGN.md` before planning is in violation.**
 
 ---
 
@@ -108,13 +108,13 @@ Trochia **drafts**, **matches**, **briefs**, **scores**, **tracks**. Trochia doe
 
 ## Workflow rules (Trochia-specific layer over global)
 
-1. Every `/gsd-plan-phase` MUST begin by reading `tasks/constraints.md` + `docs/BRAND.md` + `docs/DESIGN-REFERENCE.md` and incorporating their rules into `PLAN.md`.
+1. Every `/gsd-plan-phase` MUST begin by reading `tasks/constraints.md` + `docs/BRAND.md` + `docs/design/DESIGN.md` and incorporating their rules into `PLAN.md`.
 2. Plan-checker MUST verify all `tasks/constraints.md` rules are honored before plan approval.
-3. Verifier MUST confirm constraints held in shipped code AND that UI deliverables match `docs/DESIGN-REFERENCE.md`.
+3. Verifier MUST confirm constraints held in shipped code AND that UI deliverables match `docs/design/DESIGN.md`.
 4. Code Reviewer MUST reject any PR that:
    - Hardcodes a site URL
    - Uses banned compliance strings
-   - Introduces UI patterns listed as anti-patterns in `DESIGN-REFERENCE.md`
+   - Violates a §11 Don't or spends Signal more than once per surface (per `docs/design/DESIGN.md`)
    - Adds a Tailwind color or font outside the brand token system
    - Imports `ai/*` from `safe-engine` or `cap-table-engine`
 

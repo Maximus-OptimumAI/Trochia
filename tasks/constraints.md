@@ -75,9 +75,9 @@ Both URLs already read from `process.env.NEXT_PUBLIC_SITE_URL` / `NEXT_PUBLIC_AP
 
 | Rule | Enforcement |
 |---|---|
-| All UI subagents MUST read `docs/BRAND.md` AND `docs/DESIGN-REFERENCE.md` before planning or implementing any surface | Plan-checker verifies; Verifier confirms shipped UI matches |
-| Aesthetic target: harmonic.ai + firecrawl.dev (operator-grade, near-monochromatic, single Signal accent) | Documented in DESIGN-REFERENCE.md |
-| Anti-patterns in DESIGN-REFERENCE.md are banned | Code Reviewer rejects PRs violating |
+| All UI subagents MUST read `docs/BRAND.md` (v1.1) AND `docs/design/DESIGN.md` (canonical design system) before planning or implementing any surface. `docs/DESIGN-REFERENCE.md` is deprecated (2026-06-11) — history only. | Plan-checker verifies; Verifier confirms shipped UI matches |
+| Aesthetic target: Dialog layout/experience system on Trochia tokens (operator-grade, two-tone Paper/Card surfaces, Geist Light display, single Signal CTA moment) | Documented in `docs/design/DESIGN.md`; conflict register C1–C18 resolves all prior-canon contradictions |
+| §11 Don'ts in `docs/design/DESIGN.md` are banned (incl. >1 Signal moment per surface, pure #000, non-surface #FFF, autoplay video, motion without a reduced-motion path) | Code Reviewer rejects PRs violating |
 | Tailwind colors / fonts outside the brand token system | Code Reviewer rejects |
 | Phase 1 exit gate: `/styleguide` internal route shipped showing every themed component | Mandatory |
 
