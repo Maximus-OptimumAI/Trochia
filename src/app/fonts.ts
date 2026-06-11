@@ -1,6 +1,9 @@
 /**
- * Trochia typefaces (3-typeface brand architecture — docs/BRAND.md):
- *   - Geist       → display + headings (weights 600 / 700), CSS var --font-geist
+ * Trochia typefaces (3-typeface brand architecture — docs/BRAND.md v1.1):
+ *   - Geist       → display + headings at LIGHT (300 ≥50px / 400 below —
+ *                   weight-by-size rule, DESIGN.md §4); 700 for the wordmark
+ *                   lockup only; 600 retained for app-shell internals until
+ *                   the Phase B audit drops it. CSS var --font-geist.
  *   - Inter       → body + UI         (weights 400 / 500), CSS var --font-inter
  *   - Geist Mono  → numbers + code    (weight 400),        CSS var --font-geist-mono
  *
@@ -12,7 +15,7 @@ import { Geist, Geist_Mono, Inter } from 'next/font/google';
 
 export const geist = Geist({
   subsets: ['latin'],
-  weight: ['600', '700'],
+  weight: ['300', '400', '600', '700'],
   variable: '--font-geist',
   display: 'swap',
 });

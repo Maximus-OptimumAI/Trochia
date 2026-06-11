@@ -242,4 +242,20 @@ Phase B ships as its own branch/PR after Phase A lands and the founder approves 
 
 ---
 
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Runs | Status | Findings |
+|--------|---------|------|--------|----------|
+| Design Review (plan) | `/plan-design-review` | 1 (2026-06-11, pre-A3 gate) | PASS 8/10 | 3 — see below |
+
+**Findings (pre-A3 design gate):**
+1. **PDR-01 (resolved, founder ruling requested):** DESIGN.md §7 Nav specs a "signal pill CTA" in the nav; founder session decision #2 mandates exactly one Signal moment per page (hero CTA). Slice resolution: nav CTA = **secondary** (white pill, stone border — C7 retires ink from marketing). Canon §7 Nav line needs a one-word amend ("signal pill CTA" → "secondary pill CTA") pending founder sign-off.
+2. **PDR-02 (resolved):** M2 mockup content now specified — pre-call-brief surface, 3-step draft simulation, 800ms/step + 2s pause, static end-state under reduced-motion.
+3. **PDR-03 (resolved):** Mobile pill-nav specified — logo + hamburger inside the pill, full-screen Sheet unchanged.
+
+*Note: gstack designer mockup loop skipped — designer binary unavailable on this Windows host (XSym symlinks) and the visual direction is already ratified canon (DESIGN.md v1.0). Review ran as prose gate.*
+
+---
+
 **STOP point reached.** Founder reviews this plan; implementation begins on approval, Task 0 first.
+*2026-06-11 (later): Task 0 shipped (canon ratified through `411dec1`). Phase A implementation authorized with session decisions (inline logo + entrance, graphite eyebrow, Signal-pill hero CTA, real mockup, honest carousel). First slice: A1–A5 (through nav + hero), then founder visual + copy review.*
