@@ -204,7 +204,9 @@ bg-card rounded-3xl p-6 shadow-card
 No border. No hover lift. Interactive cards: `transition-shadow duration-150` to a
 slightly deeper `shadow-overlay` is permitted, or `hover:bg-card` tint via inner ring —
 prefer cursor + inner-content affordances. Featured card (pricing "Most chosen"):
-`ring-2 ring-signal` + small Signal badge — this **is** the page's Signal moment.
+`ring-2 ring-signal` + a neutral "Most chosen" badge (`text-graphite` on Card, per the
+Badges spec) — the ring **is** the page's Signal moment. Badges never carry Signal,
+including here; the ring alone spends the moment.
 (Because the ring spends the page's Signal moment, pricing CTAs are ink pills.)
 
 ### Badges / label pills
