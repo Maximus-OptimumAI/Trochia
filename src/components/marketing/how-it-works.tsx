@@ -1,9 +1,10 @@
 import { Card } from '@/components/ui/card';
 
 /**
- * HowItWorks — 4 numbered horizontal step cards (UI-SPEC §"Route / Screen
- * Contract" homepage section 3). Each card carries:
- *   - the step number (01–04) in `text-mono text-signal`
+ * HowItWorks — 4 numbered horizontal step cards. Each card carries:
+ *   - the step number (01–04) in `text-mono text-graphite` (Signal is never a
+ *     text color — docs/design/DESIGN.md §4, no exceptions; the page's one
+ *     Signal moment is the hero CTA)
  *   - an H3 title
  *   - a 2-sentence body in operator voice
  *
@@ -49,7 +50,7 @@ export function HowItWorks() {
           {STEPS.map((step, i) => (
             <li key={step.num} className="relative">
               <Card className="h-full">
-                <span className="text-mono text-signal">{step.num}</span>
+                <span className="text-mono text-graphite">{step.num}</span>
                 <h3 className="text-h3 text-ink">{step.title}</h3>
                 <p className="text-body-sm text-graphite">{step.body}</p>
               </Card>

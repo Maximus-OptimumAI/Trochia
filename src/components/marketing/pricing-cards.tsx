@@ -192,7 +192,9 @@ function PricingCard({
           <span className="block text-body-sm text-graphite">Activates at launch.</span>
         ) : (
           <Button
-            variant={tier.featured ? 'signal' : 'primary'}
+            // pricing CTAs are ink pills — the featured ring spends the page's
+            // Signal moment (docs/design/DESIGN.md §7 Cards)
+            variant="primary"
             className="w-full"
             render={<Link href="/sign-up" />}
           >
