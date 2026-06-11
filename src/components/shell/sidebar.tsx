@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import {
+  LayoutDashboard,
   Brain,
   Presentation,
   Network,
@@ -37,6 +38,7 @@ type NavItem = {
 };
 
 const NAV: NavItem[] = [
+  { label: 'Dashboard', href: '/app', icon: LayoutDashboard },
   { label: 'Business Memory', href: '/app/memory', icon: Brain },
   { label: 'Pitch Lab', href: '/app/pitch', icon: Presentation },
   { label: 'Pipeline', href: '/app/pipeline', icon: Network },
@@ -96,7 +98,7 @@ export function Sidebar({
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-stone bg-paper">
       <div className="p-6">
-        <Logo height={26} />
+        <Logo href="/app" height={32} />
       </div>
       <nav className="flex flex-1 flex-col gap-1 px-3">
         {NAV.map((item) => (
@@ -124,7 +126,14 @@ export function Sidebar({
             <DropdownMenuItem render={<Link href="/app/settings" />}>Settings</DropdownMenuItem>
             <DropdownMenuItem render={<Link href="/app/billing" />}>Billing</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem render={<Link href="/sign-out" />}>Sign out</DropdownMenuItem>
+            <form action="/sign-out" method="post" className="w-full">
+              {/* `nativeButton`: the render target IS a real <button>, so Base UI
+                  stays on its native-button path — Enter-key submit works and the
+                  non-native-button a11y warning is gone (codex P2, sidebar.tsx:130). */}
+              <DropdownMenuItem nativeButton render={<button type="submit" />} className="w-full">
+                Sign out
+              </DropdownMenuItem>
+            </form>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

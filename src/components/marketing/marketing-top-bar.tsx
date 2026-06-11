@@ -45,7 +45,7 @@ export function MarketingTopBar() {
       )}
     >
       <div className="mx-auto flex h-full max-w-content items-center justify-between px-6 md:px-12">
-        <Logo height={26} />
+        <Logo height={32} />
 
         <nav className="hidden items-center gap-8 md:flex">
           {NAV.map((item) => (
