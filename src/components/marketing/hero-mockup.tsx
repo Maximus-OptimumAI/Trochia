@@ -77,7 +77,7 @@ export function HeroMockup() {
         <span className="size-2.5 rounded-full bg-stone" />
         <span className="size-2.5 rounded-full bg-stone" />
         <span className="ml-3 hidden rounded-full bg-paper px-3 py-0.5 text-mono-sm text-graphite sm:block">
-          app.trochia — live raise
+          Live Raise · pre-call brief
         </span>
       </div>
 
