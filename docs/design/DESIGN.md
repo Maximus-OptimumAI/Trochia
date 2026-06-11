@@ -85,8 +85,9 @@ Never 600+ on display or section headings — light display is the brand's voice
 persist temporarily in app-shell internals until Phase B audits it out.
 
 **Default text color** is `ink`. Secondary copy is `graphite` (§10 rule applies).
-`signal` is never a text color except star/rating-style glyph accents — and those count
-as the surface's one Signal moment.
+`signal` is never a text or icon color — no exceptions. (A star/rating exception existed
+in draft and is struck: pre-revenue honesty rules make rating displays unshippable, and
+any such glyph would collide with the CTA's Signal moment under C7.)
 
 ## 5. Spacing & layout
 
@@ -204,6 +205,7 @@ No border. No hover lift. Interactive cards: `transition-shadow duration-150` to
 slightly deeper `shadow-overlay` is permitted, or `hover:bg-card` tint via inner ring —
 prefer cursor + inner-content affordances. Featured card (pricing "Most chosen"):
 `ring-2 ring-signal` + small Signal badge — this **is** the page's Signal moment.
+(Because the ring spends the page's Signal moment, pricing CTAs are ink pills.)
 
 ### Badges / label pills
 
@@ -338,7 +340,10 @@ touch targets ≥44px (`h-11`; `h-12` on mobile) · text never rendered as image
 - Real product, real-shaped data, honest copy — always.
 
 **Don't**
-- Don't put Signal on text, icons, badges, borders, or backgrounds.
+- Don't put Signal on text, icons, badges, borders, or backgrounds. The only two
+  sanctioned non-CTA Signal uses in the system: the M1 hero halo (≤6% opacity radial,
+  ambient — does not count as the moment) and the §7 featured-pricing ring (which SPENDS
+  that page's moment).
 - Don't use pure `#000` anywhere, or `#FFFFFF` for anything but level-1 surfaces.
 - Don't give cards <24px radii, borders, hover-lifts, or gradients.
 - Don't round inputs.
