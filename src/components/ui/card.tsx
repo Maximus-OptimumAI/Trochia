@@ -3,11 +3,12 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 
 /**
- * Trochia Card — `bg-paper border border-stone rounded-xl p-8`. No shadow, no
- * lift on hover, no gradient (DESIGN-REFERENCE § Cards). Pass `interactive` for
- * `hover:border-ink/20`. `featured` → `border-2 border-signal` (the "Most
- * chosen" pricing variant); the absolute Signal badge top-right is the caller's
- * responsibility (use <CardAction> or position one yourself).
+ * Trochia Card — borderless white surface on the Paper canvas (docs/design/
+ * DESIGN.md §7 Cards): `bg-card rounded-3xl p-6 shadow-card`. The flush shadow
+ * defines the edge, it doesn't lift — no border, no hover-lift, no gradient.
+ * Pass `interactive` for a one-step shadow deepen. `featured` → `ring-2
+ * ring-signal` (the "Most chosen" pricing variant — the ring IS that page's
+ * Signal moment; pair it with a NEUTRAL badge, never a Signal one).
  */
 function Card({
   className,
@@ -20,9 +21,9 @@ function Card({
       data-slot="card"
       data-featured={featured || undefined}
       className={cn(
-        "relative flex flex-col gap-6 rounded-xl bg-paper p-8 text-body text-ink transition-colors duration-150",
-        featured ? "border-2 border-signal" : "border border-stone",
-        interactive && !featured && "hover:border-ink/20",
+        "relative flex flex-col gap-6 rounded-3xl bg-card p-6 text-body text-ink shadow-card",
+        featured && "ring-2 ring-signal",
+        interactive && "transition-shadow duration-150 hover:shadow-overlay",
         className
       )}
       {...props}
@@ -64,7 +65,7 @@ function CardAction({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-action"
-      className={cn("absolute right-8 top-8", className)}
+      className={cn("absolute right-6 top-6", className)}
       {...props}
     />
   )
