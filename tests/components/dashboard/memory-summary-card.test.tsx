@@ -16,7 +16,10 @@ afterEach(cleanup);
 describe('MemorySummaryCard', () => {
   it('links to the memory workspace and omits the start-onboarding CTA copy', () => {
     render(<MemorySummaryCard companyName="ClockPay" />);
-    const link = screen.getByRole('link', { name: /view workspace/i });
+    // Base UI Buttons rendered as <Link> expose role="button" (nativeButton
+    // ={false}, the prescribed non-<button> path — design-adoption A9); the
+    // navigation contract is asserted via the href.
+    const link = screen.getByRole('button', { name: /view workspace/i });
     expect(link.getAttribute('href')).toBe('/app/memory');
     // The confirmed state replaces — never duplicates — the empty-state CTA.
     expect(screen.queryByText(/start business memory/i)).toBeNull();
