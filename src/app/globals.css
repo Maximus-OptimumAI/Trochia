@@ -239,6 +239,42 @@
   animation: trochia-node-settle 0.7s ease-out both;
 }
 
+/*
+ * Page enter (DESIGN.md §9 timing table) — 200ms ease-out fade-up, applied by
+ * the marketing route template on every navigation. Pure CSS animation: runs
+ * and completes without JS, so the page is never stuck hidden; the
+ * reduced-motion kill-switch collapses it to instant.
+ */
+@keyframes trochia-page-enter {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@utility animate-page-enter {
+  animation: trochia-page-enter 0.2s ease-out both;
+}
+
+/*
+ * Scroll reveals (DESIGN.md §9 M4) — content is server-rendered VISIBLE; the
+ * Reveal component adds .reveal-hidden client-side only for below-fold
+ * elements, then releases it on intersection (300ms ease-out, once). With JS
+ * off nothing is ever hidden; reduced-motion skips the hide entirely.
+ */
+.reveal-hidden {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.reveal-ready {
+  transition:
+    opacity 300ms ease-out,
+    transform 300ms ease-out;
+}
+
 /* reduced-motion: kill non-essential animation (motion-contract exit-gate item) */
 @media (prefers-reduced-motion: reduce) {
   *,

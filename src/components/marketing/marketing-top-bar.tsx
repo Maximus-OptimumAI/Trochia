@@ -15,19 +15,21 @@ import {
 } from '@/components/ui/sheet';
 
 /**
- * MarketingTopBar — the floating pill nav (docs/design/DESIGN.md §7
- * Navigation, motion M5). Always a pill from load (no variant morph — the hero
- * is light, there is no dark-over-hero state). Sticky transparent band; inner
- * pill `bg-card rounded-nav shadow-card h-14`; after 8px scroll the shadow
- * deepens one step (200ms ease-out). Zero JS dependency for correctness — the
- * scroll listener only deepens a shadow.
+ * MarketingTopBar — spread-at-top → pill-on-scroll (docs/design/DESIGN.md §7
+ * Navigation v1.1 / D3-B, motion M5). At page top: a full-content-width
+ * transparent row over Paper (logo left, links + secondary CTA right). Past
+ * ~64px scroll it contracts into the centered floating pill (`bg-card
+ * rounded-nav shadow-card h-14`). 200ms ease-out morph (max-width /
+ * background / shadow / padding transition); the reduced-motion kill-switch
+ * makes the two states SNAP. LIGHT-ONLY — no dark variant, no color morph.
+ * Both states are fully functional without JS (the listener is enhancement
+ * only; no-JS renders the spread state permanently).
  *
- * CTA discipline (PDR-01): the nav CTA is SECONDARY (white pill, stone
- * border) — the page's one Signal moment is the hero CTA, and ink fills are
- * retired from marketing surfaces (DESIGN.md C7). Logo: inline SVG lockup with
- * the one-time node-settle entrance.
+ * CTA discipline (D1-B): the nav is sticky — co-visible with everything — so
+ * its CTA is SECONDARY (white pill) in ALL states, never Signal. Logo: inline
+ * SVG lockup with the one-time node-settle entrance.
  *
- * Mobile: the pill holds logo + hamburger; full-screen Sheet menu (PDR-03).
+ * Mobile: logo + hamburger; full-screen Sheet menu (PDR-03).
  */
 const NAV = [
   { label: 'How it works', href: '/#how-it-works' },
@@ -39,7 +41,7 @@ export function MarketingTopBar() {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
+    const onScroll = () => setScrolled(window.scrollY > 64);
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
@@ -49,8 +51,10 @@ export function MarketingTopBar() {
     <header className="sticky top-0 z-40 px-4 pt-4 sm:px-6">
       <div
         className={cn(
-          'mx-auto flex h-14 w-fit max-w-full items-center gap-1 rounded-nav bg-card pr-2 pl-4 transition-shadow duration-200 sm:gap-2 sm:pl-5',
-          scrolled ? 'shadow-overlay' : 'shadow-card'
+          'mx-auto flex h-14 items-center justify-between rounded-nav transition-[max-width,background-color,box-shadow,padding] duration-200 ease-out',
+          scrolled
+            ? 'max-w-[780px] bg-card pr-2 pl-4 shadow-card sm:pl-5'
+            : 'max-w-content bg-transparent px-0 shadow-none'
         )}
       >
         <Logo height={34} animate className="-ml-1" />

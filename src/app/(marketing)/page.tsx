@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { HeroMockup } from '@/components/marketing/hero-mockup';
 import { HowItWorks } from '@/components/marketing/how-it-works';
 import { ModulesGrid } from '@/components/marketing/modules-grid';
-import { FounderVoices } from '@/components/marketing/founder-voices';
+import { ProofCarousel } from '@/components/marketing/proof-carousel';
+import { Reveal } from '@/components/marketing/reveal';
 import { PricingCards } from '@/components/marketing/pricing-cards';
 
 /**
@@ -59,10 +60,9 @@ export default function Home() {
               See how it works →
             </Button>
           </div>
-          {/* honest trust line — no "Trusted by" + fake logos (§11) */}
+          {/* honest trust line (D2-B) — accelerator names TEXT-ONLY, never logos (§11) */}
           <p className="max-w-xl text-body-sm text-graphite">
-            Built for founders raising at YC, Techstars, Antler and the rest — accelerator
-            partnerships in progress.
+            Built for founders raising at YC, Techstars, Antler and beyond.
           </p>
 
           <div className="mt-10 w-full max-w-3xl">
@@ -77,12 +77,13 @@ export default function Home() {
       {/* 3 · Modules grid ─────────────────────────────────────────────────── */}
       <ModulesGrid />
 
-      {/* 4 · Founder voices (placeholder) ─────────────────────────────────── */}
-      <FounderVoices />
+      {/* 4 · Proof-of-work carousel (A7 — the one sanctioned carousel, §7) ── */}
+      <ProofCarousel />
 
-      {/* 5 · Pricing teaser ───────────────────────────────────────────────── */}
-      <section className="border-t border-stone py-20 md:py-32">
-        <div className="mx-auto max-w-content px-6 md:px-12">
+      {/* 5 · Pricing teaser — paper band; ink CTAs (the featured ring spends
+          this viewport's Signal moment — D1-B co-visibility verified) */}
+      <section className="py-20 md:py-32">
+        <Reveal className="mx-auto max-w-content px-6 md:px-12">
           <header className="mb-12 flex flex-col gap-3 md:mb-16">
             <p className="text-label text-graphite">PRICING</p>
             <h2 className="max-w-2xl text-h2 text-ink">
@@ -97,23 +98,24 @@ export default function Home() {
               See full pricing →
             </Button>
           </div>
-        </div>
+        </Reveal>
       </section>
 
-      {/* 6 · Final CTA ────────────────────────────────────────────────────── */}
-      <section className="border-t border-stone py-32">
-        <div className="mx-auto flex max-w-3xl flex-col items-center gap-6 px-6 text-center md:px-12">
-          <h2 className="text-h2 text-ink">Stop juggling. Start raising.</h2>
+      {/* 6 · Final CTA — bg-card band; signal pill (D1-B: its own viewport — the
+          second conversion anchor, never co-visible with the hero's) */}
+      <section className="bg-card py-32">
+        <Reveal className="mx-auto flex max-w-3xl flex-col items-center gap-6 px-6 text-center md:px-12">
+          <h2 className="text-heading-lg text-ink">Stop juggling. Start raising.</h2>
           <p className="max-w-xl text-body text-graphite">
             One operator across business memory, pitch, pipeline, live raise, and close. You
             approve every external send.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-4">
-            <Button variant="primary" render={<Link href="/sign-up" />}>
+            <Button variant="signal" render={<Link href="/sign-up" />}>
               Start your raise
             </Button>
           </div>
-        </div>
+        </Reveal>
       </section>
     </>
   );
