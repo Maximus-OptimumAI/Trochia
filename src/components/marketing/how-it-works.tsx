@@ -45,7 +45,7 @@ const STEPS: { num: string; title: string; body: string; panel: Panel }[] = [
         { primary: 'Harbor Field Capital', secondary: 'Writes $100–250K first checks at your stage', meta: '0.87' },
         { primary: 'Northbeam Angels', secondary: 'Operator syndicate, workflow-tools thesis', meta: '0.82' },
       ],
-      footer: 'Scored against your memory. You decide who is in.',
+      footer: 'Ranked against your memory.',
     },
   },
   {

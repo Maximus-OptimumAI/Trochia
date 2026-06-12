@@ -144,7 +144,7 @@ export function ProofCarousel() {
               </p>
               <p className="text-body-sm text-graphite">
                 Logo churn is 2 customers in 6 months, both pre-onboarding-revamp. Gross
-                revenue churn is 1.8% monthly — cited from your confirmed memory, with
+                revenue churn is 1.8% monthly, cited from your confirmed memory with
                 sources attached.
               </p>
               <div className="mt-auto flex flex-wrap gap-2">

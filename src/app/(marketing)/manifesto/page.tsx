@@ -79,8 +79,8 @@ export default function ManifestoPage() {
             Pipeline lives in a spreadsheet, a CRM that was not built for venture, or in the
             founder&apos;s head. Investor research happens in another tab. Pre-call briefs get
             written if there is time, which there usually is not. A botched investor meeting
-            is a $25K to $250K loss in expected value — and the cause is almost always the
-            same. The founder walked in cold to someone they should have read for fifteen
+            is a $25K to $250K loss in expected value. The cause is almost always the
+            same: the founder walked in cold to someone they should have read for fifteen
             minutes first.
           </p>
           <p className={PARAGRAPH}>The third thing that breaks is the close.</p>
@@ -88,7 +88,7 @@ export default function ManifestoPage() {
             SAFE templates get pulled from a Google search. Cap tables are kept in Excel
             until someone says &ldquo;send me your cap table&rdquo; and the founder builds
             one in an hour. F&amp;F rounds get described in ways that are a regulatory
-            landmine — and nobody draws that on the page. A friend wires $25K and there is
+            landmine, and nobody draws that on the page. A friend wires $25K and there is
             no signed paperwork.
           </p>
           <p className={PARAGRAPH}>
@@ -159,7 +159,7 @@ export default function ManifestoPage() {
           <p className={PARAGRAPH}>
             This is the thing a general AI cannot copy in a week. A general AI does not own
             your business. A general AI does not own your pipeline. Memory plus workflow
-            ownership across the whole raise journey — that is the part that compounds.
+            ownership across the whole raise journey is the part that compounds.
           </p>
           <p className={PARAGRAPH}>
             It compounds because every interaction makes the operator more accurate. The

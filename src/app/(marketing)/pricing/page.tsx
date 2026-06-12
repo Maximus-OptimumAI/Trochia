@@ -122,7 +122,7 @@ export default function PricingPage() {
             </TabsContent>
           </Tabs>
           <p className="text-center text-body-sm text-graphite">
-            Close Mode and Alumni activate at launch — available with the close stack.
+            Close Mode and Alumni switch on at launch, alongside the close stack.
           </p>
         </div>
       </section>

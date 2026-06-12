@@ -35,7 +35,7 @@ const SECTIONS = [
     lines: [
       'Open with the activation metric — it matches the thesis in her latest fund letter.',
       'Your CAC math answers her standard objection on paid acquisition.',
-      'Ask about her March note on vertical AI operators — direct overlap with your roadmap.',
+      'Ask about her March note on vertical AI operators. It overlaps directly with your roadmap.',
     ],
   },
   {
