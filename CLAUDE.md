@@ -114,7 +114,7 @@ Trochia **drafts**, **matches**, **briefs**, **scores**, **tracks**. Trochia doe
 4. Code Reviewer MUST reject any PR that:
    - Hardcodes a site URL
    - Uses banned compliance strings
-   - Violates a §11 Don't or spends Signal more than once per surface (per `docs/design/DESIGN.md`)
+   - Violates a §11 Don't or renders two Signal elements co-visible in a viewport (per `docs/design/DESIGN.md`)
    - Adds a Tailwind color or font outside the brand token system
    - Imports `ai/*` from `safe-engine` or `cap-table-engine`
 

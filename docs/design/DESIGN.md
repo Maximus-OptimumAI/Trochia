@@ -1,6 +1,6 @@
 # Trochia Design System — Canonical
 
-**Version 1.0 — 2026-06-11.** This document is the law for every Trochia UI surface.
+**Version 1.1 — 2026-06-11.** This document is the law for every Trochia UI surface.
 It supersedes `docs/DESIGN-REFERENCE.md` (deprecated, kept for history) and implements the
 founder-approved adoption plan at `.planning/features/2026-06-11-design-adoption-PLAN.md`:
 **Dialog's layout + experience system** (structure, radii, surfaces, shadows, flow,
@@ -35,7 +35,7 @@ buddy" energy, motion serves comprehension and never decoration.
 | # | Principle | Implication |
 |---|---|---|
 | 1 | **Two-tone surface system** | Paper canvas + White cards build all depth. Section rhythm = canvas swaps, not colored bands. |
-| 2 | **Single-accent CTA discipline** | Signal appears exactly once per surface, on the primary CTA. Never text, icons, decoration, or large fills. |
+| 2 | **Single-accent CTA discipline** | Signal spends ONCE PER VIEWPORT — never two Signal elements co-visible at any scroll position. Sticky/fixed elements (nav) are co-visible with everything and therefore never carry Signal. Never text, icons, decoration, or large fills. |
 | 3 | **Light display type** | Geist Light at 50–70px is the signature typographic move. Never bold display. |
 | 4 | **Flush elevation** | Shadows define edges, they don't lift. ≤8px blur, ≤0.12 opacity. Cards sit in the plane. |
 | 5 | **Pills vs. sharp** | Buttons and badges are pills. Inputs are sharp (0px). Cards are 24px. The contrast is the system. |
@@ -166,16 +166,28 @@ buttons read as toy).
 
 | Variant | Spec | Use |
 |---|---|---|
-| **signal** | `bg-signal text-ink hover:bg-signal/90 shadow-button` | THE primary CTA — the surface's one Signal moment. **Text is Ink, never Paper/white** (Ink-on-Signal = 5.8:1, passes AA; the pre-adoption `text-paper` variant was 3.2:1 — a live AA failure this system fixes). |
-| **primary** (ink) | `bg-ink text-paper hover:bg-ink/90` | App-shell workhorse primary (Phase B). Retired from marketing surfaces, where signal is the primary. |
+| **signal** | `bg-signal text-ink hover:bg-signal/90 shadow-button` | THE conversion CTA — the viewport's one Signal moment. **Text is Ink, never Paper/white** (Ink-on-Signal = 5.8:1, passes AA; the pre-adoption `text-paper` variant was 3.2:1 — a live AA failure this system fixes). |
+| **primary** (ink) | `bg-ink text-paper hover:bg-ink/90` | Workhorse primary: app-shell screens AND marketing mid-page/pricing CTAs (v1.1 — Signal is reserved for the hero + final conversion anchors, which are never co-visible). |
 | **secondary** | `bg-card text-ink border border-stone hover:border-ink/30` | Supporting actions; the "white pill" |
 | **ghost** | `bg-transparent text-ink hover:bg-stone/50` | Tertiary, nav-adjacent |
 | **link** | `text-ink underline-offset-4 hover:text-signal hover:underline` | In-flow text actions, "See how →" |
 | **destructive** | `bg-danger text-paper hover:bg-danger/90` | Destructive confirms |
 
-**CTA discipline.** Marketing surface: signal pill = primary, secondary/ghost support it,
-ink-fill does not appear. App screen: ink pill = default primary; signal pill on at most
-the single highest-value action per screen — many screens have none.
+**CTA discipline (v1.1, founder rulings 2026-06-11).** Signal spends once per
+VIEWPORT — never two Signal elements co-visible at any scroll position; sticky/fixed
+elements never carry Signal. The marketing CTA map:
+
+| Surface | CTA treatment |
+|---|---|
+| Hero primary | **signal** pill (Ink text) |
+| Final CTA | **signal** pill — its own viewport, never co-visible with the hero's |
+| Mid-page section CTAs | ink pill or ghost/link |
+| Pricing CTAs | ink pills (the featured ring spends that viewport's moment) |
+| Nav CTA | **secondary** (white pill) in ALL nav states |
+
+App screen: ink pill = default primary; signal pill on at most the single
+highest-value action per screen — many screens have none. New marketing layouts
+verify Signal co-visibility at 1440×900 and 1920×1080.
 
 ### Inputs
 
@@ -205,26 +217,33 @@ No border. No hover lift. Interactive cards: `transition-shadow duration-150` to
 slightly deeper `shadow-overlay` is permitted, or `hover:bg-card` tint via inner ring —
 prefer cursor + inner-content affordances. Featured card (pricing "Most chosen"):
 `ring-2 ring-signal` + a neutral "Most chosen" badge (`text-graphite` on Card, per the
-Badges spec) — the ring **is** the page's Signal moment. Badges never carry Signal,
-including here; the ring alone spends the moment.
-(Because the ring spends the page's Signal moment, pricing CTAs are ink pills.)
+Badges spec) — the ring **is** that viewport's Signal moment. Badges never carry
+Signal, including here; the ring alone spends the moment.
+(Because the ring spends the viewport's Signal moment, pricing CTAs are ink pills, and
+the pricing ring must never share a viewport with another Signal element — verify at
+1440×900 and 1920×1080.)
 
 ### Badges / label pills
 
 `rounded-full bg-paper (or bg-stone/50) px-3 py-1 text-label text-graphite`. Neutral
 always — badges never carry Signal (that would spend the accent).
 
-### Navigation — marketing (floating pill)
+### Navigation — marketing (spread-at-top → pill-on-scroll, v1.1 / D3-B)
 
 ```
-Fixed/sticky container, centered, mt-4
-Inner pill: bg-card rounded-[2rem] shadow-card h-14 px-2
-Contents: logo lockup · ≤5 nav links (text-body-sm text-graphite hover:text-ink) · signal pill CTA
+Sticky container, centered
+At page top:   full-content-width transparent row over Paper —
+               logo left · links + secondary CTA right. No fill, no shadow.
+Past ~64px:    contracts into the centered floating pill —
+               bg-card rounded-nav shadow-card h-14, shadow deepens one step
+Contents: logo lockup · ≤5 nav links (text-body-sm text-graphite hover:text-ink) · SECONDARY pill CTA
 ```
 
-Always a pill from load (no variant morph — our hero is light; Dialog's dark-over-hero
-swap has no equivalent here). After 8px scroll the shadow deepens one step, 200ms
-ease-out. Mobile: pill collapses to logo + hamburger → full-screen Sheet.
+200ms ease-out morph. LIGHT-ONLY — no dark variant, no color morph; the CTA stays
+**secondary** (white pill) in both states (nav is sticky = co-visible with everything,
+so it never carries Signal — §2). `prefers-reduced-motion`: the two states SNAP, no
+transition. Both states must be fully functional without JS (the scroll listener is
+enhancement only). Mobile: logo + hamburger → full-screen Sheet.
 
 ### Navigation — app shell
 
@@ -290,7 +309,7 @@ adds the initial-hidden state, never the markup.
 | Overlay enter | 250ms | ease-out | Fade + slight upward translate |
 | Hero simulation step | 800ms/step | ease-in-out | Sequential states, 2s pause at loop end |
 | Carousel auto-drift | ≥60s/loop | linear | Pauses on hover/focus; off under reduced-motion |
-| Nav shadow gain | 200ms | ease-out | After 8px scroll |
+| Nav spread→pill morph | 200ms | ease-out | Past ~64px scroll; SNAPS under reduced-motion |
 
 ### Brand-matched replacements for Dialog's motion (M-series, locked)
 
@@ -300,7 +319,7 @@ adds the initial-hidden state, never the markup.
 | M2 | Autoplay hero MP4 | **Animated product simulation** in the mockup frame: real Trochia surface stepping through 3–4 states, 800ms/step, 2s loop pause. CSS/SVG + existing Framer Motion. Zero video bytes. | Static composed end-state |
 | M3 | 60.8s testimonial marquee | **Proof-of-work carousel** (§7) | No drift; manual scroll |
 | M4 | Framer appear effects | IntersectionObserver fade-up, 300ms, once | Content visible, no reveal |
-| M5 | Nav dark→light variant swap | Always-pill nav + shadow gain at 8px | Shadow toggles untransitioned |
+| M5 | Nav dark→light variant swap | Spread-at-top → pill-on-scroll morph at ~64px (light-only, no color morph; CTA stays secondary in both states), 200ms ease-out | The two states SNAP, no transition |
 | M6 | Lottie play/pause icons | Not adopted — no Lottie dependency. SVG icon swap if a pause control ships. | — |
 | M7 | Hover micro-interactions | Current contract kept (timing table) | Kill-switch applies |
 
@@ -334,7 +353,8 @@ touch targets ≥44px (`h-11`; `h-12` on mobile) · text never rendered as image
 
 **Do**
 - Geist 300 exclusively for display/heading-lg (≥50px); 400 below; never bold display.
-- Signal on the primary CTA pill only — one moment per surface.
+- Signal on conversion-CTA pills only — once per VIEWPORT, never two Signal elements
+  co-visible at any scroll position; sticky/fixed elements never carry Signal.
 - `bg-paper` canvas, `bg-card` raised surfaces — all section variation from this swap.
 - All buttons pills; all inputs sharp; all cards 24px.
 - `shadow-card` on cards — single low-offset shadow, no stacks.
@@ -345,7 +365,7 @@ touch targets ≥44px (`h-11`; `h-12` on mobile) · text never rendered as image
 - Don't put Signal on text, icons, badges, borders, or backgrounds. The only two
   sanctioned non-CTA Signal uses in the system: the M1 hero halo (≤6% opacity radial,
   ambient — does not count as the moment) and the §7 featured-pricing ring (which SPENDS
-  that page's moment).
+  that viewport's moment).
 - Don't use pure `#000` anywhere, or `#FFFFFF` for anything but level-1 surfaces.
 - Don't give cards <24px radii, borders, hover-lifts, or gradients.
 - Don't round inputs.
@@ -368,12 +388,12 @@ Every tension between BRAND v1.0 / old DESIGN-REFERENCE and the Dialog system, s
 | C4 | Card surface | "Never pure #FFF" | White cards on near-white canvas | **Dialog two-tone.** `card: #FFFFFF` carve-out ratified in BRAND v1.1 — surface-only (cards/nav/overlays); canvas stays Paper; pure white never a text color. Never-pure-black stands with NO exceptions. |
 | C5 | Button shape | 8px rectangles | 28px pills | **Dialog.** All variants `rounded-full`. |
 | C6 | Input shape | 8px boxed | 0px sharp | **Dialog.** `rounded-none`; §7 Inputs spec; `border-graphite/40` at-rest pre-approved if QA flags affordance. |
-| C7 | Primary CTA color | Ink fill primary; Signal "sparing" | Orange is THE CTA | **Merge.** The one-Signal-moment rule now spends the moment on the primary CTA. Marketing: signal primary, ink retired. App: ink primary, signal ≤1/screen. |
+| C7 | Primary CTA color | Ink fill primary; Signal "sparing" | Orange is THE CTA | **Merge (v1.1, D1-B).** Signal spends once per VIEWPORT, on conversion anchors: marketing hero + final CTA = signal pills (never co-visible); mid-page and pricing CTAs = ink (UN-retired for those uses — the featured ring spends pricing's moment); nav CTA = secondary always. App: ink primary, signal ≤1/screen. |
 | C8 | CTA text color | `text-paper` on signal | `#000` on orange | **Dialog logic, Trochia token: Ink on Signal** (5.8:1 AA pass). Fixes the live 3.2:1 AA failure in pre-adoption `button.tsx`. |
 | C9 | Carousels | Banned | Core social-proof pattern | **Conditional adopt.** Exactly one (§7 proof-of-work carousel), native scroll-snap, pausable drift, reduced-motion-off. Ban stands everywhere else. |
 | C10 | Autoplay video | Banned | Hero is autoplay MP4 | **Ban stands.** Replacement M2 — animated real-UI simulation, zero video bytes. |
 | C11 | Gradients | Banned (one hero exception) | Peach/lavender orb glow | **Conditional adopt.** One static Signal-halo radial (≤6% opacity) behind the hero (M1). Ban stands for sections, buttons, text. |
-| C12 | Nav | Full-width sticky bar | Floating 32px pill | **Dialog.** Always-pill marketing nav (M5). App sidebar/top-bar structure unchanged; Phase B restyles surfaces. |
+| C12 | Nav | Full-width sticky bar | Floating 32px pill | **Dialog (v1.1, D3-B).** Spread-at-top → pill-on-scroll morph (M5), light-only, CTA secondary in both states. App sidebar/top-bar structure unchanged; Phase B restyles surfaces. |
 | C13 | Section variation | Hairline dividers on one canvas | Paper↔White band swaps | **Dialog.** Bands are the rhythm; dividers are punctuation within a band. |
 | C14 | Social proof | Testimonials post-design-partner; fake anything banned | Testimonial carousel with brand photography | **Trochia reality.** Carousel filled with real product cards, manifesto pull-quote, honest status line. No fabrication — real quotes swap in when they exist. |
 | C15 | Dialog palette | — | Tangerine, Dusty Rose, Peach Whisper, Deep Slate | **Not adopted.** Reference-only; Dialog's brand values stay Dialog's. |
@@ -393,8 +413,14 @@ Banned strings ("rolling fund," un-negated "investment advice" / "legal advice")
 This document evolves only by version bump with a dated changelog line. Conflict-register
 resolutions are binding until superseded by a later version. Code Reviewer rejects PRs
 that: hardcode hex/site URLs · use banned strings · violate §11 Don'ts · add Tailwind
-colors/fonts outside the token system · spend Signal more than once per surface.
+colors/fonts outside the token system · render two Signal elements co-visible in a
+viewport (incl. Signal on sticky/fixed elements).
 
+- **v1.1 — 2026-06-11.** Founder rulings 2026-06-11 (Phase A continue): **D1-B** —
+  Signal rule reworded from per-surface to PER-VIEWPORT (§2, §7 CTA discipline + map,
+  §11, §14); marketing CTA map recorded (hero + final = signal, mid-page/pricing = ink
+  un-retired, nav = secondary always); C7 updated. **D3-B** — marketing nav becomes
+  spread-at-top → pill-on-scroll morph, light-only (§7 Nav, §9 M5 + timing row, C12).
 - **v1.0 — 2026-06-11.** Initial canon. Dialog layout/experience adoption on Trochia
   tokens per `.planning/features/2026-06-11-design-adoption-PLAN.md` (founder-approved).
   Supersedes `docs/DESIGN-REFERENCE.md` v1.0.
