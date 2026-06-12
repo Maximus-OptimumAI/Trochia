@@ -33,7 +33,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: 'Which countries are supported?',
-    a: 'The US, UK, and India today. EU data residency lands at V2 (Phase 8). The pricing above is in USD; local currencies follow at V2.',
+    a: 'EU data residency is coming; US, UK, and India today. The pricing above is in USD; local currencies follow.',
   },
   {
     q: 'Will Trochia send emails on my behalf?',
