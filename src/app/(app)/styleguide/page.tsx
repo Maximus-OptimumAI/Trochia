@@ -622,7 +622,11 @@ export default function StyleguidePage() {
           and is OFF under reduced-motion. Sanctioned for the social-proof section ONLY (§7/C9) —
           the live implementation is <code className="text-mono-sm">proof-carousel.tsx</code>.
         </p>
-        <ul className="flex snap-x snap-mandatory gap-6 overflow-x-auto pb-4" aria-label="Carousel frame demo">
+        <ul
+          tabIndex={0}
+          className="flex snap-x snap-mandatory gap-6 overflow-x-auto pb-4 outline-none focus-visible:ring-2 focus-visible:ring-ink/40"
+          aria-label="Carousel frame demo"
+        >
           {['Product surface card', 'Pull-quote card', 'Status card', 'Peek…'].map((label) => (
             <li
               key={label}

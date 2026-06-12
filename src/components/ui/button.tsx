@@ -1,4 +1,6 @@
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
+import { mergeProps } from "@base-ui/react/merge-props"
+import { useRender } from "@base-ui/react/use-render"
 import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
@@ -58,6 +60,29 @@ const buttonVariants = cva(
   }
 )
 
+/**
+ * Rendered (non-<button>) path: `render={<Link/>}` etc. keeps the element's
+ * OWN semantics — an anchor stays role "link" (CDX-20). The button primitive
+ * is bypassed entirely (it would either log a nativeButton console error or
+ * force role="button" onto the anchor); navigation elements don't need
+ * button keyboard wiring — anchors handle Enter natively.
+ */
+function RenderedButton({
+  className,
+  render,
+  props,
+}: {
+  className: string
+  render: useRender.RenderProp
+  props: Record<string, unknown>
+}) {
+  return useRender({
+    defaultTagName: "a",
+    props: mergeProps<"a">({ className, "data-slot": "button" } as never, props),
+    render,
+  })
+}
+
 function Button({
   className,
   variant,
@@ -66,14 +91,21 @@ function Button({
   nativeButton,
   ...props
 }: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+  const cls = cn(buttonVariants({ variant, size, className }))
+  if (render) {
+    return (
+      <RenderedButton
+        className={cls}
+        render={render as useRender.RenderProp}
+        props={props as Record<string, unknown>}
+      />
+    )
+  }
   return (
     <ButtonPrimitive
       data-slot="button"
-      render={render}
-      // render={<Link/>} (and other non-<button> renders) must opt out of
-      // native-button semantics or Base UI logs a console error per instance
-      nativeButton={nativeButton ?? !render}
-      className={cn(buttonVariants({ variant, size, className }))}
+      nativeButton={nativeButton}
+      className={cls}
       {...props}
     />
   )
