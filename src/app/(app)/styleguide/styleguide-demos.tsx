@@ -218,7 +218,7 @@ export function MotionExamples() {
     <div className="grid gap-4 md:grid-cols-2">
       <MotionExample label="Hover transition" duration="120ms" easing="ease-out">
         {() => (
-          <button className="rounded-lg bg-ink px-6 py-2 text-body-sm font-medium text-paper transition-colors duration-150 hover:bg-signal">
+          <button className="rounded-full bg-ink px-6 py-2 text-body-sm font-medium text-paper transition-colors duration-150 hover:bg-ink/90">
             Hover me
           </button>
         )}
@@ -259,7 +259,7 @@ export function MotionExamples() {
             initial={reduced ? false : { opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
-            className="rounded-xl border border-stone bg-paper px-6 py-3 text-body-sm text-ink shadow-[0_8px_24px_rgba(10,14,26,0.08)]"
+            className="rounded-3xl bg-card px-6 py-3 text-body-sm text-ink shadow-overlay"
           >
             Modal surface entering
           </motion.div>
@@ -267,44 +267,44 @@ export function MotionExamples() {
       </MotionExample>
 
       <MotionExample
-        label="Hero live-element loop"
+        label="Hero simulation steps (M2 — brief drafting)"
         duration="800ms/step · 2s pause"
         easing="ease-in-out"
       >
-        {(reduced) => <HeroTimelineLoop reduced={reduced} />}
+        {(reduced) => <BriefDraftLoop reduced={reduced} />}
       </MotionExample>
     </div>
   );
 }
 
-const STEPS = ['Memory', 'Pitch Lab', 'Pipeline', 'Live Raise', 'Close'];
+/* Replaces the retired HeroTimeline demo (design-adoption A10): the M2
+   hero-mockup drafting rhythm — sections fading in sequentially, looping with
+   a pause. No Signal in the loop (Signal is never decoration, DESIGN.md §11). */
+const DRAFT_LINES = ['Why this investor', 'Talking points', 'From your memory'];
 
-function HeroTimelineLoop({ reduced }: { reduced: boolean }) {
+function BriefDraftLoop({ reduced }: { reduced: boolean }) {
+  const cycle = DRAFT_LINES.length * 0.8 + 2;
   return (
-    <div className="flex items-center gap-2">
-      {STEPS.map((label, i) => (
-        <span key={label} className="flex items-center gap-2">
-          <motion.span
-            className="rounded-full px-3 py-1 text-mono-sm"
-            initial={false}
-            animate={
-              reduced
-                ? { backgroundColor: '#0A0E1A', color: '#FAFAF7' }
-                : {
-                    backgroundColor: ['#ECEAE3', '#0A0E1A', '#F25C2A', '#ECEAE3'],
-                    color: ['#6B7280', '#FAFAF7', '#FAFAF7', '#6B7280'],
-                  }
-            }
-            transition={
-              reduced
-                ? { duration: 0 }
-                : { duration: 0.8, delay: i * 0.8, repeat: Infinity, repeatDelay: 2 + (STEPS.length - 1 - i) * 0.8 }
-            }
-          >
-            {label}
-          </motion.span>
-          {i < STEPS.length - 1 && <span className="text-graphite">→</span>}
-        </span>
+    <div className="flex flex-col gap-1.5">
+      {DRAFT_LINES.map((label, i) => (
+        <motion.span
+          key={label}
+          className="text-mono-sm text-graphite uppercase"
+          initial={false}
+          animate={reduced ? { opacity: 1 } : { opacity: [0, 1, 1, 0] }}
+          transition={
+            reduced
+              ? { duration: 0 }
+              : {
+                  duration: cycle,
+                  times: [i * 0.1, i * 0.1 + 0.15, 0.92, 1],
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                }
+          }
+        >
+          {label}
+        </motion.span>
       ))}
     </div>
   );
