@@ -268,6 +268,10 @@
 .reveal-hidden {
   opacity: 0;
   transform: translateY(8px);
+  /* keep hidden content out of the tab order + a11y tree while unrevealed
+     (CDX-10); visibility flips to visible instantly on class removal, so the
+     opacity/transform transition still plays */
+  visibility: hidden;
 }
 .reveal-ready {
   transition:

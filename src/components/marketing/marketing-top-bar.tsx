@@ -48,10 +48,13 @@ export function MarketingTopBar() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 px-4 pt-4 sm:px-6">
+    // pointer-events-none on the full-width sticky band so the transparent
+    // gutters beside the contracted pill never intercept clicks (CDX-13);
+    // the inner nav row re-enables hit-testing.
+    <header className="pointer-events-none sticky top-0 z-40 px-4 pt-4 sm:px-6">
       <div
         className={cn(
-          'mx-auto flex h-14 items-center justify-between rounded-nav transition-[max-width,background-color,box-shadow,padding] duration-200 ease-out',
+          'pointer-events-auto mx-auto flex h-14 items-center justify-between rounded-nav transition-[max-width,background-color,box-shadow,padding] duration-200 ease-out',
           scrolled
             ? 'max-w-[780px] bg-card pr-2 pl-4 shadow-card sm:pl-5'
             : 'max-w-content bg-transparent px-0 shadow-none'

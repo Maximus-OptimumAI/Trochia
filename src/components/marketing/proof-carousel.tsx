@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { Pause, Play } from 'lucide-react';
 import { Reveal } from '@/components/marketing/reveal';
 
 /**
@@ -20,14 +21,32 @@ import { Reveal } from '@/components/marketing/reveal';
  */
 const DRIFT_FULL_TRAVERSAL_MS = 60_000;
 
+/**
+ * Drift lifecycle (CDX-11/CDX-12): an explicit pause/play button is the
+ * user-operable stop WCAG 2.2.2 requires for >5s moving content. On top of
+ * that, hover/focus pause the drift transiently, and ANY direct interaction
+ * (pointerdown/wheel/keys on the scroller) stops it permanently — the user
+ * took control, the carousel never wrestles it back. Reduced-motion: no
+ * drift at all and the control is not rendered (manual scroll remains).
+ */
 function DriftScroller({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLUListElement>(null);
-  const paused = useRef(false);
+  const hovered = useRef(false);
+  const stopped = useRef(false);
+  const [playing, setPlaying] = useState(true);
+  const [reduced, setReduced] = useState(true); // assume reduced until mount (no control SSR'd)
+
+  useEffect(() => {
+    // rAF defer — avoids a synchronous setState inside the effect body
+    const id = requestAnimationFrame(() =>
+      setReduced(window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+    );
+    return () => cancelAnimationFrame(id);
+  }, []);
 
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (!el || reduced) return;
 
     let raf = 0;
     let last = performance.now();
@@ -35,39 +54,62 @@ function DriftScroller({ children }: { children: React.ReactNode }) {
       const dt = now - last;
       last = now;
       const max = el.scrollWidth - el.clientWidth;
-      if (!paused.current && max > 0 && el.scrollLeft < max) {
+      if (playing && !hovered.current && !stopped.current && max > 0 && el.scrollLeft < max) {
         el.scrollLeft += (max / DRIFT_FULL_TRAVERSAL_MS) * dt;
       }
       raf = requestAnimationFrame(step);
     };
     raf = requestAnimationFrame(step);
 
-    const pause = () => (paused.current = true);
-    const resume = () => (paused.current = false);
-    el.addEventListener('pointerenter', pause);
-    el.addEventListener('pointerleave', resume);
-    el.addEventListener('pointerdown', pause);
-    el.addEventListener('focusin', pause);
-    el.addEventListener('focusout', resume);
+    const hoverOn = () => (hovered.current = true);
+    const hoverOff = () => (hovered.current = false);
+    const stop = () => {
+      stopped.current = true;
+      setPlaying(false);
+    };
+    el.addEventListener('pointerenter', hoverOn);
+    el.addEventListener('pointerleave', hoverOff);
+    el.addEventListener('pointerdown', stop);
+    el.addEventListener('wheel', stop, { passive: true });
+    el.addEventListener('keydown', stop);
+    el.addEventListener('focusin', hoverOn);
+    el.addEventListener('focusout', hoverOff);
     return () => {
       cancelAnimationFrame(raf);
-      el.removeEventListener('pointerenter', pause);
-      el.removeEventListener('pointerleave', resume);
-      el.removeEventListener('pointerdown', pause);
-      el.removeEventListener('focusin', pause);
-      el.removeEventListener('focusout', resume);
+      el.removeEventListener('pointerenter', hoverOn);
+      el.removeEventListener('pointerleave', hoverOff);
+      el.removeEventListener('pointerdown', stop);
+      el.removeEventListener('wheel', stop);
+      el.removeEventListener('keydown', stop);
+      el.removeEventListener('focusin', hoverOn);
+      el.removeEventListener('focusout', hoverOff);
     };
-  }, []);
+  }, [reduced, playing]);
 
   return (
-    <ul
-      ref={ref}
-      tabIndex={0}
-      aria-label="Proof of work — Trochia product surfaces"
-      className="-mx-6 flex snap-x snap-mandatory gap-6 overflow-x-auto px-6 pb-4 outline-none focus-visible:ring-2 focus-visible:ring-ink/40 md:-mx-12 md:px-12"
-    >
-      {children}
-    </ul>
+    <div className="relative">
+      <ul
+        ref={ref}
+        tabIndex={0}
+        aria-label="Proof of work — Trochia product surfaces"
+        className="-mx-6 flex snap-x snap-mandatory gap-6 overflow-x-auto px-6 pb-4 outline-none focus-visible:ring-2 focus-visible:ring-ink/40 md:-mx-12 md:px-12"
+      >
+        {children}
+      </ul>
+      {!reduced && (
+        <button
+          type="button"
+          aria-label={playing ? 'Pause auto-scroll' : 'Resume auto-scroll'}
+          onClick={() => {
+            stopped.current = false;
+            setPlaying((p) => !p);
+          }}
+          className="mt-2 inline-flex size-9 items-center justify-center rounded-full border border-stone bg-paper text-graphite transition-colors duration-150 outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-ink/40"
+        >
+          {playing ? <Pause className="size-4" aria-hidden /> : <Play className="size-4" aria-hidden />}
+        </button>
+      )}
+    </div>
   );
 }
 
