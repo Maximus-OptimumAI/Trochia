@@ -33,14 +33,14 @@ const SECTIONS = [
   {
     label: 'Talking points',
     lines: [
-      'Open with the activation metric — it matches the thesis in her latest fund letter.',
+      'Open with the activation metric: it matches the thesis in her latest fund letter.',
       'Your CAC math answers her standard objection on paid acquisition.',
       'Ask about her March note on vertical AI operators. It overlaps directly with your roadmap.',
     ],
   },
   {
     label: 'From your memory',
-    chips: ['Deck v4 — traction slide', 'Call notes — 2 Jun', 'Pricing memo'],
+    chips: ['Deck v4 · traction slide', 'Call notes · 2 Jun', 'Pricing memo'],
   },
 ] as const;
 
@@ -90,7 +90,7 @@ export function HeroMockup() {
         </div>
 
         <div className="flex flex-col gap-1">
-          <p className="text-h4 font-geist text-ink">Dana Okafor — Crestline Ventures</p>
+          <p className="text-h4 font-geist text-ink">Dana Okafor, Crestline Ventures</p>
           <p className="text-body-sm text-graphite">
             Partner · pre-seed/seed B2B · Thursday 14:00 call
           </p>

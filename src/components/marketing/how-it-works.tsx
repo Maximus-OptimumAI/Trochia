@@ -23,9 +23,9 @@ const STEPS: { num: string; title: string; body: string; panel: Panel }[] = [
   {
     num: '01',
     title: 'Drop your context',
-    body: 'Paste your existing AI context — ChatGPT instructions, Claude project notes, a Notion brief. Trochia builds your Business Memory from it.',
+    body: 'Paste your existing AI context: ChatGPT instructions, Claude project notes, a Notion brief. Trochia builds your Business Memory from it.',
     panel: {
-      title: 'Business Memory — confirm what Trochia read',
+      title: 'Business Memory · confirm what Trochia read',
       rows: [
         { primary: 'Stage', secondary: 'Pre-seed, raising $750K', meta: 'confirmed' },
         { primary: 'Traction', secondary: '212 weekly actives, 9% w/w', meta: 'confirmed' },
@@ -39,7 +39,7 @@ const STEPS: { num: string; title: string; body: string; panel: Panel }[] = [
     title: 'Trochia matches investors',
     body: 'A ranked list of VCs and accelerators scored against your sector, stage, and check size. One-line rationale per match. You decide who is in.',
     panel: {
-      title: 'Investor Pipeline — top matches',
+      title: 'Investor Pipeline · top matches',
       rows: [
         { primary: 'Crestline Ventures', secondary: 'Leads pre-seed B2B; 3 portfolio adjacents', meta: '0.91' },
         { primary: 'Harbor Field Capital', secondary: 'Writes $100–250K first checks at your stage', meta: '0.87' },
@@ -53,13 +53,13 @@ const STEPS: { num: string; title: string; body: string; panel: Panel }[] = [
     title: 'Run your pitches',
     body: 'Pre-call briefs from the partner’s recent posts and portfolio, post-call follow-ups grounded in the transcript. You approve every send.',
     panel: {
-      title: 'Live Raise — follow-up draft',
+      title: 'Live Raise · follow-up draft',
       rows: [
-        { primary: 'To: Dana Okafor', secondary: 'Re: Thursday — the trailer-axle question', meta: 'draft' },
+        { primary: 'To: Dana Okafor', secondary: 'Re: Thursday, the trailer-axle question', meta: 'draft' },
         { primary: 'Attached', secondary: 'Cohort table the call asked for', meta: 'draft' },
         { primary: 'Grounded in', secondary: 'Call transcript · Deck v4', meta: 'cited' },
       ],
-      footer: 'Awaiting your approval — Trochia never sends on its own.',
+      footer: 'Awaiting your approval. Trochia never sends on its own.',
     },
   },
   {
@@ -67,13 +67,13 @@ const STEPS: { num: string; title: string; body: string; panel: Panel }[] = [
     title: 'Close',
     body: 'Generate SAFEs from your template, track signatures, and watch the cap table update. The round closes through one operator.',
     panel: {
-      title: 'Raise Ops — cap table',
+      title: 'Raise Ops · cap table',
       rows: [
         { primary: 'Founders', secondary: 'Common', meta: '83.4%' },
         { primary: 'SAFE round', secondary: '$750K post-money', meta: '11.1%' },
         { primary: 'Option pool', secondary: 'Reserved', meta: '5.5%' },
       ],
-      footer: 'Deterministic math — unit-tested, never inferred by a model.',
+      footer: 'Deterministic math: unit-tested, never inferred by a model.',
     },
   },
 ];

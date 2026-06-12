@@ -15,12 +15,12 @@ import { Reveal } from '@/components/marketing/reveal';
 const MODULES: { name: string; body: string; href: string }[] = [
   {
     name: 'Business Memory',
-    body: 'The shared spine. Trochia ingests your existing AI context — paste or upload — and builds a normalized memory every other module reads from.',
+    body: 'The shared spine. Trochia ingests your existing AI context (paste or upload) and builds a normalized memory every other module reads from.',
     href: '/pricing',
   },
   {
     name: 'Pitch Lab',
-    body: 'Drop your deck. Trochia returns slide-level issues — factual gaps, vague language, missing context — with suggested rewrites you can accept or reject.',
+    body: 'Drop your deck. Trochia returns slide-level issues (factual gaps, vague language, missing context) with suggested rewrites you can accept or reject.',
     href: '/pricing',
   },
   {
@@ -35,7 +35,7 @@ const MODULES: { name: string; body: string; href: string }[] = [
   },
   {
     name: 'Data Room',
-    body: 'Vertical-aware checklists, Drive-orchestrated folders, per-investor share links, and access analytics — Trochia stores metadata, never your files.',
+    body: 'Vertical-aware checklists, Drive-orchestrated folders, per-investor share links, and access analytics. Trochia stores metadata, never your files.',
     href: '/pricing',
   },
   {
@@ -71,7 +71,7 @@ function AppShellPanel() {
           ))}
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-3 p-5">
-          <p className="text-mono-sm text-graphite uppercase">Memory — 28 confirmed facts</p>
+          <p className="text-mono-sm text-graphite uppercase">Memory · 28 confirmed facts</p>
           {[
             ['Positioning', 'Agentic operator for the raise'],
             ['Round', '$750K pre-seed, $6M cap'],
@@ -104,7 +104,7 @@ export function ModulesGrid() {
             </p>
             <h2 className="text-heading-lg text-ink">Six modules. One memory.</h2>
             <p className="max-w-prose text-body text-graphite">
-              Everything reads from the same Business Memory — the deck reviewer, the
+              Everything reads from the same Business Memory: the deck reviewer, the
               investor matcher, the call briefs, the cap table. Confirm a fact once and
               every module knows it.
             </p>

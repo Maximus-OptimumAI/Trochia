@@ -91,7 +91,7 @@ function DriftScroller({ children }: { children: React.ReactNode }) {
       <ul
         ref={ref}
         tabIndex={0}
-        aria-label="Proof of work — Trochia product surfaces"
+        aria-label="Proof of work: Trochia product surfaces"
         className="-mx-6 flex snap-x snap-mandatory gap-6 overflow-x-auto px-6 pb-4 outline-none focus-visible:ring-2 focus-visible:ring-ink/40 md:-mx-12 md:px-12"
       >
         {children}
@@ -138,7 +138,7 @@ export function ProofCarousel() {
           <DriftScroller>
             {/* 1 — real surface: memory Q&A (live in the product today) */}
             <ProofCard>
-              <p className="text-mono-sm text-graphite uppercase">Business Memory — ask</p>
+              <p className="text-mono-sm text-graphite uppercase">Business Memory · ask</p>
               <p className="text-body font-medium text-ink">
                 &ldquo;What did we tell investors about churn?&rdquo;
               </p>
@@ -148,7 +148,7 @@ export function ProofCarousel() {
                 sources attached.
               </p>
               <div className="mt-auto flex flex-wrap gap-2">
-                {['Memory — churn', 'Update — 28 May'].map((chip) => (
+                {['Memory · churn', 'Update · 28 May'].map((chip) => (
                   <span
                     key={chip}
                     className="rounded-full border border-stone bg-card px-3 py-1 text-mono-sm text-graphite"
@@ -161,14 +161,14 @@ export function ProofCarousel() {
 
             {/* 2 — real surface: deck review finding (Pitch Lab output shape) */}
             <ProofCard>
-              <p className="text-mono-sm text-graphite uppercase">Pitch Lab — slide 7</p>
+              <p className="text-mono-sm text-graphite uppercase">Pitch Lab · slide 7</p>
               <p className="text-body font-medium text-ink">
                 &ldquo;Huge market&rdquo; is doing no work on this slide.
               </p>
               <p className="text-body-sm text-graphite">
                 Flagged: vague sizing language, no bottom-up number. Suggested rewrite
                 anchors the TAM to your 212 weekly actives and the per-seat price you
-                already charge. Accept or reject — slide by slide.
+                already charge. Accept or reject, slide by slide.
               </p>
               <p className="text-mono-sm mt-auto text-graphite">finding 3 of 11 · deck v4</p>
             </ProofCard>
@@ -194,7 +194,7 @@ export function ProofCarousel() {
               <p className="text-body font-medium text-ink">Built in public, in order.</p>
               <p className="text-body-sm text-graphite">
                 Business Memory and its Q&amp;A layer are live today. Pitch Lab is in
-                build. 25 design-partner seats open at the Live Raise milestone — founder
+                build. 25 design-partner seats open at the Live Raise milestone. Founder
                 quotes will appear here when they are real, not before.
               </p>
               <p className="text-mono-sm mt-auto text-graphite">updated June 2026</p>

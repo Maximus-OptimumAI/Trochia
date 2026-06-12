@@ -51,7 +51,7 @@ export default function ManifestoPage() {
             ones who matter. Drafts cold outreach without sounding cold. Walks into a partner
             meeting having read three things the partner wrote. Comes out, runs the
             transcript, writes the follow-up before the next founder eats their slot. Sends
-            a SAFE — the right SAFE — to the right person and watches it come back signed.
+            a SAFE (the right SAFE) to the right person and watches it come back signed.
             Updates the cap table without breaking it. Keeps the F&amp;F round legal. Closes.
           </p>
           <p className={PARAGRAPH}>
@@ -69,7 +69,7 @@ export default function ManifestoPage() {
           <p className={PARAGRAPH}>
             A founder talks to a general AI every day for a year. The model knows you better
             than your last hire. Then you walk into the actual raise and the tools that
-            matter — the deck reviewer, the investor researcher, the SAFE drafter — know
+            matter (the deck reviewer, the investor researcher, the SAFE drafter) know
             none of that. You paste your business in again. You explain the round again.
             You explain who the customer is again. The deck reviewer suggests rewrites that
             sound generic because to it, your business is generic.
@@ -118,7 +118,7 @@ export default function ManifestoPage() {
             The shape of the answer is not another chatbot. It is an operator.
           </p>
           <p className={PARAGRAPH}>
-            An operator owns work — not advice. An operator carries the memory. The operator
+            An operator owns work, not advice. An operator carries the memory. The operator
             knows that you are a fintech, pre-seed, raising $1.5M, that the lead you want is
             the one who invested in three of your competitors, that the call on Thursday is
             with a partner who wrote a thesis about exactly this category last month. The
@@ -143,14 +143,14 @@ export default function ManifestoPage() {
           <h2 className={SUBHEAD}>Memory is the moat</h2>
           <p className={PARAGRAPH}>Six modules. One memory.</p>
           <p className={PARAGRAPH}>
-            Business Memory holds who you are — the company, the customer, the metrics that
+            Business Memory holds who you are: the company, the customer, the metrics that
             move, the milestones. It is built from the same context you already have
             somewhere: a custom-instructions block, a project notebook, a Notion page. You
             paste or upload, Trochia extracts a structured record, you confirm each field.
             From that point on, every other module reads from it.
           </p>
           <p className={PARAGRAPH}>
-            Pipeline Memory holds who you are talking to — the investor, the accelerator,
+            Pipeline Memory holds who you are talking to: the investor, the accelerator,
             the stage, the last touch, the transcript, the commitment. It updates as you
             move. When you generate a SAFE the cap table sees it. When you ingest a
             transcript the follow-up drafter reads it. The pipeline kanban moves itself
@@ -181,7 +181,7 @@ export default function ManifestoPage() {
 
           <h2 className={SUBHEAD}>What founders pay for</h2>
           <p className={PARAGRAPH}>
-            Trochia is a tool founders pay for during the raise — not a permanent
+            Trochia is a tool founders pay for during the raise, not a permanent
             subscription. The tiers reflect that.
           </p>
           <p className={PARAGRAPH}>
@@ -192,7 +192,7 @@ export default function ManifestoPage() {
           </p>
           <p className={PARAGRAPH}>
             There is no permanent free tier because a permanent free tier dilutes the buyer
-            pool — and because founders running a real raise are happy to pay for something
+            pool, and because founders running a real raise are happy to pay for something
             that compresses six tools into one. A 7-day trial with card on file is enough
             to see whether the operator-memory fit is real.
           </p>

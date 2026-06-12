@@ -37,7 +37,7 @@ const FEATURE_MATRIX: { feature: string; tiers: Record<string, true | false | st
     tiers: { 'pre-raise': true, 'active-raise': true, 'close-mode': true, alumni: false },
   },
   {
-    feature: 'Pitch Lab — deck reviews',
+    feature: 'Pitch Lab: deck reviews',
     tiers: {
       'pre-raise': '3 / month',
       'active-raise': 'Unlimited',
@@ -94,7 +94,7 @@ export default function PricingPage() {
               Pay for the raise you are running.
             </h1>
             <p className="max-w-xl text-body text-graphite">
-              Trochia is a tool founders pay for during the raise — not a permanent
+              Trochia is a tool founders pay for during the raise, not a permanent
               subscription. Start at $49 to set up the memory; step up to $199 when the
               round is active.
             </p>

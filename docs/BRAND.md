@@ -1,4 +1,4 @@
-# Trochia AI — Brand System v1.2
+# Trochia AI — Brand System v1.3
 
 The agentic operator for your raise. From Greek τροχιά (trochiá): track, path, trajectory, orbit. Every visual decision encodes motion forward.
 
@@ -73,6 +73,7 @@ Operator, not assistant. Direct, founder-grade. No emoji. No "AI buddy" tone.
 - Short sentences. Concrete nouns. Verbs that move.
 - Trochia "drafts," "matches," "briefs," "tracks." Trochia does not "feel," "love," or "want."
 - Strategy doc forbids: "investment advice," "legal advice," "rolling fund." These never appear in product or marketing copy.
+- User-facing prose never uses em-dashes (—). Restructure with periods, commas, colons, or parentheses. En-dashes (–) only inside numeric ranges ($100–250K). Middots (·) remain UI meta-separators, not prose.
 
 ---
 
@@ -119,6 +120,7 @@ trochia-brand/
 
 ---
 
+*v1.3 — 2026-06-12. Voice rule added (founder, ghost round 2): user-facing prose never uses em-dashes; en-dashes only in numeric ranges; middots stay UI-only.*
 *v1.2 — 2026-06-11. Founder ruling D1-B: Signal discipline reworded from "one moment per surface" to "one moment per viewport" (operational definition in `docs/design/DESIGN.md` §2 v1.1).*
 *v1.1 — 2026-06-11. Dialog layout-system adoption (founder-approved, `.planning/features/2026-06-11-design-adoption-PLAN.md`): Display typography moves to Geist Light (300/400) at the 32/50/70px scale, replacing Geist 600; Card `#FFFFFF` surface-only carve-out ratified. Component/layout/motion law lives in `docs/design/DESIGN.md`.*
 *v1.0 — May 2026. Initial brand system. This document evolves as the brand expands. Updates require a version bump.*

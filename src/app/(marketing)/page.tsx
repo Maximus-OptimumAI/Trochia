@@ -26,7 +26,7 @@ import { PricingCards } from '@/components/marketing/pricing-cards';
  * stays an exit gate.
  */
 export const metadata: Metadata = {
-  title: 'Trochia — the agentic operator for your raise',
+  title: 'Trochia · the agentic operator for your raise',
   description:
     'Trochia holds your business memory, finds the right investors, drafts your outreach, and closes the round. From F&F to Series A.',
 };
