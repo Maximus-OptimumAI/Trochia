@@ -259,3 +259,17 @@ Phase B ships as its own branch/PR after Phase A lands and the founder approves 
 
 **STOP point reached.** Founder reviews this plan; implementation begins on approval, Task 0 first.
 *2026-06-11 (later): Task 0 shipped (canon ratified through `411dec1`). Phase A implementation authorized with session decisions (inline logo + entrance, graphite eyebrow, Signal-pill hero CTA, real mockup, honest carousel). First slice: A1–A5 (through nav + hero), then founder visual + copy review.*
+*2026-06-11 (later still): founder rulings D1-B (per-viewport Signal → canon v1.1 + BRAND v1.2), D2-B (trust line), D3-B (nav morph). A6–A8 implemented. A9/A10 pending.*
+
+---
+
+## Followup ledger
+
+| ID | Item | Slot |
+|---|---|---|
+| ONBOARDING-WIZARD-01 | Redesign memory intake as the Dialog-style wizard (REFERENCE-dialog.md Part 2): one-question-per-screen, extraction-prefilled confirm screens, facet CHIPS mapping to labeled memory chunks, readiness checklist over the Inngest embed pipeline, post-onboarding banner = the existing memory CTA (ui-bundle C3). | After Phase B shell |
+| PLAYGROUND-01 | Idea-stage: "test your raise Q&A" surface over `qa.ask` (Dialog's Playground analog). | Backlog |
+| A9-QUEUE-01 | Sitewide `nativeButton` console-error fix in `button.tsx` (`render={<Link/>}` pattern). | A9 |
+| A9-QUEUE-02 / HARDCODED-DOMAIN-REGEX-01 | Make the two domain tests hermetic — stub BOTH `NEXT_PUBLIC_SITE_URL` and `NEXT_PUBLIC_APP_URL` in-test (checkout-session + email tests currently inherit `.env.local` when `.env.test` is absent). | A9 |
+| A9-QUEUE-03 | Delete untracked `.playwright-mcp/` before the PR. | Pre-PR |
+| A9-QUEUE-04 | Manifesto pull-quote treatment uses a Signal left-border bar — violates §11 v1.1 (Signal never borders); restyle to ink bar during A9 cascade QA. | A9 |

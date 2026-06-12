@@ -440,3 +440,31 @@ Max-width ~1200px centered on a #f7f7f7 full-bleed background. Hero is a center-
   --shadow-subtle-2: rgba(0, 0, 0, 0.04) 0px 1px 2px 0px, rgba(0, 0, 0, 0.02) 0px 2px 4px 0px, rgba(0, 0, 0, 0.02) 0px 4px 8px 0px;
 }
 ```
+
+---
+
+## Part 2 — App & onboarding observations (founder screen recordings, 2026-06-11)
+
+> REFERENCE-ONLY, not law. Structural observations of Dialog's authed app and
+> onboarding flow, recorded for the Phase B shell restyle and the
+> ONBOARDING-WIZARD-01 followup. Trochia adopts mechanics, never Dialog's brand.
+
+- **Nav morph mechanics:** at page top the nav is a spread full-width row; on
+  scroll it contracts into the centered floating pill (the morph Trochia adopted
+  as M5/D3-B).
+- **Route transitions:** page content fades/staggers in on navigation; app pages
+  render skeletons first, then content replaces them in place.
+- **Auth:** split-screen — brand gradient panel left, form right.
+- **Onboarding:** one-question-per-screen over a soft gradient backdrop:
+  1. Store/site URL
+  2. Platform tiles (pick your stack)
+  3. AI-prefilled, editable "what should the assistant know" textarea
+  4. Specialization chips
+  5. Fallback contact
+  6. Guidelines
+  7. Billing step
+  8. "Getting ready" readiness checklist
+  9. Dashboard with an amber setup banner
+  - A "take your time to look around" toast covers the background analysis wait.
+- **App shell:** light sidebar; skeleton loaders; honest empty states; a
+  "Playground" surface for testing the assistant against your own data.
