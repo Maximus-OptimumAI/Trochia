@@ -10,8 +10,8 @@ test('homepage `/` renders the 8 sections with the operator-voice copy', async (
   const res = await page.goto('/');
   expect(res?.status()).toBe(200);
 
-  // 1 · Hero — H1 is the operator-voice copy; left-aligned (the headline block
-  // is not centered — only the final-CTA section is centered).
+  // 1 · Hero — H1 is the operator-voice copy; CENTER-stack per canon
+  // (docs/design/DESIGN.md §5 / C2, founder-locked in the design adoption).
   await expect(
     page.getByRole('heading', { level: 1, name: 'Run your raise from one operator.' })
   ).toBeVisible();
@@ -19,13 +19,26 @@ test('homepage `/` renders the 8 sections with the operator-voice copy', async (
   await expect(page.getByRole('link', { name: 'Start your raise' }).first()).toBeVisible();
   await expect(page.getByRole('link', { name: 'See how it works →' })).toBeVisible();
 
-  // 2 · Trust strip — honest placeholder (no "Trusted by")
-  await expect(page.getByText(/partnerships in progress/i)).toBeVisible();
+  // Honest trust line inside the hero (D2-B founder-ruled copy; names text-only)
+  await expect(page.getByText(/Techstars, Antler and beyond/i)).toBeVisible();
 
-  // 3 · How it works — section heading + step 01 + step 04
+  // Below-fold sections sit behind the M4 scroll reveal (visibility:hidden
+  // until intersection — DESIGN.md §9). Hidden elements leave the a11y tree,
+  // so role queries can't resolve them: scroll the whole page once (as a
+  // reader would) to fire every reveal, then assert.
+  await page.evaluate(async () => {
+    for (let y = 0; y <= document.body.scrollHeight; y += 600) {
+      window.scrollTo(0, y);
+      await new Promise((r) => setTimeout(r, 80));
+    }
+    window.scrollTo(0, 0);
+  });
+
+  // 3 · How it works — section heading + step 01 + step 04 (scoped to the list)
   await expect(page.getByRole('heading', { name: 'Four steps, one operator.' })).toBeVisible();
-  await expect(page.getByText('01', { exact: true })).toBeVisible();
-  await expect(page.getByText('04', { exact: true })).toBeVisible();
+  const steps = page.getByLabel('How Trochia works');
+  await expect(steps.getByText('01', { exact: true })).toBeVisible();
+  await expect(steps.getByText('04', { exact: true })).toBeVisible();
 
   // 4 · Modules — section heading + all 6 module names
   await expect(page.getByRole('heading', { name: 'Six modules. One memory.' })).toBeVisible();
@@ -40,9 +53,9 @@ test('homepage `/` renders the 8 sections with the operator-voice copy', async (
     await expect(page.getByRole('heading', { name: m, level: 3 })).toBeVisible();
   }
 
-  // 5 · Founder voices — placeholder
+  // 5 · Proof-of-work carousel (replaced the founder-voices placeholder, A7)
   await expect(
-    page.getByRole('heading', { name: /Quotes go here once founders ship\./i })
+    page.getByRole('heading', { name: 'What the operator produces.' })
   ).toBeVisible();
 
   // 6 · Pricing teaser — 4 tier names + "See full pricing →"
@@ -57,12 +70,12 @@ test('homepage `/` renders the 8 sections with the operator-voice copy', async (
   ).toBeVisible();
 });
 
-test('homepage hero is left-aligned (the headline block is NOT centered)', async ({ page }) => {
+test('homepage hero is the canonical center-stack (DESIGN.md §5 / C2)', async ({ page }) => {
   await page.goto('/');
   const h1 = page.getByRole('heading', { level: 1, name: 'Run your raise from one operator.' });
-  // The H1's parent container should not center-align text. We assert the
-  // computed text-align of the headline block is "left" or "start" (the
-  // default), not "center".
+  // C2 (founder-locked, design adoption 2026-06-11): the LANDING hero is
+  // center-aligned. The pre-adoption left-aligned contract is repealed —
+  // interior pages and app screens stay left-aligned, the landing hero does not.
   const align = await h1.evaluate((el) => {
     let node: HTMLElement | null = el as HTMLElement;
     while (node) {
@@ -72,7 +85,7 @@ test('homepage hero is left-aligned (the headline block is NOT centered)', async
     }
     return 'left';
   });
-  expect(['left', 'start', 'justify']).toContain(align);
+  expect(align).toBe('center');
 });
 
 test('/pricing renders all 4 tiers, badges, the Tabs toggle, the feature matrix, and the FAQ', async ({

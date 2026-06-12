@@ -20,7 +20,8 @@ import {
   Plus,
 } from 'lucide-react';
 
-import { Logo } from '@/components/brand/logo';
+import { Logo } from '@/components/brand/inline-logo';
+import { Reveal } from '@/components/marketing/reveal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -99,21 +100,22 @@ function Section({
 }
 
 const COLOR_TOKENS: { name: string; hex: string; role: string }[] = [
-  { name: 'paper', hex: '#FAFAF7', role: 'Page background — the default surface (never #FFF)' },
-  { name: 'ink', hex: '#0A0E1A', role: 'Primary text, primary-button bg, mark color (never #000)' },
-  { name: 'graphite', hex: '#6B7280', role: 'Secondary copy, muted labels, disabled nav' },
+  { name: 'paper', hex: '#FAFAF7', role: 'Page canvas — surface level 0 (never #FFF as canvas)' },
+  { name: 'card', hex: '#FFFFFF', role: 'Raised surfaces only (cards, nav pill, overlays) — the BRAND v1.1 surface-only carve-out; never a text color' },
+  { name: 'ink', hex: '#0A0E1A', role: 'Primary text, ink-pill bg, CTA text on Signal, mark color (never #000)' },
+  { name: 'graphite', hex: '#6B7280', role: 'Secondary copy ≥13px (never alpha-lightened for text), muted labels' },
   { name: 'stone', hex: '#ECEAE3', role: '1px hairline borders, dividers, soft fills, active nav bg' },
-  { name: 'signal', hex: '#F25C2A', role: 'THE single accent — one moment per surface' },
+  { name: 'signal', hex: '#F25C2A', role: 'THE accent — once per VIEWPORT, conversion CTAs only (DESIGN.md §2 v1.1)' },
   { name: 'success', hex: '#0F9D58', role: 'Positive states, pricing checkmarks' },
   { name: 'warning', hex: '#E5A100', role: 'Caution states' },
   { name: 'danger', hex: '#E53935', role: 'Errors, destructive actions, input error borders' },
 ];
 
 const TYPE_CLASSES: { cls: string; node: ReactNode; meta: string }[] = [
-  { cls: 'text-display', node: <p className="text-display text-ink">Run your raise from one operator.</p>, meta: 'Geist 600 · ~4rem · -2% tracking · line-height 1.05 · hero H1 only' },
-  { cls: 'text-h2', node: <p className="text-h2 font-geist text-ink">Section headline</p>, meta: 'Geist 600 · ~2.5rem · -1% tracking · line-height 1.1' },
-  { cls: 'text-h3', node: <p className="text-h3 font-geist text-ink">Card title / sub-section header</p>, meta: 'Geist 500 · ~1.625rem · line-height 1.25' },
-  { cls: 'text-h4', node: <p className="text-h4 font-geist text-ink">Inline emphasis</p>, meta: 'Geist 500 · ~1.25rem · line-height 1.3' },
+  { cls: 'text-display', node: <p className="text-display text-ink">Run your raise from one operator.</p>, meta: 'Geist LIGHT 300 · clamp 44→70px · -0.01em · line-height 1.15 · hero H1 only (BRAND v1.1)' },
+  { cls: 'text-heading-lg', node: <p className="text-heading-lg font-geist text-ink">Section headline</p>, meta: 'Geist LIGHT 300 · clamp 36→50px · -0.01em · line-height 1.2 (text-h2 = alias)' },
+  { cls: 'text-heading', node: <p className="text-heading font-geist text-ink">Card title / sub-section header</p>, meta: 'Geist 400 · clamp 28→32px · -0.32px · line-height 1.3 (text-h3 = alias; 300 only ≥50px — weight-by-size rule)' },
+  { cls: 'text-h4', node: <p className="text-h4 font-geist text-ink">Inline emphasis</p>, meta: 'Geist 400 · ~1.25rem · line-height 1.3' },
   { cls: 'text-body', node: <p className="text-body text-ink">Body copy default. Trochia drafts, matches, briefs, scores, and tracks.</p>, meta: 'Inter 400 · ~1.0625rem · line-height 1.65' },
   { cls: 'text-body-sm', node: <p className="text-body-sm text-ink">Secondary copy, captions, helper text, footer.</p>, meta: 'Inter 400 · ~0.9375rem · line-height 1.55' },
   { cls: 'text-label', node: <p className="text-label text-graphite">EYEBROW / FORM LABEL</p>, meta: 'Inter 500 · ~0.8125rem · +4% tracking · uppercase OK' },
@@ -161,19 +163,18 @@ export default function StyleguidePage() {
             </div>
           ))}
         </div>
-        <Card className="bg-stone/40">
+        <Card className="bg-stone/40 shadow-none">
           <CardHeader>
-            <CardTitle className="text-h4">Signal usage — reserved for, and ONLY for</CardTitle>
+            <CardTitle className="text-h4">Signal usage — DESIGN.md v1.1 (per-viewport rule)</CardTitle>
           </CardHeader>
           <CardContent>
             <ul className="list-disc space-y-1 pl-5 text-body-sm text-graphite">
-              <li>The mark&rsquo;s signal node (the dot)</li>
-              <li>The hero eyebrow text (text-label text-signal)</li>
-              <li>ONE call-to-action per surface — a bg-signal button OR a text-signal link, never both</li>
-              <li>The mono step numbers in &ldquo;How it works&rdquo; (01 02 03 04)</li>
-              <li>The pricing &ldquo;Most chosen&rdquo; featured-card border + badge</li>
-              <li>Pull-quote left-border bar on /manifesto</li>
-              <li>Link hover color · the hero live-element illumination accent</li>
+              <li>Once per VIEWPORT — never two Signal elements co-visible at any scroll position</li>
+              <li>Conversion-CTA pills only (hero + final CTA on marketing; ≤1 per app screen), always with INK text</li>
+              <li>The pricing featured ring (ring-2 ring-signal) — spends that viewport&rsquo;s moment; its badge stays NEUTRAL</li>
+              <li>The M1 hero halo (≤6% opacity radial) — ambient, does not count as the moment</li>
+              <li>The mark&rsquo;s signal node (the dot) · link hover color (transient state)</li>
+              <li>NEVER: text, icons, badges, borders, backgrounds, or anything sticky/fixed (the nav)</li>
             </ul>
           </CardContent>
         </Card>
@@ -202,13 +203,12 @@ export default function StyleguidePage() {
           </CardHeader>
           <CardContent className="text-body-sm text-graphite">
             <ul className="space-y-1">
-              <li><strong className="text-ink">Geist</strong> — 4 sizes (display / h2 / h3 / h4), 2 weights (600 / 700)</li>
+              <li><strong className="text-ink">Geist</strong> — display / heading-lg / heading / h4 (+ h2/h3 aliases), weights 300 (≥50px) / 400 (below); 700 wordmark-only; 600 transitional until the Phase B audit</li>
               <li><strong className="text-ink">Inter</strong> — 3 sizes (body / body-sm / label), 2 weights (400 / 500)</li>
               <li><strong className="text-ink">Geist Mono</strong> — 2 sizes (text-mono = text-base, text-mono-sm = text-sm; NOT custom fontSize keys), 1 weight (400)</li>
             </ul>
             <p className="mt-3">
-              tailwind.config.ts defines <strong className="text-ink">7</strong> custom fontSize keys
-              (Geist&rsquo;s 4 + Inter&rsquo;s 3) — expected and correct.
+              The Geist Light scale is BRAND v1.1 law — never 600+ on display or section headings.
             </p>
           </CardContent>
         </Card>
@@ -220,7 +220,8 @@ export default function StyleguidePage() {
           {SPACING.map((s) => (
             <div key={s.token} className="flex items-center gap-4">
               <span className="w-16 text-mono-sm text-graphite">{s.token}</span>
-              <span className="h-6 rounded bg-signal" style={{ width: s.px }} />
+              {/* ink bars — Signal is never decoration (§11) */}
+              <span className="h-6 rounded bg-ink" style={{ width: s.px }} />
               <span className="text-body-sm text-graphite">{s.px}px</span>
             </div>
           ))}
@@ -254,9 +255,11 @@ export default function StyleguidePage() {
           </div>
         ))}
         <p className="text-body-sm text-graphite">
-          The <code className="text-mono-sm">signal</code> variant is the one accent CTA — use once
-          per surface. No <code className="text-mono-sm">xs</code> size (small buttons read as a
-          toy). Press state: <code className="text-mono-sm">active:scale-[0.98]</code>.
+          All variants are pills (<code className="text-mono-sm">rounded-full</code> — DESIGN.md §7).
+          The <code className="text-mono-sm">signal</code> variant is the conversion CTA — once per
+          VIEWPORT, always <code className="text-mono-sm">text-ink</code> (5.8:1 AA; paper-on-signal
+          fails). No <code className="text-mono-sm">xs</code> size (small buttons read as a toy).
+          Press state: <code className="text-mono-sm">active:scale-[0.98]</code>.
         </p>
       </Section>
 
@@ -283,7 +286,7 @@ export default function StyleguidePage() {
                 id="sg-textarea"
                 rows={3}
                 placeholder="Paste 500–5,000 words…"
-                className="w-full rounded-lg border border-stone bg-paper px-4 py-3 text-body text-ink outline-none placeholder:text-graphite focus-visible:border-ink"
+                className="w-full rounded-none border border-stone bg-paper px-4 py-3 text-body text-ink outline-none placeholder:text-graphite focus-visible:border-ink"
               />
             </div>
           </div>
@@ -300,14 +303,14 @@ export default function StyleguidePage() {
           <Card>
             <CardHeader>
               <CardTitle>Default card</CardTitle>
-              <CardDescription>1px stone border, no shadow, no lift, no gradient.</CardDescription>
+              <CardDescription>Borderless white surface; the flush shadow defines the edge.</CardDescription>
             </CardHeader>
-            <CardContent className="text-body-sm text-graphite">bg-paper border border-stone rounded-xl p-8</CardContent>
+            <CardContent className="text-body-sm text-graphite">bg-card rounded-3xl p-6 shadow-card</CardContent>
           </Card>
           <Card interactive>
             <CardHeader>
               <CardTitle>Interactive card</CardTitle>
-              <CardDescription>hover:border-ink/20 — no lift.</CardDescription>
+              <CardDescription>One-step shadow deepen on hover — never a lift.</CardDescription>
             </CardHeader>
             <CardContent className="text-body-sm text-graphite">Hover me</CardContent>
           </Card>
@@ -315,7 +318,7 @@ export default function StyleguidePage() {
             <Badge variant="signal" className="absolute right-6 top-6">Most chosen</Badge>
             <CardHeader>
               <CardTitle>Featured card</CardTitle>
-              <CardDescription>border-2 border-signal + Signal badge — the pricing &ldquo;Most chosen&rdquo; variant.</CardDescription>
+              <CardDescription>ring-2 ring-signal + NEUTRAL badge — the ring alone spends the viewport&rsquo;s Signal moment.</CardDescription>
             </CardHeader>
             <CardContent className="text-body-sm text-graphite">$199 / month</CardContent>
           </Card>
@@ -383,22 +386,38 @@ export default function StyleguidePage() {
         </p>
       </Section>
 
-      {/* 11 · NavigationMenu */}
-      <Section id="navigation-menu" title="11 · NavigationMenu (marketing top bar)">
-        <div className="rounded-xl border border-stone p-4">
-          <NavigationMenu>
-            <NavigationMenuList>
-              <NavigationMenuItem>
-                <NavigationMenuLink href="/#how-it-works">How it works</NavigationMenuLink>
-              </NavigationMenuItem>
-              <NavigationMenuItem>
-                <NavigationMenuLink href="/pricing">Pricing</NavigationMenuLink>
-              </NavigationMenuItem>
-              <NavigationMenuItem>
-                <NavigationMenuLink href="/manifesto">Manifesto</NavigationMenuLink>
-              </NavigationMenuItem>
-            </NavigationMenuList>
-          </NavigationMenu>
+      {/* 11 · Marketing nav — both morph states (M5/D3-B), static representations */}
+      <Section id="navigation-menu" title="11 · Marketing nav (spread → pill morph, both states)">
+        <p className="text-body-sm text-graphite">
+          At page top: full-content-width transparent row. Past ~64px scroll: the centered floating
+          pill (200ms ease-out morph; SNAPs under reduced-motion). The nav CTA is SECONDARY in both
+          states — sticky elements never carry Signal.
+        </p>
+        <div className="flex flex-col gap-4 rounded-3xl border border-stone bg-paper p-4">
+          <p className="text-mono-sm text-graphite uppercase">State A — page top (spread)</p>
+          <div className="flex h-14 items-center justify-between">
+            <Logo height={34} />
+            <NavigationMenu>
+              <NavigationMenuList>
+                <NavigationMenuItem><NavigationMenuLink href="/#how-it-works">How it works</NavigationMenuLink></NavigationMenuItem>
+                <NavigationMenuItem><NavigationMenuLink href="/pricing">Pricing</NavigationMenuLink></NavigationMenuItem>
+                <NavigationMenuItem><NavigationMenuLink href="/manifesto">Manifesto</NavigationMenuLink></NavigationMenuItem>
+              </NavigationMenuList>
+            </NavigationMenu>
+            <Button variant="secondary" size="compact">Start raising</Button>
+          </div>
+          <p className="text-mono-sm text-graphite uppercase">State B — scrolled (pill)</p>
+          <div className="mx-auto flex h-14 w-fit max-w-full items-center gap-2 rounded-nav bg-card pr-2 pl-5 shadow-card">
+            <Logo height={34} />
+            <NavigationMenu>
+              <NavigationMenuList>
+                <NavigationMenuItem><NavigationMenuLink href="/#how-it-works">How it works</NavigationMenuLink></NavigationMenuItem>
+                <NavigationMenuItem><NavigationMenuLink href="/pricing">Pricing</NavigationMenuLink></NavigationMenuItem>
+                <NavigationMenuItem><NavigationMenuLink href="/manifesto">Manifesto</NavigationMenuLink></NavigationMenuItem>
+              </NavigationMenuList>
+            </NavigationMenu>
+            <Button variant="secondary" size="compact">Start raising</Button>
+          </div>
         </div>
       </Section>
 
@@ -415,10 +434,14 @@ export default function StyleguidePage() {
       <Section id="badge" title="13 · Badge">
         <div className="flex flex-wrap items-center gap-3">
           <Badge variant="signal">Most chosen</Badge>
-          <Badge variant="phase">Phase 6</Badge>
+          <Badge variant="phase">Coming soon</Badge>
           <Badge variant="default">New</Badge>
           <Badge variant="outline">Default</Badge>
         </div>
+        <p className="text-body-sm text-graphite">
+          Badges NEVER carry Signal (§7) — the <code className="text-mono-sm">signal</code> variant
+          name survives for call-site compatibility but renders neutral (graphite on Card).
+        </p>
       </Section>
 
       {/* 14 · DropdownMenu */}
@@ -529,6 +552,90 @@ export default function StyleguidePage() {
             </div>
           ))}
         </div>
+      </Section>
+
+      {/* 20 · Logo (inline SVG) */}
+      <Section id="logo" title="20 · Logo — inline SVG (static + entrance)">
+        <div className="flex flex-wrap items-end gap-10">
+          <div className="flex flex-col gap-2">
+            <p className="text-mono-sm text-graphite uppercase">Lockup · static</p>
+            <Logo height={40} href={null} />
+          </div>
+          <div className="flex flex-col gap-2">
+            <p className="text-mono-sm text-graphite uppercase">Mark only</p>
+            <Logo variant="mark" height={40} href={null} />
+          </div>
+          <div className="flex flex-col gap-2">
+            <p className="text-mono-sm text-graphite uppercase">With node-settle entrance</p>
+            <Logo height={40} href={null} animate />
+          </div>
+        </div>
+        <p className="text-body-sm text-graphite">
+          Tokens only (ink arc/stem/wordmark, signal node); wordmark at Geist 700 (the sanctioned
+          wordmark weight). The entrance runs ONCE per full page load (700ms ease-out, the node
+          settling onto its arc) and never loops; reduced-motion renders it static. Reload to
+          replay the demo.
+        </p>
+      </Section>
+
+      {/* 21 · Shadows */}
+      <Section id="shadows" title="21 · Shadows (Ink-tinted, flush)">
+        <div className="grid gap-6 md:grid-cols-4">
+          {[
+            ['shadow-card', 'Cards — edge, not lift'],
+            ['shadow-button', 'Pill CTAs — layered micro'],
+            ['shadow-overlay', 'Modals, dropdowns, scrolled nav'],
+            ['shadow-fade', 'Mockup vignette — fades INTO Paper'],
+          ].map(([cls, role]) => (
+            <div key={cls} className="flex flex-col gap-3">
+              <div className={`h-24 rounded-3xl bg-card ${cls}`} />
+              <p className="text-mono-sm text-ink">{cls}</p>
+              <p className="text-body-sm text-graphite">{role}</p>
+            </div>
+          ))}
+        </div>
+        <p className="text-body-sm text-graphite">
+          ≤8px blur, ≤0.12 opacity on cards; never stacked high-elevation shadows (DESIGN.md §6).
+        </p>
+      </Section>
+
+      {/* 22 · Reveal (M4 scroll reveal) */}
+      <Section id="reveal" title="22 · Reveal (M4 scroll reveal)">
+        <Reveal>
+          <Card>
+            <CardHeader>
+              <CardTitle>This card fade-up revealed</CardTitle>
+              <CardDescription>
+                300ms ease-out, once, on viewport intersection. Server-rendered VISIBLE — JS adds
+                the hidden state below the fold only; reduced-motion skips the hide entirely.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </Reveal>
+      </Section>
+
+      {/* 23 · Carousel frame (the one sanctioned carousel) */}
+      <Section id="carousel" title="23 · Carousel frame (proof-of-work pattern)">
+        <p className="text-body-sm text-graphite">
+          Native scroll-snap <code className="text-mono-sm">ul</code>, ~3 visible with peek, ≥60s
+          drift with an explicit pause/play control; drift stops permanently on direct interaction
+          and is OFF under reduced-motion. Sanctioned for the social-proof section ONLY (§7/C9) —
+          the live implementation is <code className="text-mono-sm">proof-carousel.tsx</code>.
+        </p>
+        <ul
+          tabIndex={0}
+          className="flex snap-x snap-mandatory gap-6 overflow-x-auto pb-4 outline-none focus-visible:ring-2 focus-visible:ring-ink/40"
+          aria-label="Carousel frame demo"
+        >
+          {['Product surface card', 'Pull-quote card', 'Status card', 'Peek…'].map((label) => (
+            <li
+              key={label}
+              className="flex h-32 w-[31%] shrink-0 snap-start items-center justify-center rounded-3xl border border-stone bg-paper p-6 text-body-sm text-graphite"
+            >
+              {label}
+            </li>
+          ))}
+        </ul>
       </Section>
     </div>
   );

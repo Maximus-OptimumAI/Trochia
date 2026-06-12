@@ -16,6 +16,7 @@ afterEach(cleanup);
 describe('MemorySummaryCard', () => {
   it('links to the memory workspace and omits the start-onboarding CTA copy', () => {
     render(<MemorySummaryCard companyName="ClockPay" />);
+    // Button render={<Link/>} keeps anchor/link semantics (CDX-20).
     const link = screen.getByRole('link', { name: /view workspace/i });
     expect(link.getAttribute('href')).toBe('/app/memory');
     // The confirmed state replaces — never duplicates — the empty-state CTA.

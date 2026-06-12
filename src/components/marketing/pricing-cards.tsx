@@ -46,12 +46,12 @@ export const PRICING_TIERS: PricingTier[] = [
     priceAnnual: 39,
     teaser: 'Get raise-ready.',
     features: [
-      'Business Memory — paste and upload your context',
+      'Business Memory: paste and upload your context',
       'Knowledge Pack Import (paste, ZIP, .md/.txt)',
       'Ambient Q&A grounded in your memory',
       'Investor research and matching',
       'Accelerator application tracker',
-      'Pitch Lab — deck review (3 decks per month)',
+      'Pitch Lab: deck review (3 decks per month)',
       'Email and Calendar integration',
       'Founder approves every external send',
     ],
@@ -68,7 +68,7 @@ export const PRICING_TIERS: PricingTier[] = [
       'Pre-call briefs from partner posts and portfolio',
       'Transcript ingestion and post-call follow-ups',
       'Pipeline kanban with auto-stage updates',
-      'Pitch Lab — unlimited deck reviews',
+      'Pitch Lab: unlimited deck reviews',
       'Warm-intro mapper from your LinkedIn export',
       'Outreach drafter tuned to your voice',
       'Priority support during your raise',
@@ -192,7 +192,9 @@ function PricingCard({
           <span className="block text-body-sm text-graphite">Activates at launch.</span>
         ) : (
           <Button
-            variant={tier.featured ? 'signal' : 'primary'}
+            // pricing CTAs are ink pills — the featured ring spends the page's
+            // Signal moment (docs/design/DESIGN.md §7 Cards)
+            variant="primary"
             className="w-full"
             render={<Link href="/sign-up" />}
           >

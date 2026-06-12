@@ -16,7 +16,7 @@ import './globals.css';
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: 'Trochia — the agentic operator for your raise',
+    default: 'Trochia · the agentic operator for your raise',
     template: '%s · Trochia',
   },
   description:
@@ -38,14 +38,14 @@ export const metadata: Metadata = {
     type: 'website',
     siteName: 'Trochia',
     url: SITE_URL,
-    title: 'Trochia — the agentic operator for your raise',
+    title: 'Trochia · the agentic operator for your raise',
     description:
       'Trochia holds your business memory, finds the right investors, drafts your outreach, and closes the round. From F&F to Series A.',
     images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'Trochia' }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Trochia — the agentic operator for your raise',
+    title: 'Trochia · the agentic operator for your raise',
     description: 'The agentic operator for your raise. From F&F to Series A.',
     images: ['/og-image.png'],
   },

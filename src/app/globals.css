@@ -6,18 +6,20 @@
 /*
  * Trochia design system — light only (no dark mode this phase).
  *
- * Brand tokens (paper / ink / graphite / stone / signal / success / warning /
- * danger), the 7 custom fontSize keys (display / h2 / h3 / h4 / body / body-sm
- * / label), the spacing scale and radii are the canonical token set from
- * docs/DESIGN-REFERENCE.md "Tailwind config additions Phase 1 must produce".
- * They are declared in tailwind.config.ts (referenced above via @config) AND
- * mirrored into the Tailwind v4 @theme block below so `bg-paper`, `text-ink`,
- * `text-display`, etc. resolve as utilities. shadcn's CSS-variable theme
- * (--background / --foreground / --primary / --border / ...) is mapped onto the
- * brand tokens so every shadcn component renders in the brand palette.
+ * Canonical token set per docs/design/DESIGN.md §3–§6 + docs/BRAND.md v1.1:
+ * brand colors (incl. the `card` #FFFFFF surface-only carve-out), the Geist
+ * Light type scale (display/heading-lg at 300, heading at 400 — responsive
+ * clamps), the four Ink-tinted flush shadows, the Dialog-system radii
+ * (cards 24px / buttons pill / inputs 0px / nav 32px). Declared in
+ * tailwind.config.ts (referenced above via @config) AND mirrored into the
+ * Tailwind v4 @theme block below so `bg-paper`, `bg-card`, `text-display`,
+ * `shadow-card`, etc. resolve as utilities. shadcn's CSS-variable theme
+ * (--background / --foreground / --primary / --border / ...) is mapped onto
+ * the brand tokens so every shadcn component renders in the brand palette.
  *
  * No Tailwind color or font outside the brand token system — Code Reviewer
- * rejects it. Never pure #000 / #FFF — use ink (#0A0E1A) / paper (#FAFAF7).
+ * rejects it. Never pure #000; #FFFFFF only as the `card` surface token
+ * (never text, never the canvas) — paper (#FAFAF7) is the page canvas.
  */
 
 @theme inline {
@@ -72,21 +74,31 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* 7 custom fontSize keys — Geist (4) + Inter (3); mono uses native text-base/text-sm */
-  --text-display: 4rem;
-  --text-display--line-height: 1.05;
-  --text-display--letter-spacing: -0.02em;
-  --text-display--font-weight: 600;
-  --text-h2: 2.5rem;
-  --text-h2--line-height: 1.1;
+  /* Geist Light scale (DESIGN.md §4) — 300 ≥50px, 400 below; responsive clamps.
+     h2/h3 are pre-adoption aliases re-valued to heading-lg/heading. */
+  --text-display: clamp(2.75rem, 1.55rem + 5vw, 4.375rem); /* 44px → 70px */
+  --text-display--line-height: 1.15;
+  --text-display--letter-spacing: -0.01em;
+  --text-display--font-weight: 300;
+  --text-heading-lg: clamp(2.25rem, 1.6rem + 2.7vw, 3.125rem); /* 36px → 50px */
+  --text-heading-lg--line-height: 1.2;
+  --text-heading-lg--letter-spacing: -0.01em;
+  --text-heading-lg--font-weight: 300;
+  --text-heading: clamp(1.75rem, 1.57rem + 0.8vw, 2rem); /* 28px → 32px */
+  --text-heading--line-height: 1.3;
+  --text-heading--letter-spacing: -0.32px;
+  --text-heading--font-weight: 400;
+  --text-h2: clamp(2.25rem, 1.6rem + 2.7vw, 3.125rem);
+  --text-h2--line-height: 1.2;
   --text-h2--letter-spacing: -0.01em;
-  --text-h2--font-weight: 600;
-  --text-h3: 1.625rem;
-  --text-h3--line-height: 1.25;
-  --text-h3--font-weight: 500;
+  --text-h2--font-weight: 300;
+  --text-h3: clamp(1.75rem, 1.57rem + 0.8vw, 2rem);
+  --text-h3--line-height: 1.3;
+  --text-h3--letter-spacing: -0.32px;
+  --text-h3--font-weight: 400;
   --text-h4: 1.25rem;
   --text-h4--line-height: 1.3;
-  --text-h4--font-weight: 500;
+  --text-h4--font-weight: 400;
   --text-body: 1.0625rem;
   --text-body--line-height: 1.65;
   --text-body--font-weight: 400;
@@ -106,23 +118,33 @@
   --container-content: 1200px;
   --container-prose: 65ch;
 
-  /* radii: lg = 8px (buttons/inputs), xl = 12px (cards), full pills */
+  /* radii (DESIGN.md §6): cards/overlays 24px (3xl), buttons pill (full),
+     inputs 0 (none), nav pill 32px, card-inner chips 12px (xl) */
   --radius-sm: calc(var(--radius) * 0.75);
   --radius-md: calc(var(--radius) * 0.875);
-  --radius-lg: var(--radius); /* 0.5rem = 8px */
-  --radius-xl: 0.75rem; /* 12px — cards */
+  --radius-lg: var(--radius); /* 0.5rem = 8px — small chips only */
+  --radius-xl: 0.75rem; /* 12px — card-inner chips */
   --radius-2xl: 1rem;
-  --radius-3xl: 1.5rem;
+  --radius-3xl: 1.5rem; /* 24px — cards, mockup frames, overlays */
+  --radius-nav: 2rem; /* 32px — floating pill nav */
   --radius-4xl: 2rem;
+
+  /* shadows (DESIGN.md §6) — Ink-tinted, flush with the plane */
+  --shadow-card: 0 2px 3px -2px rgba(10, 14, 26, 0.12);
+  --shadow-button:
+    0 1px 2px rgba(10, 14, 26, 0.04), 0 2px 4px rgba(10, 14, 26, 0.02),
+    0 4px 8px rgba(10, 14, 26, 0.02);
+  --shadow-fade: 0 -40px 40px rgba(250, 250, 247, 0.5);
+  --shadow-overlay: 0 8px 24px rgba(10, 14, 26, 0.08);
 }
 
 :root {
   /* shadcn theme → Trochia brand tokens (light only) */
-  --background: #fafaf7; /* paper */
+  --background: #fafaf7; /* paper — the canvas */
   --foreground: #0a0e1a; /* ink */
-  --card: #fafaf7; /* paper */
+  --card: #ffffff; /* card — level-1 raised surface (BRAND v1.1 carve-out) */
   --card-foreground: #0a0e1a; /* ink */
-  --popover: #fafaf7; /* paper */
+  --popover: #ffffff; /* card — popovers are level-1 surfaces */
   --popover-foreground: #0a0e1a; /* ink */
   --primary: #0a0e1a; /* ink */
   --primary-foreground: #fafaf7; /* paper */
@@ -195,6 +217,66 @@
   font-size: 0.875rem;
   line-height: 1.25rem;
   font-weight: 400;
+}
+
+/*
+ * Logo entrance — the Signal node settling onto its arc (τροχιά = trajectory).
+ * One-time on first load only, 700ms ease-out, then fully static (perpetual
+ * decorative motion is canon-banned — DESIGN.md §9). The reduced-motion
+ * kill-switch below collapses it to instant.
+ */
+@keyframes trochia-node-settle {
+  from {
+    transform: translateY(-14px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@utility animate-node-settle {
+  animation: trochia-node-settle 0.7s ease-out both;
+}
+
+/*
+ * Page enter (DESIGN.md §9 timing table) — 200ms ease-out fade-up, applied by
+ * the marketing route template on every navigation. Pure CSS animation: runs
+ * and completes without JS, so the page is never stuck hidden; the
+ * reduced-motion kill-switch collapses it to instant.
+ */
+@keyframes trochia-page-enter {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@utility animate-page-enter {
+  animation: trochia-page-enter 0.2s ease-out both;
+}
+
+/*
+ * Scroll reveals (DESIGN.md §9 M4) — content is server-rendered VISIBLE; the
+ * Reveal component adds .reveal-hidden client-side only for below-fold
+ * elements, then releases it on intersection (300ms ease-out, once). With JS
+ * off nothing is ever hidden; reduced-motion skips the hide entirely.
+ */
+.reveal-hidden {
+  opacity: 0;
+  transform: translateY(8px);
+  /* keep hidden content out of the tab order + a11y tree while unrevealed
+     (CDX-10); visibility flips to visible instantly on class removal, so the
+     opacity/transform transition still plays */
+  visibility: hidden;
+}
+.reveal-ready {
+  transition:
+    opacity 300ms ease-out,
+    transform 300ms ease-out;
 }
 
 /* reduced-motion: kill non-essential animation (motion-contract exit-gate item) */

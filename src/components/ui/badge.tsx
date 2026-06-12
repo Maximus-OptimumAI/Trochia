@@ -5,9 +5,13 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 /**
- * Trochia Badge — `rounded-full` pill. Variants:
- *   - default   bg-ink text-paper           — generic ("New")
- *   - signal    bg-signal text-paper         — "Most chosen" (the accent moment)
+ * Trochia Badge — `rounded-full` pill. Badges NEVER carry Signal (docs/design/
+ * DESIGN.md §7 Badges — Signal on a badge would spend the surface's accent
+ * moment). Variants:
+ *   - default   bg-ink text-paper            — generic ("New")
+ *   - signal    NEUTRAL ("Most chosen") — text-graphite on Card per the §7
+ *               featured-card spec; the variant NAME survives for call-site
+ *               compatibility, the styling is deliberately not Signal
  *   - phase     bg-transparent text-graphite — disabled-nav phase tags ("Phase 7"), mono-sm
  *   - outline   border-stone text-graphite   — neutral
  */
@@ -17,7 +21,7 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default: "bg-ink text-paper",
-        signal: "bg-signal text-paper",
+        signal: "bg-card text-graphite border-stone",
         phase: "bg-transparent text-graphite px-1.5",
         outline: "border-stone text-graphite",
         // alias kept for shadcn-generated internals

@@ -37,7 +37,7 @@ const FEATURE_MATRIX: { feature: string; tiers: Record<string, true | false | st
     tiers: { 'pre-raise': true, 'active-raise': true, 'close-mode': true, alumni: false },
   },
   {
-    feature: 'Pitch Lab — deck reviews',
+    feature: 'Pitch Lab: deck reviews',
     tiers: {
       'pre-raise': '3 / month',
       'active-raise': 'Unlimited',
@@ -88,12 +88,13 @@ export default function PricingPage() {
       <section className="py-20 md:py-28">
         <div className="mx-auto max-w-content px-6 md:px-12">
           <div className="flex max-w-3xl flex-col gap-4">
-            <p className="text-label text-signal">PRICING</p>
+            {/* graphite — Signal is never a text color (DESIGN.md §4) */}
+            <p className="text-label text-graphite">PRICING</p>
             <h1 className="text-h2 tracking-tight text-ink md:text-display">
               Pay for the raise you are running.
             </h1>
             <p className="max-w-xl text-body text-graphite">
-              Trochia is a tool founders pay for during the raise — not a permanent
+              Trochia is a tool founders pay for during the raise, not a permanent
               subscription. Start at $49 to set up the memory; step up to $199 when the
               round is active.
             </p>
@@ -121,7 +122,7 @@ export default function PricingPage() {
             </TabsContent>
           </Tabs>
           <p className="text-center text-body-sm text-graphite">
-            Close Mode and Alumni activate at launch — available with the close stack.
+            Close Mode and Alumni switch on at launch, alongside the close stack.
           </p>
         </div>
       </section>

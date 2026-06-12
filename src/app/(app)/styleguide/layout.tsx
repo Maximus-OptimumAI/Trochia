@@ -30,6 +30,10 @@ const SECTIONS: { id: string; label: string }[] = [
   { id: 'app-shell', label: '17 · App shell' },
   { id: 'motion', label: '18 · Motion examples' },
   { id: 'iconography', label: '19 · Iconography' },
+  { id: 'logo', label: '20 · Logo' },
+  { id: 'shadows', label: '21 · Shadows' },
+  { id: 'reveal', label: '22 · Reveal' },
+  { id: 'carousel', label: '23 · Carousel frame' },
 ];
 
 export default function StyleguideLayout({ children }: { children: ReactNode }) {

@@ -1,4 +1,19 @@
-# Trochia AI — Design Reference v1.0
+> ⛔ **DEPRECATED — 2026-06-11. This document is no longer canonical.**
+>
+> The Trochia design system now lives at **`docs/design/DESIGN.md`** (Dialog
+> layout/experience system on Trochia tokens, per the founder-approved plan at
+> `.planning/features/2026-06-11-design-adoption-PLAN.md`). Read that document — not this
+> one — before planning or implementing any UI surface. Several rules below are
+> explicitly **repealed** (card shadows/borders, button/input radii, centered hero,
+> carousel ban scope, CTA color discipline, the display type scale) — the full
+> supersession list is the Conflict Register (C1–C18) in `docs/design/DESIGN.md` §12.
+>
+> This file is retained for history only: Phase 0–2 artifacts and pre-adoption code
+> comments reference it, and it accurately describes the system **as shipped before the
+> adoption**. Code comments pointing here are re-pointed as each file is restyled in
+> design-adoption Phases A/B.
+
+# Trochia AI — Design Reference v1.0 (superseded)
 
 Distilled from the two reference sites: **harmonic.ai** and **firecrawl.dev**. This document translates the Trochia brand tokens (`BRAND.md`) into specific component and layout decisions so Phase 1 ships a coherent, intentional design system — not a default shadcn/ui theme with brand colors swapped in.
 

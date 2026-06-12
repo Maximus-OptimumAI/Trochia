@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Menu } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Logo } from '@/components/brand/logo';
+import { Logo } from '@/components/brand/inline-logo';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -15,11 +15,21 @@ import {
 } from '@/components/ui/sheet';
 
 /**
- * MarketingTopBar — `h-16 bg-paper/95 backdrop-blur-sm sticky top-0 z-40`,
- * `border-b border-stone` only when scrolled past 8px. Left: logo lockup → `/`.
- * Center: nav "How it works" / "Pricing" / "Manifesto" (no Docs/Changelog in
- * Phase 1). Right: "Sign in" link + "Start raising" primary button. Mobile:
- * hamburger → full-screen Sheet, mark stays top-left.
+ * MarketingTopBar — spread-at-top → pill-on-scroll (docs/design/DESIGN.md §7
+ * Navigation v1.1 / D3-B, motion M5). At page top: a full-content-width
+ * transparent row over Paper (logo left, links + secondary CTA right). Past
+ * ~64px scroll it contracts into the centered floating pill (`bg-card
+ * rounded-nav shadow-card h-14`). 200ms ease-out morph (max-width /
+ * background / shadow / padding transition); the reduced-motion kill-switch
+ * makes the two states SNAP. LIGHT-ONLY — no dark variant, no color morph.
+ * Both states are fully functional without JS (the listener is enhancement
+ * only; no-JS renders the spread state permanently).
+ *
+ * CTA discipline (D1-B): the nav is sticky — co-visible with everything — so
+ * its CTA is SECONDARY (white pill) in ALL states, never Signal. Logo: inline
+ * SVG lockup with the one-time node-settle entrance.
+ *
+ * Mobile: logo + hamburger; full-screen Sheet menu (PDR-03).
  */
 const NAV = [
   { label: 'How it works', href: '/#how-it-works' },
@@ -31,42 +41,47 @@ export function MarketingTopBar() {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
+    const onScroll = () => setScrolled(window.scrollY > 64);
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
   return (
-    <header
-      className={cn(
-        'sticky top-0 z-40 h-16 bg-paper/95 backdrop-blur-sm transition-colors',
-        scrolled && 'border-b border-stone'
-      )}
-    >
-      <div className="mx-auto flex h-full max-w-content items-center justify-between px-6 md:px-12">
-        <Logo height={32} />
+    // pointer-events-none on the full-width sticky band so the transparent
+    // gutters beside the contracted pill never intercept clicks (CDX-13);
+    // the inner nav row re-enables hit-testing.
+    <header className="pointer-events-none sticky top-0 z-40 px-4 pt-4 sm:px-6">
+      <div
+        className={cn(
+          'pointer-events-auto mx-auto flex h-14 items-center justify-between rounded-nav transition-[max-width,background-color,box-shadow,padding] duration-200 ease-out',
+          scrolled
+            ? 'max-w-[780px] bg-card pr-2 pl-4 shadow-card sm:pl-5'
+            : 'max-w-content bg-transparent px-0 shadow-none'
+        )}
+      >
+        <Logo height={34} animate className="-ml-1" />
 
-        <nav className="hidden items-center gap-8 md:flex">
+        <nav className="hidden items-center md:flex">
           {NAV.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className="text-body-sm font-medium text-graphite transition-colors hover:text-ink"
+              className="rounded-full px-3 py-2 text-body-sm font-medium text-graphite transition-colors duration-150 outline-none hover:text-ink focus-visible:text-ink focus-visible:ring-2 focus-visible:ring-ink/40"
             >
               {item.label}
             </Link>
           ))}
         </nav>
 
-        <div className="hidden items-center gap-4 md:flex">
+        <div className="hidden items-center gap-1 md:flex">
           <Link
             href="/sign-in"
-            className="text-body-sm font-medium text-ink transition-colors hover:text-signal"
+            className="rounded-full px-3 py-2 text-body-sm font-medium text-ink transition-colors duration-150 outline-none hover:text-signal focus-visible:ring-2 focus-visible:ring-ink/40"
           >
             Sign in
           </Link>
-          <Button variant="primary" size="compact" render={<Link href="/sign-up" />}>
+          <Button variant="secondary" size="compact" render={<Link href="/sign-up" />}>
             Start raising
           </Button>
         </div>
@@ -75,7 +90,7 @@ export function MarketingTopBar() {
         <div className="md:hidden">
           <Sheet>
             <SheetTrigger
-              className="inline-flex size-9 items-center justify-center rounded-lg text-ink hover:bg-stone/50"
+              className="inline-flex size-9 items-center justify-center rounded-full text-ink outline-none hover:bg-stone/50 focus-visible:ring-2 focus-visible:ring-ink/40"
               aria-label="Open menu"
             >
               <Menu className="size-5" aria-hidden />
@@ -89,18 +104,18 @@ export function MarketingTopBar() {
                   <Link
                     key={item.href}
                     href={item.href}
-                    className="rounded-md px-3 py-3 text-body font-medium text-ink hover:bg-stone/50"
+                    className="rounded-xl px-3 py-3 text-body font-medium text-ink hover:bg-stone/50"
                   >
                     {item.label}
                   </Link>
                 ))}
                 <Link
                   href="/sign-in"
-                  className="rounded-md px-3 py-3 text-body font-medium text-ink hover:bg-stone/50"
+                  className="rounded-xl px-3 py-3 text-body font-medium text-ink hover:bg-stone/50"
                 >
                   Sign in
                 </Link>
-                <Button variant="primary" className="mt-2" render={<Link href="/sign-up" />}>
+                <Button variant="secondary" className="mt-2" render={<Link href="/sign-up" />}>
                   Start raising
                 </Button>
               </nav>

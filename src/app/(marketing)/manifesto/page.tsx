@@ -25,7 +25,8 @@ export const metadata: Metadata = {
 
 const PARAGRAPH = 'text-body text-ink leading-[1.65] [&+&]:mt-6';
 const SUBHEAD = 'text-h2 text-ink mt-16 mb-6';
-const PULL = 'my-10 border-l-4 border-signal pl-6 text-h3 font-geist text-ink';
+// ink bar — Signal is never a border (docs/design/DESIGN.md §11 v1.1, A9-QUEUE-04)
+const PULL = 'my-10 border-l-4 border-ink pl-6 text-h3 font-geist text-ink';
 
 export default function ManifestoPage() {
   return (
@@ -50,7 +51,7 @@ export default function ManifestoPage() {
             ones who matter. Drafts cold outreach without sounding cold. Walks into a partner
             meeting having read three things the partner wrote. Comes out, runs the
             transcript, writes the follow-up before the next founder eats their slot. Sends
-            a SAFE — the right SAFE — to the right person and watches it come back signed.
+            a SAFE (the right SAFE) to the right person and watches it come back signed.
             Updates the cap table without breaking it. Keeps the F&amp;F round legal. Closes.
           </p>
           <p className={PARAGRAPH}>
@@ -68,7 +69,7 @@ export default function ManifestoPage() {
           <p className={PARAGRAPH}>
             A founder talks to a general AI every day for a year. The model knows you better
             than your last hire. Then you walk into the actual raise and the tools that
-            matter — the deck reviewer, the investor researcher, the SAFE drafter — know
+            matter (the deck reviewer, the investor researcher, the SAFE drafter) know
             none of that. You paste your business in again. You explain the round again.
             You explain who the customer is again. The deck reviewer suggests rewrites that
             sound generic because to it, your business is generic.
@@ -78,8 +79,8 @@ export default function ManifestoPage() {
             Pipeline lives in a spreadsheet, a CRM that was not built for venture, or in the
             founder&apos;s head. Investor research happens in another tab. Pre-call briefs get
             written if there is time, which there usually is not. A botched investor meeting
-            is a $25K to $250K loss in expected value — and the cause is almost always the
-            same. The founder walked in cold to someone they should have read for fifteen
+            is a $25K to $250K loss in expected value. The cause is almost always the
+            same: the founder walked in cold to someone they should have read for fifteen
             minutes first.
           </p>
           <p className={PARAGRAPH}>The third thing that breaks is the close.</p>
@@ -87,7 +88,7 @@ export default function ManifestoPage() {
             SAFE templates get pulled from a Google search. Cap tables are kept in Excel
             until someone says &ldquo;send me your cap table&rdquo; and the founder builds
             one in an hour. F&amp;F rounds get described in ways that are a regulatory
-            landmine — and nobody draws that on the page. A friend wires $25K and there is
+            landmine, and nobody draws that on the page. A friend wires $25K and there is
             no signed paperwork.
           </p>
           <p className={PARAGRAPH}>
@@ -117,7 +118,7 @@ export default function ManifestoPage() {
             The shape of the answer is not another chatbot. It is an operator.
           </p>
           <p className={PARAGRAPH}>
-            An operator owns work — not advice. An operator carries the memory. The operator
+            An operator owns work, not advice. An operator carries the memory. The operator
             knows that you are a fintech, pre-seed, raising $1.5M, that the lead you want is
             the one who invested in three of your competitors, that the call on Thursday is
             with a partner who wrote a thesis about exactly this category last month. The
@@ -142,14 +143,14 @@ export default function ManifestoPage() {
           <h2 className={SUBHEAD}>Memory is the moat</h2>
           <p className={PARAGRAPH}>Six modules. One memory.</p>
           <p className={PARAGRAPH}>
-            Business Memory holds who you are — the company, the customer, the metrics that
+            Business Memory holds who you are: the company, the customer, the metrics that
             move, the milestones. It is built from the same context you already have
             somewhere: a custom-instructions block, a project notebook, a Notion page. You
             paste or upload, Trochia extracts a structured record, you confirm each field.
             From that point on, every other module reads from it.
           </p>
           <p className={PARAGRAPH}>
-            Pipeline Memory holds who you are talking to — the investor, the accelerator,
+            Pipeline Memory holds who you are talking to: the investor, the accelerator,
             the stage, the last touch, the transcript, the commitment. It updates as you
             move. When you generate a SAFE the cap table sees it. When you ingest a
             transcript the follow-up drafter reads it. The pipeline kanban moves itself
@@ -158,7 +159,7 @@ export default function ManifestoPage() {
           <p className={PARAGRAPH}>
             This is the thing a general AI cannot copy in a week. A general AI does not own
             your business. A general AI does not own your pipeline. Memory plus workflow
-            ownership across the whole raise journey — that is the part that compounds.
+            ownership across the whole raise journey is the part that compounds.
           </p>
           <p className={PARAGRAPH}>
             It compounds because every interaction makes the operator more accurate. The
@@ -180,7 +181,7 @@ export default function ManifestoPage() {
 
           <h2 className={SUBHEAD}>What founders pay for</h2>
           <p className={PARAGRAPH}>
-            Trochia is a tool founders pay for during the raise — not a permanent
+            Trochia is a tool founders pay for during the raise, not a permanent
             subscription. The tiers reflect that.
           </p>
           <p className={PARAGRAPH}>
@@ -191,7 +192,7 @@ export default function ManifestoPage() {
           </p>
           <p className={PARAGRAPH}>
             There is no permanent free tier because a permanent free tier dilutes the buyer
-            pool — and because founders running a real raise are happy to pay for something
+            pool, and because founders running a real raise are happy to pay for something
             that compresses six tools into one. A 7-day trial with card on file is enough
             to see whether the operator-memory fit is real.
           </p>

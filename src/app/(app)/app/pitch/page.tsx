@@ -25,8 +25,8 @@ export default async function PitchPlaceholderPage() {
       userEmail={user.email ?? undefined}
     >
       <EmptyState
-        heading="Pitch Lab — coming in Phase 3"
-        body="Trochia will review your deck against your Business Memory and a defect taxonomy, flagging factual contradictions, vague language, and missing context — with zero fabricated slide references."
+        heading="Pitch Lab is coming soon"
+        body="Trochia will review your deck against your Business Memory and a defect taxonomy, flagging factual contradictions, vague language, and missing context, with zero fabricated slide references."
         primaryCtaLabel="Back to dashboard"
         primaryCtaHref="/app"
       />
