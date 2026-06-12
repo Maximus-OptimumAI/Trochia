@@ -80,9 +80,11 @@ export default function Home() {
       {/* 4 · Proof-of-work carousel (A7 — the one sanctioned carousel, §7) ── */}
       <ProofCarousel />
 
-      {/* 5 · Pricing teaser — paper band; ink CTAs (the featured ring spends
-          this viewport's Signal moment — D1-B co-visibility verified) */}
-      <section className="py-20 md:py-32">
+      {/* 5 · Pricing teaser — paper band; ink CTAs. The featured ring spends
+          this viewport's Signal moment; the deep bottom padding (with the final
+          CTA's top padding) keeps the ring and the Signal final CTA out of any
+          shared viewport at 1440x900 AND 1920x1080 (D1-B check). */}
+      <section className="pt-20 pb-32 md:pt-32 md:pb-64">
         <Reveal className="mx-auto max-w-content px-6 md:px-12">
           <header className="mb-12 flex flex-col gap-3 md:mb-16">
             <p className="text-label text-graphite">PRICING</p>
@@ -103,7 +105,7 @@ export default function Home() {
 
       {/* 6 · Final CTA — bg-card band; signal pill (D1-B: its own viewport — the
           second conversion anchor, never co-visible with the hero's) */}
-      <section className="bg-card py-32">
+      <section className="bg-card py-32 md:pt-48">
         <Reveal className="mx-auto flex max-w-3xl flex-col items-center gap-6 px-6 text-center md:px-12">
           <h2 className="text-heading-lg text-ink">Stop juggling. Start raising.</h2>
           <p className="max-w-xl text-body text-graphite">

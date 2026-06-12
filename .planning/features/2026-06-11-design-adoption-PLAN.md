@@ -263,6 +263,19 @@ Phase B ships as its own branch/PR after Phase A lands and the founder approves 
 
 ---
 
+## D1-B co-visibility check (2026-06-11, measured live via Playwright)
+
+| Viewport | Ring-top → final-CTA-bottom span | Co-visible? | Verdict |
+|---|---|---|---|
+| 1440×900 (before fix) | 910px | No (by 10px) | too tight |
+| 1920×1080 (before fix) | 910px | **YES — FAIL** | fixed |
+| 1440×900 (after +192px separation) | 1102px | No | **PASS** |
+| 1920×1080 (after) | 1102px | No | **PASS** |
+
+Fix: pricing teaser `md:pb-64` + final CTA `md:pt-48`. Page-wide Signal census after
+fix: exactly 2 signal pills (hero + final CTA, 6,013px apart) + the pricing ring; no
+pair co-visible at either checked viewport.
+
 ## Followup ledger
 
 | ID | Item | Slot |
