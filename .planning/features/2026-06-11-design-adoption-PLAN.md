@@ -276,10 +276,24 @@ Fix: pricing teaser `md:pb-64` + final CTA `md:pt-48`. Page-wide Signal census a
 fix: exactly 2 signal pills (hero + final CTA, 6,013px apart) + the pricing ring; no
 pair co-visible at either checked viewport.
 
+## Founder rulings — 2026-06-11 (Phase A finish)
+
+| # | Ruling |
+|---|---|
+| R1 | **Honesty dial:** the landing page sells the FULL platform vision as final-state; no live/in-build/coming tags on marketing. A6–A8 copy approved AS DRAFTED (status card included). Deferred truth pass → LAUNCH-TRUTH-PASS-01. |
+| R2 | Nav label/page stays "Manifesto" (not About us). Optional future: short "Who's building this" section at the manifesto foot — NOT built now. |
+| R3 | Auth restyle (Dialog split-screen, REFERENCE-dialog.md Part 2) = Phase B OPENING slice, not this PR → AUTH-RESTYLE-01. |
+| R4 | App "Coming in Phase X" labels → "Coming soon" (this cycle, text-only). Illustrated module-preview pages → COMING-SOON-PAGES-01, Phase B. |
+
 ## Followup ledger
 
 | ID | Item | Slot |
 |---|---|---|
+| LAUNCH-TRUTH-PASS-01 | Before first real user traffic (Phase 5 launch gate): re-verify every landing claim against shipped reality. Founder-scheduled. | Phase 5 gate |
+| AUTH-RESTYLE-01 | Auth split-screen restyle per REFERENCE-dialog.md Part 2 (brand panel left / form right). | Phase B opening slice |
+| COMING-SOON-PAGES-01 | Illustrated module-preview pages (how it works + examples) behind each "Coming soon" module. | Phase B |
+| EMAIL-AUTH-01 | Email auth wiring (see email-field verdict, 2026-06-11). | Before external users |
+| PHASE-B-SIGNAL-01 | App-surface §4 Signal-as-text violations found in the A9 census, deferred to Phase B restyle: onboarding `stepper.tsx` current-step `text-signal`; `confirmation-card.tsx` `bg-signal/10 text-signal` chip. | Phase B |
 | ONBOARDING-WIZARD-01 | Redesign memory intake as the Dialog-style wizard (REFERENCE-dialog.md Part 2): one-question-per-screen, extraction-prefilled confirm screens, facet CHIPS mapping to labeled memory chunks, readiness checklist over the Inngest embed pipeline, post-onboarding banner = the existing memory CTA (ui-bundle C3). | After Phase B shell |
 | PLAYGROUND-01 | Idea-stage: "test your raise Q&A" surface over `qa.ask` (Dialog's Playground analog). | Backlog |
 | A9-QUEUE-01 | Sitewide `nativeButton` console-error fix in `button.tsx` (`render={<Link/>}` pattern). | A9 |

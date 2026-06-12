@@ -39,7 +39,7 @@ export function AppShell({
         <SheetContent side="right" className="w-[380px]">
           <SheetHeader>
             <SheetTitle>Ask Trochia</SheetTitle>
-            <SheetDescription>The ambient Q&amp;A sidebar arrives in Phase 2.</SheetDescription>
+            <SheetDescription>The ambient Q&amp;A sidebar is coming soon.</SheetDescription>
           </SheetHeader>
         </SheetContent>
       </Sheet>

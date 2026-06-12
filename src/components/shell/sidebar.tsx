@@ -43,8 +43,8 @@ const NAV: NavItem[] = [
   { label: 'Pitch Lab', href: '/app/pitch', icon: Presentation },
   { label: 'Pipeline', href: '/app/pipeline', icon: Network },
   { label: 'Live Raise', href: '/app/live-raise', icon: PhoneCall },
-  { label: 'Data Room', href: '/app/data-room', icon: FolderLock, disabledPhase: 'Phase 7' },
-  { label: 'Raise Ops', href: '/app/raise-ops', icon: Calculator, disabledPhase: 'Phase 9' },
+  { label: 'Data Room', href: '/app/data-room', icon: FolderLock, disabledPhase: 'Coming soon' },
+  { label: 'Raise Ops', href: '/app/raise-ops', icon: Calculator, disabledPhase: 'Coming soon' },
 ];
 
 function NavLink({ item, active }: { item: NavItem; active?: boolean }) {
@@ -56,7 +56,7 @@ function NavLink({ item, active }: { item: NavItem; active?: boolean }) {
       <span
         aria-disabled
         className={cn(base, 'cursor-not-allowed text-graphite/50')}
-        title={`Ships in ${item.disabledPhase}`}
+        title={item.disabledPhase}
       >
         <Icon className="size-4 shrink-0" aria-hidden />
         <span className="flex-1">{item.label}</span>

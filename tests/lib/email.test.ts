@@ -6,7 +6,7 @@
  * `scripts/check-banned-strings.mjs` is reused (its exported function) to
  * assert each template's HTML carries no banned compliance strings.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const resendSend = vi.fn(async () => ({ data: { id: 'em_test' }, error: null }));
 
@@ -18,6 +18,18 @@ vi.mock('resend', () => {
     }
   }
   return { Resend };
+});
+
+beforeAll(() => {
+  // Hermetic env (HARDCODED-DOMAIN-REGEX-01): the "not a trochia domain"
+  // from-address assertion must hold regardless of .env.local / a missing
+  // .env.test — stub BOTH url vars to neutral test values.
+  vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'https://test.example');
+  vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://app.test.example');
+});
+
+afterAll(() => {
+  vi.unstubAllEnvs();
 });
 
 beforeEach(() => {

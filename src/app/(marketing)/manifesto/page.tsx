@@ -25,7 +25,8 @@ export const metadata: Metadata = {
 
 const PARAGRAPH = 'text-body text-ink leading-[1.65] [&+&]:mt-6';
 const SUBHEAD = 'text-h2 text-ink mt-16 mb-6';
-const PULL = 'my-10 border-l-4 border-signal pl-6 text-h3 font-geist text-ink';
+// ink bar — Signal is never a border (docs/design/DESIGN.md §11 v1.1, A9-QUEUE-04)
+const PULL = 'my-10 border-l-4 border-ink pl-6 text-h3 font-geist text-ink';
 
 export default function ManifestoPage() {
   return (

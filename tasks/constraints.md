@@ -75,8 +75,8 @@ Both URLs already read from `process.env.NEXT_PUBLIC_SITE_URL` / `NEXT_PUBLIC_AP
 
 | Rule | Enforcement |
 |---|---|
-| All UI subagents MUST read `docs/BRAND.md` (v1.1) AND `docs/design/DESIGN.md` (canonical design system) before planning or implementing any surface. `docs/DESIGN-REFERENCE.md` is deprecated (2026-06-11) — history only. | Plan-checker verifies; Verifier confirms shipped UI matches |
-| Aesthetic target: Dialog layout/experience system on Trochia tokens (operator-grade, two-tone Paper/Card surfaces, Geist Light display, single Signal CTA moment) | Documented in `docs/design/DESIGN.md`; conflict register C1–C18 resolves all prior-canon contradictions |
+| All UI subagents MUST read `docs/BRAND.md` (v1.2) AND `docs/design/DESIGN.md` (canonical design system) before planning or implementing any surface. `docs/DESIGN-REFERENCE.md` is deprecated (2026-06-11) — history only. | Plan-checker verifies; Verifier confirms shipped UI matches |
+| Aesthetic target: Dialog layout/experience system on Trochia tokens (operator-grade, two-tone Paper/Card surfaces, Geist Light display, Signal once per viewport — never two Signal elements co-visible) | Documented in `docs/design/DESIGN.md` v1.1; conflict register C1–C18 resolves all prior-canon contradictions |
 | §11 Don'ts in `docs/design/DESIGN.md` are banned (incl. two Signal elements co-visible in a viewport / Signal on sticky elements, pure #000, non-surface #FFF, autoplay video, motion without a reduced-motion path) | Code Reviewer rejects PRs violating |
 | Tailwind colors / fonts outside the brand token system | Code Reviewer rejects |
 | Phase 1 exit gate: `/styleguide` internal route shipped showing every themed component | Mandatory |

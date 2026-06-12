@@ -88,7 +88,8 @@ export default function PricingPage() {
       <section className="py-20 md:py-28">
         <div className="mx-auto max-w-content px-6 md:px-12">
           <div className="flex max-w-3xl flex-col gap-4">
-            <p className="text-label text-signal">PRICING</p>
+            {/* graphite — Signal is never a text color (DESIGN.md §4) */}
+            <p className="text-label text-graphite">PRICING</p>
             <h1 className="text-h2 tracking-tight text-ink md:text-display">
               Pay for the raise you are running.
             </h1>

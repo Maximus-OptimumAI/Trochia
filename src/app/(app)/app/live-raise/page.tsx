@@ -27,7 +27,7 @@ export default async function LiveRaisePlaceholderPage() {
       userEmail={user.email ?? undefined}
     >
       <EmptyState
-        heading="Live Raise — coming in Phase 5"
+        heading="Live Raise — coming soon"
         body="Trochia will generate pre-call briefs, ingest your transcripts, draft 24-hour follow-ups, and keep a Pipeline Memory kanban — so no thread goes cold."
         primaryCtaLabel="Back to dashboard"
         primaryCtaHref="/app"

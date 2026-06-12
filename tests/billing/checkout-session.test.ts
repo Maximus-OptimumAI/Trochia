@@ -5,7 +5,7 @@
  *
  * Mocks the Stripe SDK; never makes a network call.
  */
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 const checkoutCreate = vi.fn();
 
@@ -15,6 +15,15 @@ beforeAll(() => {
   process.env.STRIPE_PRICE_ACTIVE_RAISE_MONTHLY = 'price_active_raise_m';
   process.env.STRIPE_PRICE_ACTIVE_RAISE_ANNUAL = 'price_active_raise_a';
   process.env.STRIPE_SECRET_KEY = 'sk_test_dummy';
+  // Hermetic env (HARDCODED-DOMAIN-REGEX-01): the "no hardcoded trochia
+  // domain" assertions must hold regardless of the developer's .env.local /
+  // missing .env.test — stub BOTH url vars to neutral test values.
+  vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://app.test.example');
+  vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'https://test.example');
+});
+
+afterAll(() => {
+  vi.unstubAllEnvs();
 });
 
 vi.mock('stripe', () => {

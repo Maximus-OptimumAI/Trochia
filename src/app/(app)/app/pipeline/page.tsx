@@ -27,7 +27,7 @@ export default async function PipelinePlaceholderPage() {
       userEmail={user.email ?? undefined}
     >
       <EmptyState
-        heading="Investor Pipeline — coming in Phase 4"
+        heading="Investor Pipeline — coming soon"
         body="Trochia will match VCs and accelerators from your Business Memory, track applications, draft outreach, and map warm intros — all founder-approved before anything leaves."
         primaryCtaLabel="Back to dashboard"
         primaryCtaHref="/app"
