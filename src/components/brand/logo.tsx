@@ -55,7 +55,7 @@ export function Logo({
 
   if (href === null) return wrapped;
   return (
-    <Link href={href} aria-label="Trochia — home" className="inline-flex items-center">
+    <Link href={href} aria-label="Trochia home" className="inline-flex items-center">
       {wrapped}
     </Link>
   );

@@ -11,7 +11,7 @@ import { TOS_VERSION } from '@/lib/compliance/dpa';
  */
 export const metadata: Metadata = {
   title: 'Terms',
-  description: 'The terms of using Trochia — what we agree to, what you agree to.',
+  description: 'The terms of using Trochia, what we agree to, what you agree to.',
 };
 
 const PARAGRAPH = 'text-body text-ink leading-[1.65] [&+&]:mt-5';
@@ -35,7 +35,7 @@ export default function TermsPage() {
           <LegalDisclaimerBanner variant="not-legal-advice" />
 
           <p className={PARAGRAPH}>
-            These terms govern your use of Trochia. They are short on purpose — the longer
+            These terms govern your use of Trochia. They are short on purpose. The longer
             a terms-of-service document is, the less likely anyone reads it.
           </p>
 
@@ -54,7 +54,7 @@ export default function TermsPage() {
             </Link>
             . A new account gets a 7-day trial with a card on file at signup. No permanent
             free tier. After the trial, the card is charged at the tier you selected. You
-            can cancel any time — you keep access until the end of the current billing
+            can cancel any time. You keep access until the end of the current billing
             period.
           </p>
 
@@ -68,7 +68,7 @@ export default function TermsPage() {
           <h2 className={SUBHEAD}>Your content</h2>
           <p className={PARAGRAPH}>
             Your content is yours. You grant Trochia the limited rights it needs to
-            operate the product — store it, run the features you invoke against it, back
+            operate the product: store it, run the features you invoke against it, back
             it up, serve it back to you. Nothing more.
           </p>
           <p className={PARAGRAPH}>
@@ -90,8 +90,8 @@ export default function TermsPage() {
 
           <h2 className={SUBHEAD}>Founder-approved external action</h2>
           <p className={PARAGRAPH}>
-            Anything Trochia sends outside the product on your behalf — outreach, intros,
-            signature requests — requires your explicit approval first. This is a product
+            Anything Trochia sends outside the product on your behalf (outreach, intros,
+            signature requests) requires your explicit approval first. This is a product
             commitment as much as a legal one.
           </p>
 
@@ -104,7 +104,7 @@ export default function TermsPage() {
           </p>
           <p className={PARAGRAPH}>
             The Legal Stack module recommends vendors and may earn a referral fee from
-            partner programs — that disclosure is visible on every recommendation. The
+            partner programs. That disclosure is visible on every recommendation. The
             module does not provide legal advice and does not interpret documents.
           </p>
           <p className={PARAGRAPH}>
@@ -119,8 +119,8 @@ export default function TermsPage() {
 
           <h2 className={SUBHEAD}>Cancellation and deletion</h2>
           <p className={PARAGRAPH}>
-            Cancel in the billing screen — access continues to the end of the period.
-            Delete your account in settings — a 30-day soft-delete window applies, after
+            Cancel in the billing screen. Access continues to the end of the period.
+            Delete your account in settings. A 30-day soft-delete window applies, after
             which the data is permanently purged from the primary databases. You can
             export your data before, during, or after either flow.
           </p>

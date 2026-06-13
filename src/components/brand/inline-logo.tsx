@@ -105,7 +105,7 @@ export function Logo({
 
   if (href === null) return svg;
   return (
-    <Link href={href} aria-label="Trochia — home" className="inline-flex items-center">
+    <Link href={href} aria-label="Trochia home" className="inline-flex items-center">
       {svg}
     </Link>
   );
