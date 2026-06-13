@@ -15,7 +15,7 @@ export function AuthBrandPanel({ className }: { className?: string }) {
   return (
     <aside
       className={cn(
-        'relative flex-col justify-between overflow-hidden bg-paper p-12 lg:p-16',
+        'relative flex-col overflow-hidden bg-paper p-12 lg:p-16',
         className,
       )}
     >
@@ -26,10 +26,10 @@ export function AuthBrandPanel({ className }: { className?: string }) {
       />
 
       <div className="relative">
-        <Logo variant="lockup" height={28} href="/" />
+        <Logo variant="lockup" height={40} href="/" />
       </div>
 
-      <div className="relative flex flex-col gap-4">
+      <div className="relative flex flex-1 flex-col justify-center gap-4">
         <p className="max-w-md text-heading-lg text-ink">Your raise has an operator now.</p>
         <p className="max-w-md text-body text-graphite">
           Trochia drafts your outreach, matches investors, and tracks the round.
