@@ -250,10 +250,18 @@ export function scanEmDash(text) {
   return hits;
 }
 
-/** Collect the files in the em-dash rule's scope (Phase B 0b). */
+/**
+ * Collect the files in the em-dash rule's scope.
+ *   - Phase B 0b: marketing + legal + brand.
+ *   - Phase B step 1 (AUTH-RESTYLE-01): + the (auth) route group. Verified free
+ *     of the `${ /* … *\/ }` interpolation-comment pattern, so the CDX-1
+ *     false-positive cannot trip; the broader CDX-1 hardening stays the step-2
+ *     gate-widen.
+ */
 function emDashScopedFiles() {
   return [
     ...walk(path.join(REPO_ROOT, 'src', 'app', '(marketing)'), ['.ts', '.tsx']),
+    ...walk(path.join(REPO_ROOT, 'src', 'app', '(auth)'), ['.ts', '.tsx']),
     ...walk(path.join(REPO_ROOT, 'src', 'components', 'brand'), ['.ts', '.tsx']),
   ];
 }
