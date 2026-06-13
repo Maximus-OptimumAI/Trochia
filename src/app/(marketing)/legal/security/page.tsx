@@ -9,7 +9,7 @@ import { SectionDivider } from '@/components/primitives/section-divider';
  */
 export const metadata: Metadata = {
   title: 'Security',
-  description: 'How Trochia protects customer data — architecture, controls, and roadmap.',
+  description: 'How Trochia protects customer data: architecture, controls, and roadmap.',
 };
 
 const PARAGRAPH = 'text-body text-ink leading-[1.65] [&+&]:mt-5';
@@ -46,14 +46,14 @@ export default function SecurityPage() {
           <h2 className={SUBHEAD}>Encryption</h2>
           <p className={PARAGRAPH}>
             Data is encrypted in transit (TLS 1.2+) and at rest (the database
-            provider&apos;s native at-rest encryption). Sensitive fields — secrets, API
-            keys, tokens — never enter logs, error reports, or product analytics. A
+            provider&apos;s native at-rest encryption). Sensitive fields (secrets, API
+            keys, tokens) never enter logs, error reports, or product analytics. A
             field-scrubbing pass runs before payloads leave the application.
           </p>
 
           <h2 className={SUBHEAD}>Authentication</h2>
           <p className={PARAGRAPH}>
-            Sign-in is handled by Supabase Auth — Google SSO and magic-link email at MVP;
+            Sign-in is handled by Supabase Auth: Google SSO and magic-link email at MVP;
             multi-factor authentication lands at V2. Server-side session validation runs
             on every authenticated request; the API never trusts a client-supplied
             account identifier.
@@ -65,22 +65,22 @@ export default function SecurityPage() {
             <span className="font-mono">src/ai/client.ts</span>). That chokepoint enforces
             prompt caching, structured-output validation, rate limits, and the no-training
             contract with the model provider. The fallback path is config-flagged off by
-            default. The chokepoint is lint-enforced — modules under the financial
+            default. The chokepoint is lint-enforced. Modules under the financial
             primitives (the SAFE generator and the cap-table engine) cannot import from
             it.
           </p>
 
           <h2 className={SUBHEAD}>External sends</h2>
           <p className={PARAGRAPH}>
-            Anything Trochia sends outside the product on behalf of a founder — outreach,
-            intros, signature requests — routes through an explicit founder-approval
+            Anything Trochia sends outside the product on behalf of a founder (outreach,
+            intros, signature requests) routes through an explicit founder-approval
             dialog. No autonomous send.
           </p>
 
           <h2 className={SUBHEAD}>Vendors</h2>
           <p className={PARAGRAPH}>
-            The full sub-processor inventory — every vendor that sees customer data, its
-            training posture, its retention window, and its contract status — lives in
+            The full sub-processor inventory, every vendor that sees customer data, its
+            training posture, its retention window, and its contract status, lives in
             our internal vendor-data-flow document and is referenced from the Data
             Processing Addendum at{' '}
             <Link href="/legal/dpa" className="text-ink underline hover:text-signal">

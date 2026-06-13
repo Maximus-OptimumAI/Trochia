@@ -24,7 +24,7 @@ describe('Sidebar', () => {
   it('C1: the brand logo links to /app (not the marketing hero) and renders at height 32', () => {
     render(<Sidebar activeHref="/app" />);
     // The Logo wraps its <img alt="Trochia"> in a Link with this aria-label.
-    const logoLink = screen.getByLabelText('Trochia — home');
+    const logoLink = screen.getByLabelText('Trochia home');
     expect(logoLink.tagName).toBe('A');
     expect(logoLink.getAttribute('href')).toBe('/app');
     // Regression guard: never back to the marketing root.

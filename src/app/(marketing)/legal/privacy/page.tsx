@@ -39,13 +39,13 @@ export default function PrivacyPage() {
           <p className={PARAGRAPH}>
             This policy explains what data Trochia collects, what we do with it, what we do
             not do with it, and how to get it back or delete it. We tried to write it the
-            way we would explain it to a founder — short, specific, in plain English.
+            way we would explain it to a founder, short, specific, in plain English.
           </p>
 
           <h2 className={SUBHEAD}>What we collect</h2>
           <p className={PARAGRAPH}>
             Account data: name, email, authentication metadata, billing identifiers (the
-            payment-card number itself is handled by our payments sub-processor — Trochia
+            payment-card number itself is handled by our payments sub-processor, Trochia
             never sees it).
           </p>
           <p className={PARAGRAPH}>
@@ -54,7 +54,7 @@ export default function PrivacyPage() {
             includes meeting transcripts and signed SAFE documents.
           </p>
           <p className={PARAGRAPH}>
-            Product analytics: pseudonymous event identifiers — which pages you visit, which
+            Product analytics: pseudonymous event identifiers, which pages you visit, which
             features you use, which onboarding step you reach. Free-text content (deck
             bodies, transcripts, financial figures) is never sent as an event property.
           </p>
@@ -96,24 +96,24 @@ export default function PrivacyPage() {
 
           <h2 className={SUBHEAD}>Sub-processors</h2>
           <p className={PARAGRAPH}>
-            We use a short list of trusted vendors to operate the service — Supabase
+            We use a short list of trusted vendors to operate the service: Supabase
             (database + storage), Stripe (payments), our model provider, Resend
             (transactional email), Sentry (error monitoring), Amplitude (product
             analytics), Langfuse (model-call tracing), Inngest (background jobs), Vercel
             (hosting). Each is bound by a data-processing contract that mirrors the
-            commitments here. The full inventory — with each vendor&apos;s training
-            posture, retention window, and contract status — lives in our internal
+            commitments here. The full inventory, with each vendor&apos;s training
+            posture, retention window, and contract status, lives in our internal
             vendor-data-flow document and is referenced from the DPA.
           </p>
 
           <h2 className={SUBHEAD}>Your rights</h2>
           <p className={PARAGRAPH}>
-            You can export your data at any time — a JSON dump of every tenant-scoped table
+            You can export your data at any time, a JSON dump of every tenant-scoped table
             we hold for your account, delivered as a private signed URL.
           </p>
           <p className={PARAGRAPH}>
             You can delete your account at any time. Deletion is a 30-day soft-delete
-            window — during which you can restore — followed by permanent purge across our
+            window, during which you can restore, followed by permanent purge across our
             primary databases. Backups age out on their normal cycle.
           </p>
           <p className={PARAGRAPH}>
@@ -143,7 +143,7 @@ export default function PrivacyPage() {
           <h2 className={SUBHEAD}>Contact</h2>
           <p className={PARAGRAPH}>
             Email <span className="font-mono">privacy@trochia.ai</span> for any
-            privacy-related request. We reply within 14 days — usually sooner.
+            privacy-related request. We reply within 14 days, usually sooner.
           </p>
         </div>
       </div>
