@@ -401,6 +401,8 @@ Every tension between BRAND v1.0 / old DESIGN-REFERENCE and the Dialog system, s
 | C17 | Motion timing | 120/200/300ms, no spring | Framer defaults, 2s entrances, 60s marquee | **Trochia table stands** + two additions: carousel drift (≥60s, pausable) and hero-simulation steps (800ms). |
 | C18 | Dark sections | Not in system | Deep Slate panels; dark nav over hero | **Defer.** Light-only this phase. At most one Ink contrast panel is a recorded future option, not current scope. |
 
+> **C11 ratification (2026-06-13):** the static Signal halo (ambient, Signal ≤6% over Paper, M1 treatment) is sanctioned behind the hero and behind the auth split-screen brand panel.
+
 ## 13. Voice & compliance (pointer)
 
 Voice per `docs/BRAND.md`: operator, not assistant; no emoji in product copy; Trochia

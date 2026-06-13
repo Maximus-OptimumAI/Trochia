@@ -260,6 +260,37 @@
 }
 
 /*
+ * Auth split-screen form-column stagger (AUTH-RESTYLE-01, §9). The form
+ * column's direct children fade-up in sequence (mark -> heading -> form ->
+ * Google button -> footer). Gated to `no-preference` so under reduced-motion
+ * the rule never exists: children render visible with no hidden state and no
+ * reveal — the §9 global rail. Pure CSS, so it also completes with JS off.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .auth-enter > * {
+    animation: trochia-page-enter 0.3s ease-out both;
+  }
+  .auth-enter > *:nth-child(1) {
+    animation-delay: 0ms;
+  }
+  .auth-enter > *:nth-child(2) {
+    animation-delay: 70ms;
+  }
+  .auth-enter > *:nth-child(3) {
+    animation-delay: 140ms;
+  }
+  .auth-enter > *:nth-child(4) {
+    animation-delay: 210ms;
+  }
+  .auth-enter > *:nth-child(5) {
+    animation-delay: 280ms;
+  }
+  .auth-enter > *:nth-child(6) {
+    animation-delay: 350ms;
+  }
+}
+
+/*
  * Scroll reveals (DESIGN.md §9 M4) — content is server-rendered VISIBLE; the
  * Reveal component adds .reveal-hidden client-side only for below-fold
  * elements, then releases it on intersection (300ms ease-out, once). With JS

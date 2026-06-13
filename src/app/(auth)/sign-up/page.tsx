@@ -57,8 +57,8 @@ export default function SignUpPage() {
   }
 
   return (
-    <div className="flex flex-col items-center gap-8">
-      <Logo variant="mark" height={48} href={null} />
+    <div className="auth-enter flex flex-col items-center gap-8">
+      <Logo variant="mark" height={48} href={null} className="md:hidden" />
 
       <header className="flex flex-col items-center gap-2 text-center">
         <h1 className="text-h3 text-ink">Start your raise</h1>
@@ -101,7 +101,7 @@ export default function SignUpPage() {
       </div>
 
       <Button
-        variant="secondary"
+        variant="signal"
         className="w-full"
         onClick={onContinueWithGoogle}
         disabled={loading}
@@ -111,7 +111,7 @@ export default function SignUpPage() {
 
       <p className="text-center text-body-sm text-graphite">
         Already have an account?{' '}
-        <Link href="/sign-in" className="text-ink underline-offset-4 hover:text-signal hover:underline">
+        <Link href="/sign-in" className="text-ink underline-offset-4 hover:text-ink hover:underline">
           Sign in →
         </Link>
       </p>

@@ -39,8 +39,8 @@ export default function SignInPage() {
   }
 
   return (
-    <div className="flex flex-col items-center gap-8">
-      <Logo variant="mark" height={48} href={null} />
+    <div className="auth-enter flex flex-col items-center gap-8">
+      <Logo variant="mark" height={48} href={null} className="md:hidden" />
 
       <header className="flex flex-col items-center gap-2 text-center">
         <h1 className="text-h3 text-ink">Welcome back</h1>
@@ -78,7 +78,7 @@ export default function SignInPage() {
       </div>
 
       <Button
-        variant="secondary"
+        variant="signal"
         className="w-full"
         onClick={onContinueWithGoogle}
         disabled={loading}
@@ -88,7 +88,7 @@ export default function SignInPage() {
 
       <p className="text-center text-body-sm text-graphite">
         New to Trochia?{' '}
-        <Link href="/sign-up" className="text-ink underline-offset-4 hover:text-signal hover:underline">
+        <Link href="/sign-up" className="text-ink underline-offset-4 hover:text-ink hover:underline">
           Start raising →
         </Link>
       </p>
