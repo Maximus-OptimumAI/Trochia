@@ -59,7 +59,7 @@ function NavLink({ item, active }: { item: NavItem; active?: boolean }) {
         title={item.disabledPhase}
       >
         <Icon className="size-4 shrink-0" aria-hidden />
-        <span className="flex-1">{item.label}</span>
+        <span className="min-w-0 flex-1 truncate">{item.label}</span>
         <Badge variant="phase">{item.disabledPhase}</Badge>
       </span>
     );
@@ -73,7 +73,7 @@ function NavLink({ item, active }: { item: NavItem; active?: boolean }) {
       )}
     >
       <Icon className="size-4 shrink-0" aria-hidden />
-      <span className="flex-1">{item.label}</span>
+      <span className="min-w-0 flex-1 truncate">{item.label}</span>
     </Link>
   );
 }

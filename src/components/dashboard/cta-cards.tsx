@@ -75,7 +75,7 @@ export function CtaCards() {
               <h3 className="text-h4 font-geist text-ink">{card.title}</h3>
               <p className="text-body-sm text-graphite">{card.description}</p>
             </div>
-            <span className="mt-auto inline-flex items-center gap-1 text-body-sm font-medium text-ink transition-colors group-hover:text-signal">
+            <span className="mt-auto inline-flex items-center gap-1 text-body-sm font-medium text-ink transition-colors group-hover:text-ink">
               Open
               <ArrowRight className="size-4" aria-hidden />
             </span>

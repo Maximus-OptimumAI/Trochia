@@ -147,7 +147,7 @@ function StatusBadge({ status }: { status: ConfirmationStatus }) {
   }
   return (
     <Badge
-      className="bg-signal/10 text-signal border-transparent"
+      className="bg-stone text-ink border-transparent"
       aria-label={COPY.statusEdited}
     >
       {COPY.statusEdited}
