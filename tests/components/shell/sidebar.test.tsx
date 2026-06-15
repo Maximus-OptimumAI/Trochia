@@ -52,4 +52,19 @@ describe('Sidebar', () => {
     rerender(<Sidebar activeHref="/app/memory" />);
     expect(tokens('Dashboard')).not.toContain('bg-stone');
   });
+
+  it('R5: disabled nav rows stay single-line — label truncates, badge reads "Soon"', () => {
+    render(<Sidebar activeHref="/app" />);
+    // Data Room is a disabled (aria-disabled, non-link) row with a phase badge.
+    const label = screen.getByText('Data Room');
+    // The label gives way (min-w-0 + truncate) so the row never wraps.
+    expect(label).toHaveClass('truncate');
+    expect(label).toHaveClass('min-w-0');
+    const row = label.closest('[aria-disabled]');
+    expect(row).not.toBeNull();
+    // R12 fallback: the sidebar badge is shortened to "Soon" (not "Coming soon"),
+    // which is what stops the 240px row from crowding.
+    expect(row).toHaveTextContent('Soon');
+    expect(row).not.toHaveTextContent('Coming');
+  });
 });
