@@ -151,6 +151,19 @@ export async function runAgent<T>(opts: RunAgentOpts<T>): Promise<T> {
       metadata: { model },
     }) as TraceLike | undefined) ?? NOOP_TRACE;
 
+  // Isolate EVERY Langfuse write from product behavior (codex P1 #2 / CSO-LT-2): a
+  // tracing SDK throw must NEVER turn a successful Anthropic response into a failed
+  // runAgent. Same swallow+log contract as flushTracing(). Applied to every
+  // trace.update / trace.generation site below — NOT only the generation writes:
+  // a throw from the success-path trace.update is the same class of bug, two lines away.
+  function safeTrace(op: () => void): void {
+    try {
+      op();
+    } catch (err) {
+      logger.warn('langfuse: trace write failed (non-fatal — tracing only)', { err });
+    }
+  }
+
   // Additive GENERATION observation per Anthropic attempt (LANGFUSE-TRACING-01):
   // carries `model` + token `usageDetails` so Langfuse can compute auto-cost from
   // its model table. KEEP this ADDITIVE — the trace-level cache metadata above is a
@@ -158,16 +171,18 @@ export async function runAgent<T>(opts: RunAgentOpts<T>): Promise<T> {
   // Privacy (Trochia CLAUDE.md): NO raw input/output — `variableSuffix` may carry
   // untrusted/PII. usageDetails keys verified against Langfuse docs 2026-06-15.
   function recordGeneration(usage: AnthropicAttemptUsage, repair: boolean): void {
-    trace
-      .generation({ name: 'anthropic.messages', model, metadata: { repair } })
-      .end({
-        usageDetails: {
-          input: usage.input_tokens,
-          output: usage.output_tokens,
-          cache_read_input_tokens: usage.cache_read_input_tokens ?? 0,
-          cache_creation_input_tokens: usage.cache_creation_input_tokens ?? 0,
-        },
-      });
+    safeTrace(() =>
+      trace
+        .generation({ name: 'anthropic.messages', model, metadata: { repair } })
+        .end({
+          usageDetails: {
+            input: usage.input_tokens,
+            output: usage.output_tokens,
+            cache_read_input_tokens: usage.cache_read_input_tokens ?? 0,
+            cache_creation_input_tokens: usage.cache_creation_input_tokens ?? 0,
+          },
+        }),
+    );
   }
 
   // The Zod schema → a forced-tool-use tool definition (reliable structured output).
@@ -211,9 +226,13 @@ export async function runAgent<T>(opts: RunAgentOpts<T>): Promise<T> {
         providerStatus !== undefined
           ? `anthropic request failed (status ${providerStatus})`
           : 'anthropic request failed';
-      trace.update({ level: 'ERROR', statusMessage });
-      // Mark an ERROR generation with the SAME static string — no usage, no body.
-      trace.generation({ name: 'anthropic.messages', model, level: 'ERROR', statusMessage }).end();
+      // Wrapped (codex P1 #2 / CSO-LT-2): a tracing throw here must not mask the
+      // static AppError thrown below — write the ERROR trace, then always throw it.
+      safeTrace(() => {
+        trace.update({ level: 'ERROR', statusMessage });
+        // Mark an ERROR generation with the SAME static string — no usage, no body.
+        trace.generation({ name: 'anthropic.messages', model, level: 'ERROR', statusMessage }).end();
+      });
       // R1 (codex re-gate P1 / CSO-H1 second half): do NOT re-throw the raw
       // provider error — its message/body/cause can echo the request content
       // (the query + retrieved chunks in variableSuffix, or paste content on the
@@ -254,15 +273,17 @@ export async function runAgent<T>(opts: RunAgentOpts<T>): Promise<T> {
     // ── First attempt ──
     let res = await call(baseMessages);
     if (metered) attempts.push(res.usage);
-    trace.update({
-      metadata: {
-        cacheWrite: res.usage.cache_creation_input_tokens,
-        cacheRead: res.usage.cache_read_input_tokens,
-        inputTokens: res.usage.input_tokens,
-        outputTokens: res.usage.output_tokens,
-        model,
-      },
-    });
+    safeTrace(() =>
+      trace.update({
+        metadata: {
+          cacheWrite: res.usage.cache_creation_input_tokens,
+          cacheRead: res.usage.cache_read_input_tokens,
+          inputTokens: res.usage.input_tokens,
+          outputTokens: res.usage.output_tokens,
+          model,
+        },
+      }),
+    );
     recordGeneration(res.usage, false);
 
     let parsed = opts.schema.safeParse(extractToolArgs(res));
@@ -282,16 +303,18 @@ export async function runAgent<T>(opts: RunAgentOpts<T>): Promise<T> {
     ];
     res = await call(repairMessages);
     if (metered) attempts.push(res.usage);
-    trace.update({
-      metadata: {
-        cacheWrite: res.usage.cache_creation_input_tokens,
-        cacheRead: res.usage.cache_read_input_tokens,
-        inputTokens: res.usage.input_tokens,
-        outputTokens: res.usage.output_tokens,
-        model,
-        repair: true,
-      },
-    });
+    safeTrace(() =>
+      trace.update({
+        metadata: {
+          cacheWrite: res.usage.cache_creation_input_tokens,
+          cacheRead: res.usage.cache_read_input_tokens,
+          inputTokens: res.usage.input_tokens,
+          outputTokens: res.usage.output_tokens,
+          model,
+          repair: true,
+        },
+      }),
+    );
     recordGeneration(res.usage, true);
     parsed = opts.schema.safeParse(extractToolArgs(res));
     if (parsed.success) return parsed.data;
@@ -309,27 +332,36 @@ export async function runAgent<T>(opts: RunAgentOpts<T>): Promise<T> {
         schema: opts.schema,
       });
     }
-    trace.update({ level: 'ERROR', statusMessage: 'structured output failed validation' });
+    safeTrace(() =>
+      trace.update({ level: 'ERROR', statusMessage: 'structured output failed validation' }),
+    );
     throw new AppError('AI structured output failed validation (after one repair retry).', {
       code: 'AI_STRUCTURED_OUTPUT_INVALID',
     });
   } finally {
-    // SETTLE-or-REFUND, keyed on the reservation token's usageDate (P2-C). If no Anthropic
-    // attempt fired (a pre-call throw) → full REFUND; otherwise SETTLE to the actual that
-    // already billed (even on a post-call structured-validation throw — the provider spend
-    // happened, do not refund it).
-    if (reservation) {
-      if (attempts.length === 0) {
-        await refundReservation(reservation);
-      } else {
-        await settleSpend(reservation, actualAnthropicMicroUsd(attempts));
+    // codex P1 #1: a ledger throw (settle/refund) must NOT skip the flush. Nest the
+    // settle/refund in its own try whose `finally` always runs flushTracing() — else
+    // the trace+generation this change exists to capture are silently dropped on the
+    // exact failure path we most want recorded.
+    try {
+      // SETTLE-or-REFUND, keyed on the reservation token's usageDate (P2-C). If no
+      // Anthropic attempt fired (a pre-call throw) → full REFUND; otherwise SETTLE to
+      // the actual that already billed (even on a post-call structured-validation
+      // throw — the provider spend happened, do not refund it).
+      if (reservation) {
+        if (attempts.length === 0) {
+          await refundReservation(reservation);
+        } else {
+          await settleSpend(reservation, actualAnthropicMicroUsd(attempts));
+        }
       }
+    } finally {
+      // Deliver buffered trace + generation events before this (serverless / eval /
+      // script) context freezes or exits — the langfuse SDK otherwise loses them on
+      // its batch timer (LANGFUSE-TRACING-01). Null-safe + never throws. The chokepoint
+      // finally is the one flush point every Anthropic call passes through, INCLUDING
+      // the eval's own runAgent calls (the eval runner is not a serverless boundary).
+      await flushTracing();
     }
-    // Deliver buffered trace + generation events before this (serverless / eval /
-    // script) context freezes or exits — the langfuse SDK otherwise loses them on
-    // its batch timer (LANGFUSE-TRACING-01). Null-safe + never throws. The chokepoint
-    // finally is the one flush point every Anthropic call passes through, INCLUDING
-    // the eval's own runAgent calls (the eval runner is not a serverless boundary).
-    await flushTracing();
   }
 }

@@ -58,21 +58,21 @@ export async function runEvalSuite(): Promise<EvalSuiteResult> {
     }),
   );
 
-  // When EVAL_LIVE_REQUIRED==='1' (nightly / manual live runs), an ENV-UNAVAILABLE
-  // 'skip' is promoted to a FAILURE — a run that was supposed to reach its dependency
-  // (creds present) and could not is a RED gate, not a silent pass (C1-H1). A
-  // DATA-UNAVAILABLE 'skip' (no agent:* traces yet / Langfuse ingestion lag,
-  // LANGFUSE-TRACING-01) is TOLERATED even on a live run — it is not a regression,
-  // and the absence of `skipKind` defaults to the strict (env-unavailable) treatment.
+  // When EVAL_LIVE_REQUIRED==='1' (nightly / manual live runs), ANY surviving 'skip'
+  // is promoted to a FAILURE — a run that was supposed to reach its dependency and did
+  // not is a RED gate, not a silent pass (C1-H1). This INCLUDES a data-unavailable skip
+  // (codex P1 #3, LANGFUSE-TRACING-01): the flush fix in this change makes the live eval
+  // produce AND deliver its own agent:* traces, so zero traces after the cache-hit
+  // check's bounded ingestion-lag retry means DELIVERY is broken — exactly what the
+  // gate must catch. `skipKind` is now a DIAGNOSTIC ONLY (it shapes the failure reason:
+  // "flush/ingestion suspect" vs "creds missing"), never a tolerance switch.
   const liveRequired = process.env.EVAL_LIVE_REQUIRED === '1';
 
   const anyFail = results.some((r) => r.status === 'fail');
   const disallowedPending = results.some(
     (r) => r.status === 'pending' && !PENDING_ALLOWED.has(r.id),
   );
-  const liveSkipFail =
-    liveRequired &&
-    results.some((r) => r.status === 'skip' && r.skipKind !== 'data-unavailable');
+  const liveSkipFail = liveRequired && results.some((r) => r.status === 'skip');
   const exitCode: 0 | 1 = anyFail || disallowedPending || liveSkipFail ? 1 : 0;
 
   const summary = [

@@ -269,11 +269,13 @@ describe('runEvalSuite', () => {
     expect(result.checks.find((c) => c.id === 'extraction-floor')?.status).toBe('skip');
   });
 
-  it('Case 8b — exit 0 on a DATA-unavailable skip under EVAL_LIVE_REQUIRED=1 (ingestion-lag tolerated, LANGFUSE-TRACING-01)', async () => {
+  it('Case 8b — exit 1 on a DATA-unavailable skip under EVAL_LIVE_REQUIRED=1 (delivery broken after retry reds the gate, codex P1 #3 / LANGFUSE-TRACING-01)', async () => {
     process.env.EVAL_LIVE_REQUIRED = '1';
-    // A data-unavailable skip (no agent:* traces yet / Langfuse ingestion lag) is NOT
-    // a regression → tolerated even on a live run. The other two checks pass so the
-    // exit code reflects the cache-hit data-unavailable skip alone.
+    // codex P1 #3: under EVAL_LIVE_REQUIRED the cache-hit retry already absorbed benign
+    // Langfuse ingestion lag, so a data-unavailable skip that SURVIVES means the eval's
+    // own traces were not delivered (broken flush/ingestion) — a RED gate, NOT a
+    // tolerated pass. skipKind is now diagnostic only; ANY surviving skip reds the gate.
+    // The other two checks pass so the exit 1 is attributable to the cache-hit skip alone.
     vi.spyOn(extractionFloor, 'run').mockResolvedValueOnce({
       id: 'extraction-floor',
       description: extractionFloor.description,
@@ -291,10 +293,10 @@ describe('runEvalSuite', () => {
       description: cacheHit.description,
       status: 'skip',
       skipKind: 'data-unavailable',
-      reason: 'test-stub: no agent:* traces in the window',
+      reason: 'test-stub: no agent:* traces after retry — flush/ingestion suspect',
     });
     const result = await runEvalSuite();
-    expect(result.exitCode).toBe(0);
+    expect(result.exitCode).toBe(1);
     expect(result.checks.find((c) => c.id === 'cache-hit')?.skipKind).toBe('data-unavailable');
   });
 

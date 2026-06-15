@@ -70,10 +70,15 @@ describe('cacheHit.run', () => {
     expect(r.metric).toBe(0);
   });
 
-  it('isLangfuseConfigured() === false → skip, fetchTraces NOT called', async () => {
+  it('isLangfuseConfigured() === false → skip (env-unavailable), fetchTraces NOT called', async () => {
     isLangfuseConfigured.mockReturnValue(false);
     const r = await cacheHit.run();
     expect(r.status).toBe('skip');
+    // Pin the classification (codex P2 #5): the runner reds ANY skip under
+    // EVAL_LIVE_REQUIRED, and skipKind is the DIAGNOSTIC that distinguishes
+    // "creds missing" from "delivery broken". A misclassification would corrupt
+    // the failure reason the live gate surfaces.
+    expect(r.skipKind).toBe('env-unavailable');
     expect(r.reason).toContain('Langfuse');
     expect(fetchTraces).toHaveBeenCalledTimes(0);
     expect(getLangfuseClient).toHaveBeenCalledTimes(0);
@@ -118,15 +123,20 @@ describe('cacheHit.run', () => {
     });
     const r = await cacheHit.run();
     expect(r.status).toBe('skip');
+    // Pin classification (codex P2 #5): data-unavailable (dependency reached, no data)
+    // — NOT env-unavailable. Under EVAL_LIVE_REQUIRED the runner reds this; off the live
+    // path it is non-blocking. The reason must read "insufficient data" on the non-live path.
+    expect(r.skipKind).toBe('data-unavailable');
     expect(r.reason).toContain('insufficient data');
   });
 
-  it('non-array res.data (e.g. a swallowed 401) → skip, never a throw', async () => {
+  it('non-array res.data (e.g. a swallowed 401) → skip (data-unavailable), never a throw', async () => {
     // The Array.isArray(res.data) guard treats a malformed response as zero
     // traces → counted 0 → skip (fail-OPEN on PR/local, RED under EVAL_LIVE_REQUIRED).
     fetchTraces.mockResolvedValueOnce({ data: undefined });
     const r = await cacheHit.run();
     expect(r.status).toBe('skip');
+    expect(r.skipKind).toBe('data-unavailable');
   });
 
   it('fetchTraces rejection propagates (the runner, not this check, converts it to fail)', async () => {

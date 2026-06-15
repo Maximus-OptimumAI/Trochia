@@ -232,13 +232,48 @@ describe('runAgent — Langfuse tracing', () => {
     );
   });
 
-  it('flushes tracing in the finally (delivery in serverless / eval contexts)', async () => {
+  it('AWAITS flushTracing in the finally before resolving — a non-awaited void flush would not block (codex P2 #4)', async () => {
+    // Proves the flush is AWAITED, not fire-and-forget. We gate the flush so it cannot
+    // complete until we release it: runAgent must PARK on `await flushTracing()` and
+    // stay unresolved until the gate opens, then resolve strictly AFTER the flush ends.
+    // If client.ts did `void flushTracing()` (not awaited), runAgent would resolve while
+    // the gate is still closed → `settled` would be true at the mid-test assertion → FAIL.
     langfuseSpy = makeSpyLangfuse();
     server.use(http.post(ANTHROPIC_URL, () => HttpResponse.json(anthropicToolResponse({ label: 'ok' }))));
     const runAgent = await importRunAgent({ AI_FALLBACK_ENABLED: 'false' });
-    await runAgent({ taskClass: 'classify', stablePrefix: { system: 's' }, variableSuffix: 'x', schema: TestSchema });
     const { flushTracing } = await import('@/lib/langfuse');
-    expect(flushTracing).toHaveBeenCalled();
+
+    const order: string[] = [];
+    let releaseFlush!: () => void;
+    const flushGate = new Promise<void>((res) => {
+      releaseFlush = res;
+    });
+    (flushTracing as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(async () => {
+      order.push('flush:start');
+      await flushGate;
+      order.push('flush:end');
+    });
+
+    let settled = false;
+    const p = runAgent({
+      taskClass: 'classify',
+      stablePrefix: { system: 's' },
+      variableSuffix: 'x',
+      schema: TestSchema,
+    }).then(() => {
+      settled = true;
+      order.push('runAgent:resolved');
+    });
+
+    // Drain microtasks + a macrotask. runAgent should be parked on the awaited flush.
+    await new Promise((r) => setTimeout(r, 10));
+    expect(order).toContain('flush:start');
+    expect(settled).toBe(false); // void flushTracing() would have let it resolve here
+
+    releaseFlush();
+    await p;
+    expect(settled).toBe(true);
+    expect(order).toEqual(['flush:start', 'flush:end', 'runAgent:resolved']);
   });
 
   it('A / codex#2 / CSO-H1 — on an Anthropic error the trace statusMessage is STATIC (provider status only), never the provider message/body', async () => {
