@@ -368,9 +368,22 @@ export async function runAgent<T>(opts: RunAgentOpts<T>): Promise<T> {
       // Billing-integrity event (NOT a tracing one) → logger.error, alertable. Not
       // rethrown: masking the AI result with a ledger error is worse than an unsettled
       // reservation, which is bounded by the daily-cap window and reconcilable.
+      // codex re-gate-2 P2: because we deliberately do NOT rethrow, THIS log is the only
+      // reconciliation signal — make it actionable. `err` is a static AppError from cap.ts
+      // and carries no reservation identity, so attach the reservation key + attempt count.
+      // CSO constraint (binding): ONLY accountId (internal UUID, already the Langfuse
+      // userId), usageDate, reservedMicroUsd, and the attempt count — no customer PII /
+      // cap-table/SAFE financials. (reservation is defined whenever this catch fires —
+      // settle/refund only runs inside `if (reservation)` — but optional-chain for the type.)
       logger.error(
         'ai/client: cost ledger settle/refund failed — reservation may be unsettled, reconcile',
-        { err },
+        {
+          err,
+          accountId: reservation?.accountId,
+          usageDate: reservation?.usageDate,
+          reservedMicroUsd: reservation?.reservedMicroUsd,
+          attempts: attempts.length,
+        },
       );
     } finally {
       // Deliver buffered trace + generation events before this (serverless / eval /
