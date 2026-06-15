@@ -55,14 +55,15 @@ Read from `node_modules/langfuse-core/lib/index.d.ts`. NOT from memory.
   scripts. `flush(cb?)` (7434) is fire-and-forget; do not use it where we need
   delivery before the process exits.
 
-### Anthropic cache-token → usageDetails mapping (VERIFY-BEFORE-CODING)
+### Anthropic cache-token → usageDetails mapping (VERIFIED 2026-06-15)
 
-Anthropic `message.usage` returns `input_tokens`, `output_tokens`,
-`cache_creation_input_tokens`, `cache_read_input_tokens`. The SDK type only
-guarantees `usageDetails: Record<string, number>`; the cost mapping is a Langfuse
-server-side concern keyed on the model name + metric-key names. **Candidate mapping
-(confirm against the Langfuse Anthropic model definitions / docs at implementation
-time — this is the one thing not pinned by the .d.ts):**
+Confirmed against the Langfuse docs (Model Usage & Cost Tracking,
+`langfuse.com/docs/observability/features/token-and-cost-tracking`). The canonical
+Anthropic keys are `input`, `output`, `cache_read_input_tokens` (the doc's exact
+example), and `total` is derived from their sum if omitted. The doc also states
+"Usage types can be arbitrary strings" and "any type that includes the string
+`input` is summarized as input usage" — so `cache_creation_input_tokens` (cache-write)
+is a valid input-type key. **Verified mapping:**
 
 ```ts
 usageDetails: {
@@ -73,11 +74,21 @@ usageDetails: {
 }
 ```
 
-The generation `model` MUST be the same model string `pickModel(taskClass)` returns
-(e.g. `claude-haiku-4-5`) for Langfuse to match a price row. If auto-cost does not
-resolve for our exact model ids, the fallback is to attach `costDetails` computed
-from `src/ai/cost/rates.ts` (we already price Anthropic there) — record this as the
-contingency, not the default.
+The generation `model` is the same string `pickModel(taskClass)` returns (e.g.
+`claude-haiku-4-5`). Cost is then **inferred** by Langfuse when its model table has a
+price row for that id.
+
+**Cost decision (DEVIATION from the plan's costDetails contingency — keys were
+unclear then, are verified now, so the "if unclear → costDetails" branch does NOT
+trigger):** ingest `usageDetails` ONLY; do NOT ingest `costDetails` from
+`src/ai/cost/rates.ts`. Reason: `actualAnthropicMicroUsd` in rates.ts prices EVERY
+model at OPUS worst-case rates (it is the $5/day cap's provable upper bound, not a
+per-model figure), so feeding it as a Haiku/Sonnet generation's cost would
+over-report cost ~10-25x — knowingly wrong, worse than no cost. Accurate cost is
+Langfuse's job from the model definition; getting cost to light up for the Claude
+4.x ids is a FOLLOW-UP (add custom model definitions in Langfuse, or add a per-model
+rate table to rates.ts) — explicitly out of scope here. Token usage is tracked
+accurately regardless.
 
 ## Hard contracts to preserve (each confirmed)
 
@@ -145,27 +156,23 @@ No change to `isLangfuseConfigured` / `getLangfuseClient`.
     metadata: { repair: <bool> },            // safe flags only — NO input/output
   });
   ```
-  No `input`/`output` fields (privacy contract 3). On the error path, do NOT add a
-  generation that carries the provider body; keep the existing static
-  `trace.update({ level:'ERROR', statusMessage })` (contract 2).
-- **Flush decision for `client.ts`:** do NOT flush per-call (kills batching). Flush is
-  the caller's responsibility at the serverless boundary (below). Document this in the
-  `runAgent` header.
+  On the error path, do NOT carry the provider body; mark the generation
+  `level: 'ERROR'` with the SAME static `statusMessage` the trace uses, and keep the
+  existing `trace.update({ level:'ERROR', statusMessage })` (contract 2). No
+  `input`/`output` on the generation (privacy contract 3).
+- **Flush in the `runAgent` `finally` (REVISED approach).** `await flushTracing()` at
+  the end of the existing `finally` block (after settle/refund). Rationale: the
+  CHOKEPOINT finally is the only flush point that (a) the eval's own `runAgent` calls
+  pass through — the eval runner is NOT a serverless boundary, so a boundary-only
+  flush would never deliver the eval's traces and `cache-hit` could not become a real
+  assertion — and (b) cannot miss a call site (every Anthropic call goes through here
+  by the chokepoint rule). Trade-off: a per-call `flushAsync()` round-trip; acceptable
+  because agent calls are not hot-loop and Trochia's call volume is low. The Inngest
+  functions and tRPC routers are left UNTOUCHED.
 
-### 3. Flush at the serverless / script boundaries (delivery — the critical gap)
-Call `await flushTracing()` after agent work completes, in each short-lived context:
-- **`src/inngest/functions/ai-health-check.ts`** — MUST-HAVE. The deploy-time Haiku
-  ping (`src/ai/health-check.ts` → `runHealthCheck` → `runAgent`) is the guaranteed
-  producer of the first `agent:*` trace; flushing here is what lands a trace in the
-  7d window on every deploy, closing the nightly `cache-hit` no-data gap at the
-  source.
-- **`src/inngest/functions/embed-memory.ts`** and any other Inngest fn that invokes an
-  agent — flush at the end of the step.
-- **tRPC procedures that call `runAgent`** (`src/server/routers/memory.ts`,
-  `src/server/routers/qa.ts`) — flush in a `finally` before the resolver returns.
-  (Confirm exact call sites during implementation; the pattern is the same:
-  `try { ...agent... } finally { await flushTracing(); }`.)
-- Keep each flush null-safe (no Langfuse creds → `flushTracing()` is a no-op).
+### 3. (removed) — flush now lives in the client.ts chokepoint finally (section 2)
+No edits to `src/inngest/*` or `src/server/routers/*`. The single flush in
+`runAgent`'s `finally` covers every producer, including the eval's own runAgent calls.
 
 ### 4. `src/ai/eval/types.ts` — discriminate skip cause (additive, optional field)
 Add an optional discriminator so the runner can tell "creds absent" from "no data":

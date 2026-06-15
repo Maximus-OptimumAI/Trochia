@@ -27,7 +27,7 @@ import { z, type ZodType } from 'zod';
 
 import { env } from '@/lib/env';
 import { AppError } from '@/lib/errors';
-import { getLangfuseClient } from '@/lib/langfuse';
+import { getLangfuseClient, flushTracing } from '@/lib/langfuse';
 import { logger } from '@/lib/logger';
 
 import {
@@ -46,11 +46,20 @@ import { pickModel, type TaskClass } from './router';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY ?? '' });
 
+/** Minimal shape of the Langfuse generation handle we use. */
+interface GenerationLike {
+  end(payload?: Record<string, unknown>): void;
+}
 /** Minimal shape of the Langfuse trace handle we use (so the stub's `null` is type-safe). */
 interface TraceLike {
   update(payload: Record<string, unknown>): void;
+  generation(payload: Record<string, unknown>): GenerationLike;
 }
-const NOOP_TRACE: TraceLike = { update: () => undefined };
+const NOOP_GENERATION: GenerationLike = { end: () => undefined };
+const NOOP_TRACE: TraceLike = {
+  update: () => undefined,
+  generation: () => NOOP_GENERATION,
+};
 
 const TOOL_NAME = 'emit_result';
 const DEFAULT_MAX_TOKENS = 1024;
@@ -133,8 +142,33 @@ export async function runAgent<T>(opts: RunAgentOpts<T>): Promise<T> {
   const model = pickModel(opts.taskClass);
   const langfuse = getLangfuseClient();
   const trace: TraceLike =
-    (langfuse?.trace({ name: `agent:${opts.taskClass}`, metadata: { model } }) as TraceLike | undefined) ??
-    NOOP_TRACE;
+    (langfuse?.trace({
+      name: `agent:${opts.taskClass}`,
+      // The tenant account id (an internal UUID, not PII) is the natural Langfuse
+      // userId — it enables per-tenant cost/usage views. Undefined on un-metered
+      // internal calls (health-check), which is fine (optional field).
+      userId: opts.costContext?.accountId,
+      metadata: { model },
+    }) as TraceLike | undefined) ?? NOOP_TRACE;
+
+  // Additive GENERATION observation per Anthropic attempt (LANGFUSE-TRACING-01):
+  // carries `model` + token `usageDetails` so Langfuse can compute auto-cost from
+  // its model table. KEEP this ADDITIVE — the trace-level cache metadata above is a
+  // SEPARATE write the cache-hit eval reads via fetchTraces; do not move it here.
+  // Privacy (Trochia CLAUDE.md): NO raw input/output — `variableSuffix` may carry
+  // untrusted/PII. usageDetails keys verified against Langfuse docs 2026-06-15.
+  function recordGeneration(usage: AnthropicAttemptUsage, repair: boolean): void {
+    trace
+      .generation({ name: 'anthropic.messages', model, metadata: { repair } })
+      .end({
+        usageDetails: {
+          input: usage.input_tokens,
+          output: usage.output_tokens,
+          cache_read_input_tokens: usage.cache_read_input_tokens ?? 0,
+          cache_creation_input_tokens: usage.cache_creation_input_tokens ?? 0,
+        },
+      });
+  }
 
   // The Zod schema → a forced-tool-use tool definition (reliable structured output).
   const { $schema: _drop, ...jsonSchema } = z.toJSONSchema(opts.schema) as Record<string, unknown>;
@@ -172,13 +206,14 @@ export async function runAgent<T>(opts: RunAgentOpts<T>): Promise<T> {
       // Use a STATIC status string plus the safe numeric provider status only.
       const providerStatus =
         typeof (e as { status?: unknown }).status === 'number' ? (e as { status: number }).status : undefined;
-      trace.update({
-        level: 'ERROR',
-        statusMessage:
-          providerStatus !== undefined
-            ? `anthropic request failed (status ${providerStatus})`
-            : 'anthropic request failed',
-      });
+      // STATIC status-only string — never the provider message/body (CSO-H1).
+      const statusMessage =
+        providerStatus !== undefined
+          ? `anthropic request failed (status ${providerStatus})`
+          : 'anthropic request failed';
+      trace.update({ level: 'ERROR', statusMessage });
+      // Mark an ERROR generation with the SAME static string — no usage, no body.
+      trace.generation({ name: 'anthropic.messages', model, level: 'ERROR', statusMessage }).end();
       // R1 (codex re-gate P1 / CSO-H1 second half): do NOT re-throw the raw
       // provider error — its message/body/cause can echo the request content
       // (the query + retrieved chunks in variableSuffix, or paste content on the
@@ -228,6 +263,7 @@ export async function runAgent<T>(opts: RunAgentOpts<T>): Promise<T> {
         model,
       },
     });
+    recordGeneration(res.usage, false);
 
     let parsed = opts.schema.safeParse(extractToolArgs(res));
     if (parsed.success) return parsed.data;
@@ -256,6 +292,7 @@ export async function runAgent<T>(opts: RunAgentOpts<T>): Promise<T> {
         repair: true,
       },
     });
+    recordGeneration(res.usage, true);
     parsed = opts.schema.safeParse(extractToolArgs(res));
     if (parsed.success) return parsed.data;
 
@@ -288,5 +325,11 @@ export async function runAgent<T>(opts: RunAgentOpts<T>): Promise<T> {
         await settleSpend(reservation, actualAnthropicMicroUsd(attempts));
       }
     }
+    // Deliver buffered trace + generation events before this (serverless / eval /
+    // script) context freezes or exits — the langfuse SDK otherwise loses them on
+    // its batch timer (LANGFUSE-TRACING-01). Null-safe + never throws. The chokepoint
+    // finally is the one flush point every Anthropic call passes through, INCLUDING
+    // the eval's own runAgent calls (the eval runner is not a serverless boundary).
+    await flushTracing();
   }
 }

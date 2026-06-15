@@ -269,6 +269,60 @@ describe('runEvalSuite', () => {
     expect(result.checks.find((c) => c.id === 'extraction-floor')?.status).toBe('skip');
   });
 
+  it('Case 8b — exit 0 on a DATA-unavailable skip under EVAL_LIVE_REQUIRED=1 (ingestion-lag tolerated, LANGFUSE-TRACING-01)', async () => {
+    process.env.EVAL_LIVE_REQUIRED = '1';
+    // A data-unavailable skip (no agent:* traces yet / Langfuse ingestion lag) is NOT
+    // a regression → tolerated even on a live run. The other two checks pass so the
+    // exit code reflects the cache-hit data-unavailable skip alone.
+    vi.spyOn(extractionFloor, 'run').mockResolvedValueOnce({
+      id: 'extraction-floor',
+      description: extractionFloor.description,
+      status: 'pass',
+      reason: 'test-stub: pass',
+    });
+    vi.spyOn(qaGrounding, 'run').mockResolvedValueOnce({
+      id: 'qa-grounding',
+      description: qaGrounding.description,
+      status: 'pass',
+      reason: 'test-stub: pass',
+    });
+    vi.spyOn(cacheHit, 'run').mockResolvedValueOnce({
+      id: 'cache-hit',
+      description: cacheHit.description,
+      status: 'skip',
+      skipKind: 'data-unavailable',
+      reason: 'test-stub: no agent:* traces in the window',
+    });
+    const result = await runEvalSuite();
+    expect(result.exitCode).toBe(0);
+    expect(result.checks.find((c) => c.id === 'cache-hit')?.skipKind).toBe('data-unavailable');
+  });
+
+  it('Case 8c — exit 1 on an ENV-unavailable skip under EVAL_LIVE_REQUIRED=1 (missing creds still RED the gate)', async () => {
+    process.env.EVAL_LIVE_REQUIRED = '1';
+    vi.spyOn(extractionFloor, 'run').mockResolvedValueOnce({
+      id: 'extraction-floor',
+      description: extractionFloor.description,
+      status: 'pass',
+      reason: 'test-stub: pass',
+    });
+    vi.spyOn(qaGrounding, 'run').mockResolvedValueOnce({
+      id: 'qa-grounding',
+      description: qaGrounding.description,
+      status: 'pass',
+      reason: 'test-stub: pass',
+    });
+    vi.spyOn(cacheHit, 'run').mockResolvedValueOnce({
+      id: 'cache-hit',
+      description: cacheHit.description,
+      status: 'skip',
+      skipKind: 'env-unavailable',
+      reason: 'test-stub: Langfuse not configured',
+    });
+    const result = await runEvalSuite();
+    expect(result.exitCode).toBe(1);
+  });
+
   it('Case 9 — a thrown check becomes a sanitized fail (not a rejection), report still produced', async () => {
     // Per-check try/catch isolation (/codex P2 + /cso L3): a check that throws
     // must NOT reject Promise.all (which would skip the report write). It is

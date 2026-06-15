@@ -58,16 +58,21 @@ export async function runEvalSuite(): Promise<EvalSuiteResult> {
     }),
   );
 
-  // When EVAL_LIVE_REQUIRED==='1' (nightly / manual live runs), a 'skip'
-  // (env-unavailable) is promoted to a FAILURE — a run that was supposed to
-  // reach its dependency and could not is a RED gate, not a silent pass (C1-H1).
+  // When EVAL_LIVE_REQUIRED==='1' (nightly / manual live runs), an ENV-UNAVAILABLE
+  // 'skip' is promoted to a FAILURE — a run that was supposed to reach its dependency
+  // (creds present) and could not is a RED gate, not a silent pass (C1-H1). A
+  // DATA-UNAVAILABLE 'skip' (no agent:* traces yet / Langfuse ingestion lag,
+  // LANGFUSE-TRACING-01) is TOLERATED even on a live run — it is not a regression,
+  // and the absence of `skipKind` defaults to the strict (env-unavailable) treatment.
   const liveRequired = process.env.EVAL_LIVE_REQUIRED === '1';
 
   const anyFail = results.some((r) => r.status === 'fail');
   const disallowedPending = results.some(
     (r) => r.status === 'pending' && !PENDING_ALLOWED.has(r.id),
   );
-  const liveSkipFail = liveRequired && results.some((r) => r.status === 'skip');
+  const liveSkipFail =
+    liveRequired &&
+    results.some((r) => r.status === 'skip' && r.skipKind !== 'data-unavailable');
   const exitCode: 0 | 1 = anyFail || disallowedPending || liveSkipFail ? 1 : 0;
 
   const summary = [

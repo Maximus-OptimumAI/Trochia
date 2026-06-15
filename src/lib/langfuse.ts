@@ -15,6 +15,7 @@
 import { Langfuse } from 'langfuse';
 
 import { env } from '@/lib/env';
+import { logger } from '@/lib/logger';
 
 /** True iff the 3 Langfuse credentials are set. */
 export function isLangfuseConfigured(): boolean {
@@ -33,4 +34,26 @@ export function getLangfuseClient(): Langfuse | null {
     baseUrl: env.LANGFUSE_HOST,
   });
   return cached;
+}
+
+/**
+ * Deliver any buffered Langfuse events before a serverless freeze or a short-lived
+ * script (the eval harness, the deploy health-check) exits. The langfuse Node SDK
+ * batches events and flushes on a timer, so without an explicit flush the process
+ * exits before delivery and traces are silently lost (LANGFUSE-TRACING-01).
+ *
+ * Null-safe and never throws: with no creds `getLangfuseClient()` is `null` and this
+ * is a no-op; a flush failure is logged, not thrown, so tracing never breaks a real
+ * request. Called from the `ai/client.ts` `runAgent` `finally` (the chokepoint) so it
+ * covers every Anthropic call — including the eval's own `runAgent` calls, which is
+ * what lets the `cache-hit` check read real traces.
+ */
+export async function flushTracing(): Promise<void> {
+  const client = getLangfuseClient();
+  if (!client) return;
+  try {
+    await client.flushAsync();
+  } catch (err) {
+    logger.warn('langfuse: flushAsync failed (non-fatal — tracing only)', { err });
+  }
 }

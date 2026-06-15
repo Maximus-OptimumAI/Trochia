@@ -31,8 +31,13 @@ function anthropicToolResponse(input: unknown, opts: { cacheWrite?: number; cach
 /** Spy Langfuse client (matches the subset of the API client.ts touches). */
 function makeSpyLangfuse() {
   const traceUpdate = vi.fn();
-  const trace = vi.fn(() => ({ update: traceUpdate }));
-  return { client: { trace }, trace, traceUpdate };
+  const generationEnd = vi.fn();
+  const generationUpdate = vi.fn();
+  // trace.generation(body) → a handle with .end(usage) / .update(); client.ts calls
+  // trace.generation({ model, ... }).end({ usageDetails }) (LANGFUSE-TRACING-01).
+  const generation = vi.fn(() => ({ end: generationEnd, update: generationUpdate }));
+  const trace = vi.fn(() => ({ update: traceUpdate, generation }));
+  return { client: { trace }, trace, traceUpdate, generation, generationEnd, generationUpdate };
 }
 
 let langfuseSpy: ReturnType<typeof makeSpyLangfuse> | null = null;
@@ -40,6 +45,23 @@ let langfuseSpy: ReturnType<typeof makeSpyLangfuse> | null = null;
 vi.mock('@/lib/langfuse', () => ({
   isLangfuseConfigured: () => langfuseSpy !== null,
   getLangfuseClient: () => (langfuseSpy ? langfuseSpy.client : null),
+  // client.ts now flushes in its finally (LANGFUSE-TRACING-01); a spy so a test can
+  // assert it ran. Always resolves regardless of langfuseSpy (null-safe in real code).
+  flushTracing: vi.fn(() => Promise.resolve()),
+}));
+
+// The metered path (costContext present) reserves against the $5/day ledger before
+// the call — mock the store to a no-op so the userId/metered test never hits a DB.
+// Existing tests pass no costContext (metered=false) so this mock is simply unused.
+vi.mock('@/ai/cost/cap', () => ({
+  CAP_MICRO_USD: 5_000_000,
+  reserveWithinDailyCap: vi.fn(async (accountId: string, estMicroUsd: number) => ({
+    accountId,
+    usageDate: '2026-06-15',
+    reservedMicroUsd: estMicroUsd,
+  })),
+  settleSpend: vi.fn(async () => undefined),
+  refundReservation: vi.fn(async () => undefined),
 }));
 
 /** Fresh import of `runAgent` after setting env (env.ts parses process.env at module load). */
@@ -176,6 +198,47 @@ describe('runAgent — Langfuse tracing', () => {
     const meta = (metaCall![0] as { metadata: Record<string, unknown> }).metadata;
     expect(meta).toMatchObject({ cacheWrite: 250, cacheRead: 30, inputTokens: 42, outputTokens: 7 });
     expect(meta.model).toMatch(/haiku/);
+
+    // ADDITIVE generation observation: model + usageDetails for Langfuse auto-cost.
+    // The trace-level cache metadata above is UNCHANGED (cache-hit reads it).
+    expect(langfuseSpy!.generation).toHaveBeenCalledWith(
+      expect.objectContaining({ model: expect.stringMatching(/haiku/) }),
+    );
+    expect(langfuseSpy!.generationEnd).toHaveBeenCalledWith(
+      expect.objectContaining({
+        usageDetails: expect.objectContaining({
+          input: 42,
+          output: 7,
+          cache_read_input_tokens: 30,
+          cache_creation_input_tokens: 250,
+        }),
+      }),
+    );
+  });
+
+  it('sets the trace userId to the costContext accountId (metered path)', async () => {
+    langfuseSpy = makeSpyLangfuse();
+    server.use(http.post(ANTHROPIC_URL, () => HttpResponse.json(anthropicToolResponse({ label: 'ok' }))));
+    const runAgent = await importRunAgent({ AI_FALLBACK_ENABLED: 'false' });
+    await runAgent({
+      taskClass: 'classify',
+      stablePrefix: { system: 's' },
+      variableSuffix: 'x',
+      schema: TestSchema,
+      costContext: { accountId: 'acct_123' },
+    });
+    expect(langfuseSpy.trace).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'acct_123' }),
+    );
+  });
+
+  it('flushes tracing in the finally (delivery in serverless / eval contexts)', async () => {
+    langfuseSpy = makeSpyLangfuse();
+    server.use(http.post(ANTHROPIC_URL, () => HttpResponse.json(anthropicToolResponse({ label: 'ok' }))));
+    const runAgent = await importRunAgent({ AI_FALLBACK_ENABLED: 'false' });
+    await runAgent({ taskClass: 'classify', stablePrefix: { system: 's' }, variableSuffix: 'x', schema: TestSchema });
+    const { flushTracing } = await import('@/lib/langfuse');
+    expect(flushTracing).toHaveBeenCalled();
   });
 
   it('A / codex#2 / CSO-H1 — on an Anthropic error the trace statusMessage is STATIC (provider status only), never the provider message/body', async () => {
@@ -216,8 +279,14 @@ describe('runAgent — Langfuse tracing', () => {
     expect(errorCall).toBeDefined();
     const statusMessage = (errorCall![0] as { statusMessage: string }).statusMessage;
     expect(statusMessage).toBe('anthropic request failed (status 400)');
-    // The provider message/body NEVER reaches the trace.
-    const allTraceArgs = JSON.stringify(langfuseSpy.traceUpdate.mock.calls);
+    // The provider message/body NEVER reaches the trace OR the generation —
+    // sweep trace-open, trace.update, generation(), and generation.end() args.
+    const allTraceArgs = JSON.stringify([
+      langfuseSpy.trace.mock.calls,
+      langfuseSpy.traceUpdate.mock.calls,
+      langfuseSpy.generation.mock.calls,
+      langfuseSpy.generationEnd.mock.calls,
+    ]);
     expect(allTraceArgs).not.toContain(SENSITIVE);
   });
 

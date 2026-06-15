@@ -16,8 +16,11 @@ const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 
 function makeSpyLangfuse() {
   const traceUpdate = vi.fn();
-  const trace = vi.fn(() => ({ update: traceUpdate }));
-  return { client: { trace }, trace, traceUpdate };
+  // runAgent now also calls trace.generation({...}).end({...}) (LANGFUSE-TRACING-01);
+  // the handle must expose generation() or runAgent throws.
+  const generation = vi.fn(() => ({ end: vi.fn(), update: vi.fn() }));
+  const trace = vi.fn(() => ({ update: traceUpdate, generation }));
+  return { client: { trace }, trace, traceUpdate, generation };
 }
 
 let langfuseSpy: ReturnType<typeof makeSpyLangfuse> | null = null;
@@ -26,6 +29,7 @@ const seenModels: string[] = [];
 vi.mock('@/lib/langfuse', () => ({
   isLangfuseConfigured: () => langfuseSpy !== null,
   getLangfuseClient: () => (langfuseSpy ? langfuseSpy.client : null),
+  flushTracing: () => Promise.resolve(),
 }));
 
 beforeEach(() => {

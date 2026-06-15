@@ -59,6 +59,7 @@ export const cacheHit: EvalCheck = {
         id: this.id,
         description: this.description,
         status: 'skip' as const,
+        skipKind: 'env-unavailable' as const,
         reason:
           'Langfuse not configured — cache-hit read skipped (env-unavailable, non-blocking)',
       };
@@ -71,6 +72,7 @@ export const cacheHit: EvalCheck = {
         id: this.id,
         description: this.description,
         status: 'skip' as const,
+        skipKind: 'env-unavailable' as const,
         reason:
           'Langfuse client unavailable — cache-hit read skipped (env-unavailable, non-blocking)',
       };
@@ -80,41 +82,59 @@ export const cacheHit: EvalCheck = {
     // restricted whitelist that still returns `metadata` (the d.ts groups
     // input/output/metadata under 'io'); we read ONLY metadata.* below.
     const fromTimestamp = new Date(Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000);
-    const res = await client.fetchTraces({
-      fromTimestamp,
-      fields: 'core,io',
-      limit: TRACE_LIMIT,
-    });
+
+    // Ingestion-lag tolerance (LANGFUSE-TRACING-01): a live run may read moments
+    // after a trace was produced+flushed, before Langfuse has ingested it. When
+    // EVAL_LIVE_REQUIRED, retry the fetch a few times with a short backoff before
+    // concluding no-data. In every other context (PR / local / unit) this is a
+    // SINGLE fetch with no sleeps — so the fetchTraces call count / query signature
+    // is unchanged off the live path.
+    const liveRequired = process.env.EVAL_LIVE_REQUIRED === '1';
+    const maxTries = liveRequired ? 3 : 1;
+    const retryDelayMs = 5000;
 
     let cacheRead = 0;
     let inputTokens = 0;
     let counted = 0;
-    // Defensive: the SDK can resolve a response whose `data` is absent / non-array
-    // on some error paths (e.g. a creds 401 the SDK swallows). Treat a missing
-    // `data` as zero traces — which falls through to the counted===0 → 'skip'
-    // branch below (data-unavailable), never a throw.
-    const traces = Array.isArray(res.data) ? res.data : [];
-    for (const trace of traces) {
-      // Filter to Anthropic-chokepoint traces by the `agent:` name prefix.
-      if (!trace.name || !trace.name.startsWith(AGENT_NAME_PREFIX)) continue;
-      // WHITELIST: read ONLY the two metadata token counts; never .input/.output.
-      const meta = (trace.metadata ?? {}) as CacheMetadata;
-      cacheRead += meta.cacheRead ?? 0;
-      inputTokens += meta.inputTokens ?? 0;
-      counted += 1;
+    for (let attempt = 1; attempt <= maxTries; attempt++) {
+      const res = await client.fetchTraces({
+        fromTimestamp,
+        fields: 'core,io',
+        limit: TRACE_LIMIT,
+      });
+      // Defensive: the SDK can resolve a response whose `data` is absent / non-array
+      // on some error paths (e.g. a creds 401 the SDK swallows). Treat a missing
+      // `data` as zero traces — which falls through to the counted===0 → 'skip'
+      // branch below (data-unavailable), never a throw.
+      const traces = Array.isArray(res.data) ? res.data : [];
+      cacheRead = 0;
+      inputTokens = 0;
+      counted = 0;
+      for (const trace of traces) {
+        // Filter to Anthropic-chokepoint traces by the `agent:` name prefix.
+        if (!trace.name || !trace.name.startsWith(AGENT_NAME_PREFIX)) continue;
+        // WHITELIST: read ONLY the two metadata token counts; never .input/.output.
+        const meta = (trace.metadata ?? {}) as CacheMetadata;
+        cacheRead += meta.cacheRead ?? 0;
+        inputTokens += meta.inputTokens ?? 0;
+        counted += 1;
+      }
+      if (counted > 0) break;
+      if (attempt < maxTries) await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
     }
 
     // Zero agent:* traces in the window is data-unavailable, NOT a cache
-    // failure — return 'skip' so we never conflate "no traffic yet" (or a
-    // swallowed 401) with "caching broken" (/codex P1 + /cso). 'skip' is
-    // fail-OPEN on PR/local and a RED gate under EVAL_LIVE_REQUIRED, so a quiet
-    // nightly still surfaces a data/creds problem rather than a false 'fail'.
-    // Also makes the ratio division below safe (no inputTokens → no divide).
+    // failure — return 'skip' (skipKind 'data-unavailable') so we never conflate
+    // "no traffic yet" / ingestion lag (or a swallowed 401) with "caching broken"
+    // (/codex P1 + /cso). The runner TOLERATES a data-unavailable skip even under
+    // EVAL_LIVE_REQUIRED (it only reds env-unavailable skips). Also makes the ratio
+    // division below safe (no inputTokens → no divide).
     if (counted === 0) {
       return {
         id: this.id,
         description: this.description,
         status: 'skip' as const,
+        skipKind: 'data-unavailable' as const,
         reason: `no agent:* traces in the ${WINDOW_DAYS}d window — insufficient data (data-unavailable, non-blocking)`,
       };
     }
