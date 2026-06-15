@@ -58,9 +58,14 @@ export async function runEvalSuite(): Promise<EvalSuiteResult> {
     }),
   );
 
-  // When EVAL_LIVE_REQUIRED==='1' (nightly / manual live runs), a 'skip'
-  // (env-unavailable) is promoted to a FAILURE — a run that was supposed to
-  // reach its dependency and could not is a RED gate, not a silent pass (C1-H1).
+  // When EVAL_LIVE_REQUIRED==='1' (nightly / manual live runs), ANY surviving 'skip'
+  // is promoted to a FAILURE — a run that was supposed to reach its dependency and did
+  // not is a RED gate, not a silent pass (C1-H1). This INCLUDES a data-unavailable skip
+  // (codex P1 #3, LANGFUSE-TRACING-01): the flush fix in this change makes the live eval
+  // produce AND deliver its own agent:* traces, so zero traces after the cache-hit
+  // check's bounded ingestion-lag retry means DELIVERY is broken — exactly what the
+  // gate must catch. `skipKind` is now a DIAGNOSTIC ONLY (it shapes the failure reason:
+  // "flush/ingestion suspect" vs "creds missing"), never a tolerance switch.
   const liveRequired = process.env.EVAL_LIVE_REQUIRED === '1';
 
   const anyFail = results.some((r) => r.status === 'fail');

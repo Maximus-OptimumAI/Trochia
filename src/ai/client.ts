@@ -27,7 +27,7 @@ import { z, type ZodType } from 'zod';
 
 import { env } from '@/lib/env';
 import { AppError } from '@/lib/errors';
-import { getLangfuseClient } from '@/lib/langfuse';
+import { getLangfuseClient, flushTracing } from '@/lib/langfuse';
 import { logger } from '@/lib/logger';
 
 import {
@@ -46,11 +46,20 @@ import { pickModel, type TaskClass } from './router';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY ?? '' });
 
+/** Minimal shape of the Langfuse generation handle we use. */
+interface GenerationLike {
+  end(payload?: Record<string, unknown>): void;
+}
 /** Minimal shape of the Langfuse trace handle we use (so the stub's `null` is type-safe). */
 interface TraceLike {
   update(payload: Record<string, unknown>): void;
+  generation(payload: Record<string, unknown>): GenerationLike;
 }
-const NOOP_TRACE: TraceLike = { update: () => undefined };
+const NOOP_GENERATION: GenerationLike = { end: () => undefined };
+const NOOP_TRACE: TraceLike = {
+  update: () => undefined,
+  generation: () => NOOP_GENERATION,
+};
 
 const TOOL_NAME = 'emit_result';
 const DEFAULT_MAX_TOKENS = 1024;
@@ -131,10 +140,58 @@ function extractToolArgs(res: Anthropic.Messages.Message): unknown {
  */
 export async function runAgent<T>(opts: RunAgentOpts<T>): Promise<T> {
   const model = pickModel(opts.taskClass);
-  const langfuse = getLangfuseClient();
-  const trace: TraceLike =
-    (langfuse?.trace({ name: `agent:${opts.taskClass}`, metadata: { model } }) as TraceLike | undefined) ??
-    NOOP_TRACE;
+  // Guard CREATION, not only the writes (codex re-gate P1 #2): a Langfuse client
+  // constructor / trace-open throw must NOT fail runAgent. On any throw, log and fall
+  // back to NOOP_TRACE so the AI call proceeds untraced rather than failing.
+  let trace: TraceLike = NOOP_TRACE;
+  try {
+    const langfuse = getLangfuseClient();
+    trace =
+      (langfuse?.trace({
+        name: `agent:${opts.taskClass}`,
+        // The tenant account id (an internal UUID, not PII) is the natural Langfuse
+        // userId — it enables per-tenant cost/usage views. Undefined on un-metered
+        // internal calls (health-check), which is fine (optional field).
+        userId: opts.costContext?.accountId,
+        metadata: { model },
+      }) as TraceLike | undefined) ?? NOOP_TRACE;
+  } catch (err) {
+    logger.warn('langfuse: trace creation failed (non-fatal — tracing only)', { err });
+  }
+
+  // Isolate EVERY Langfuse write from product behavior (codex P1 #2 / CSO-LT-2): a
+  // tracing SDK throw must NEVER turn a successful Anthropic response into a failed
+  // runAgent. Same swallow+log contract as flushTracing(). Applied to every
+  // trace.update / trace.generation site below — NOT only the generation writes:
+  // a throw from the success-path trace.update is the same class of bug, two lines away.
+  function safeTrace(op: () => void): void {
+    try {
+      op();
+    } catch (err) {
+      logger.warn('langfuse: trace write failed (non-fatal — tracing only)', { err });
+    }
+  }
+
+  // Additive GENERATION observation per Anthropic attempt (LANGFUSE-TRACING-01):
+  // carries `model` + token `usageDetails` so Langfuse can compute auto-cost from
+  // its model table. KEEP this ADDITIVE — the trace-level cache metadata above is a
+  // SEPARATE write the cache-hit eval reads via fetchTraces; do not move it here.
+  // Privacy (Trochia CLAUDE.md): NO raw input/output — `variableSuffix` may carry
+  // untrusted/PII. usageDetails keys verified against Langfuse docs 2026-06-15.
+  function recordGeneration(usage: AnthropicAttemptUsage, repair: boolean): void {
+    safeTrace(() =>
+      trace
+        .generation({ name: 'anthropic.messages', model, metadata: { repair } })
+        .end({
+          usageDetails: {
+            input: usage.input_tokens,
+            output: usage.output_tokens,
+            cache_read_input_tokens: usage.cache_read_input_tokens ?? 0,
+            cache_creation_input_tokens: usage.cache_creation_input_tokens ?? 0,
+          },
+        }),
+    );
+  }
 
   // The Zod schema → a forced-tool-use tool definition (reliable structured output).
   const { $schema: _drop, ...jsonSchema } = z.toJSONSchema(opts.schema) as Record<string, unknown>;
@@ -172,12 +229,17 @@ export async function runAgent<T>(opts: RunAgentOpts<T>): Promise<T> {
       // Use a STATIC status string plus the safe numeric provider status only.
       const providerStatus =
         typeof (e as { status?: unknown }).status === 'number' ? (e as { status: number }).status : undefined;
-      trace.update({
-        level: 'ERROR',
-        statusMessage:
-          providerStatus !== undefined
-            ? `anthropic request failed (status ${providerStatus})`
-            : 'anthropic request failed',
+      // STATIC status-only string — never the provider message/body (CSO-H1).
+      const statusMessage =
+        providerStatus !== undefined
+          ? `anthropic request failed (status ${providerStatus})`
+          : 'anthropic request failed';
+      // Wrapped (codex P1 #2 / CSO-LT-2): a tracing throw here must not mask the
+      // static AppError thrown below — write the ERROR trace, then always throw it.
+      safeTrace(() => {
+        trace.update({ level: 'ERROR', statusMessage });
+        // Mark an ERROR generation with the SAME static string — no usage, no body.
+        trace.generation({ name: 'anthropic.messages', model, level: 'ERROR', statusMessage }).end();
       });
       // R1 (codex re-gate P1 / CSO-H1 second half): do NOT re-throw the raw
       // provider error — its message/body/cause can echo the request content
@@ -219,15 +281,18 @@ export async function runAgent<T>(opts: RunAgentOpts<T>): Promise<T> {
     // ── First attempt ──
     let res = await call(baseMessages);
     if (metered) attempts.push(res.usage);
-    trace.update({
-      metadata: {
-        cacheWrite: res.usage.cache_creation_input_tokens,
-        cacheRead: res.usage.cache_read_input_tokens,
-        inputTokens: res.usage.input_tokens,
-        outputTokens: res.usage.output_tokens,
-        model,
-      },
-    });
+    safeTrace(() =>
+      trace.update({
+        metadata: {
+          cacheWrite: res.usage.cache_creation_input_tokens,
+          cacheRead: res.usage.cache_read_input_tokens,
+          inputTokens: res.usage.input_tokens,
+          outputTokens: res.usage.output_tokens,
+          model,
+        },
+      }),
+    );
+    recordGeneration(res.usage, false);
 
     let parsed = opts.schema.safeParse(extractToolArgs(res));
     if (parsed.success) return parsed.data;
@@ -246,16 +311,19 @@ export async function runAgent<T>(opts: RunAgentOpts<T>): Promise<T> {
     ];
     res = await call(repairMessages);
     if (metered) attempts.push(res.usage);
-    trace.update({
-      metadata: {
-        cacheWrite: res.usage.cache_creation_input_tokens,
-        cacheRead: res.usage.cache_read_input_tokens,
-        inputTokens: res.usage.input_tokens,
-        outputTokens: res.usage.output_tokens,
-        model,
-        repair: true,
-      },
-    });
+    safeTrace(() =>
+      trace.update({
+        metadata: {
+          cacheWrite: res.usage.cache_creation_input_tokens,
+          cacheRead: res.usage.cache_read_input_tokens,
+          inputTokens: res.usage.input_tokens,
+          outputTokens: res.usage.output_tokens,
+          model,
+          repair: true,
+        },
+      }),
+    );
+    recordGeneration(res.usage, true);
     parsed = opts.schema.safeParse(extractToolArgs(res));
     if (parsed.success) return parsed.data;
 
@@ -272,21 +340,58 @@ export async function runAgent<T>(opts: RunAgentOpts<T>): Promise<T> {
         schema: opts.schema,
       });
     }
-    trace.update({ level: 'ERROR', statusMessage: 'structured output failed validation' });
+    safeTrace(() =>
+      trace.update({ level: 'ERROR', statusMessage: 'structured output failed validation' }),
+    );
     throw new AppError('AI structured output failed validation (after one repair retry).', {
       code: 'AI_STRUCTURED_OUTPUT_INVALID',
     });
   } finally {
-    // SETTLE-or-REFUND, keyed on the reservation token's usageDate (P2-C). If no Anthropic
-    // attempt fired (a pre-call throw) → full REFUND; otherwise SETTLE to the actual that
-    // already billed (even on a post-call structured-validation throw — the provider spend
-    // happened, do not refund it).
-    if (reservation) {
-      if (attempts.length === 0) {
-        await refundReservation(reservation);
-      } else {
-        await settleSpend(reservation, actualAnthropicMicroUsd(attempts));
+    // codex P1 #1: a ledger throw (settle/refund) must NOT skip the flush — the inner
+    // `finally` below always runs flushTracing(). codex RE-GATE P1 #1: a ledger throw
+    // must ALSO not MASK runAgent's result/error — `catch` the settle/refund failure
+    // (log loud, never rethrow) so the user's AI result or the original AppError
+    // survives instead of being replaced by a ledger error from this `finally`.
+    try {
+      // SETTLE-or-REFUND, keyed on the reservation token's usageDate (P2-C). If no
+      // Anthropic attempt fired (a pre-call throw) → full REFUND; otherwise SETTLE to
+      // the actual that already billed (even on a post-call structured-validation
+      // throw — the provider spend happened, do not refund it).
+      if (reservation) {
+        if (attempts.length === 0) {
+          await refundReservation(reservation);
+        } else {
+          await settleSpend(reservation, actualAnthropicMicroUsd(attempts));
+        }
       }
+    } catch (err) {
+      // Billing-integrity event (NOT a tracing one) → logger.error, alertable. Not
+      // rethrown: masking the AI result with a ledger error is worse than an unsettled
+      // reservation, which is bounded by the daily-cap window and reconcilable.
+      // codex re-gate-2 P2: because we deliberately do NOT rethrow, THIS log is the only
+      // reconciliation signal — make it actionable. `err` is a static AppError from cap.ts
+      // and carries no reservation identity, so attach the reservation key + attempt count.
+      // CSO constraint (binding): ONLY accountId (internal UUID, already the Langfuse
+      // userId), usageDate, reservedMicroUsd, and the attempt count — no customer PII /
+      // cap-table/SAFE financials. (reservation is defined whenever this catch fires —
+      // settle/refund only runs inside `if (reservation)` — but optional-chain for the type.)
+      logger.error(
+        'ai/client: cost ledger settle/refund failed — reservation may be unsettled, reconcile',
+        {
+          err,
+          accountId: reservation?.accountId,
+          usageDate: reservation?.usageDate,
+          reservedMicroUsd: reservation?.reservedMicroUsd,
+          attempts: attempts.length,
+        },
+      );
+    } finally {
+      // Deliver buffered trace + generation events before this (serverless / eval /
+      // script) context freezes or exits — the langfuse SDK otherwise loses them on
+      // its batch timer (LANGFUSE-TRACING-01). Null-safe + never throws. The chokepoint
+      // finally is the one flush point every Anthropic call passes through, INCLUDING
+      // the eval's own runAgent calls (the eval runner is not a serverless boundary).
+      await flushTracing();
     }
   }
 }

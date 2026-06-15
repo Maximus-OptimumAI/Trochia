@@ -34,6 +34,18 @@
  */
 export type EvalStatus = 'pending' | 'pass' | 'fail' | 'skip';
 
+/**
+ * Why a check 'skip'ped (LANGFUSE-TRACING-01). The runner treats these differently
+ * under EVAL_LIVE_REQUIRED:
+ *   - 'env-unavailable'  = a live dependency (creds: ANTHROPIC / Langfuse) was absent.
+ *                          A live run that was SUPPOSED to reach it and could not is a
+ *                          RED gate (the original C1-H1 intent) → promoted to FAIL.
+ *   - 'data-unavailable' = the dependency was reached but had no data yet (no agent:*
+ *                          traces in the window, or Langfuse ingestion lag). NOT a
+ *                          regression → tolerated even on a live run.
+ */
+export type SkipKind = 'env-unavailable' | 'data-unavailable';
+
 export type EvalCheckResult = {
   id: string;
   description: string;
@@ -41,6 +53,7 @@ export type EvalCheckResult = {
   reason: string;          // human-readable; in 'pending'/'skip' it explains why
   metric?: number;         // optional numeric value (e.g. p50 latency, FP rate)
   threshold?: number;      // optional comparison threshold
+  skipKind?: SkipKind;     // only meaningful when status === 'skip' (LANGFUSE-TRACING-01)
 };
 
 export type EvalCheck = {
