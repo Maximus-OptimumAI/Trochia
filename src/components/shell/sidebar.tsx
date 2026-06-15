@@ -43,8 +43,8 @@ const NAV: NavItem[] = [
   { label: 'Pitch Lab', href: '/app/pitch', icon: Presentation },
   { label: 'Pipeline', href: '/app/pipeline', icon: Network },
   { label: 'Live Raise', href: '/app/live-raise', icon: PhoneCall },
-  { label: 'Data Room', href: '/app/data-room', icon: FolderLock, disabledPhase: 'Coming soon' },
-  { label: 'Raise Ops', href: '/app/raise-ops', icon: Calculator, disabledPhase: 'Coming soon' },
+  { label: 'Data Room', href: '/app/data-room', icon: FolderLock, disabledPhase: 'Soon' },
+  { label: 'Raise Ops', href: '/app/raise-ops', icon: Calculator, disabledPhase: 'Soon' },
 ];
 
 function NavLink({ item, active }: { item: NavItem; active?: boolean }) {
