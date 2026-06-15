@@ -140,16 +140,24 @@ function extractToolArgs(res: Anthropic.Messages.Message): unknown {
  */
 export async function runAgent<T>(opts: RunAgentOpts<T>): Promise<T> {
   const model = pickModel(opts.taskClass);
-  const langfuse = getLangfuseClient();
-  const trace: TraceLike =
-    (langfuse?.trace({
-      name: `agent:${opts.taskClass}`,
-      // The tenant account id (an internal UUID, not PII) is the natural Langfuse
-      // userId — it enables per-tenant cost/usage views. Undefined on un-metered
-      // internal calls (health-check), which is fine (optional field).
-      userId: opts.costContext?.accountId,
-      metadata: { model },
-    }) as TraceLike | undefined) ?? NOOP_TRACE;
+  // Guard CREATION, not only the writes (codex re-gate P1 #2): a Langfuse client
+  // constructor / trace-open throw must NOT fail runAgent. On any throw, log and fall
+  // back to NOOP_TRACE so the AI call proceeds untraced rather than failing.
+  let trace: TraceLike = NOOP_TRACE;
+  try {
+    const langfuse = getLangfuseClient();
+    trace =
+      (langfuse?.trace({
+        name: `agent:${opts.taskClass}`,
+        // The tenant account id (an internal UUID, not PII) is the natural Langfuse
+        // userId — it enables per-tenant cost/usage views. Undefined on un-metered
+        // internal calls (health-check), which is fine (optional field).
+        userId: opts.costContext?.accountId,
+        metadata: { model },
+      }) as TraceLike | undefined) ?? NOOP_TRACE;
+  } catch (err) {
+    logger.warn('langfuse: trace creation failed (non-fatal — tracing only)', { err });
+  }
 
   // Isolate EVERY Langfuse write from product behavior (codex P1 #2 / CSO-LT-2): a
   // tracing SDK throw must NEVER turn a successful Anthropic response into a failed
@@ -339,10 +347,11 @@ export async function runAgent<T>(opts: RunAgentOpts<T>): Promise<T> {
       code: 'AI_STRUCTURED_OUTPUT_INVALID',
     });
   } finally {
-    // codex P1 #1: a ledger throw (settle/refund) must NOT skip the flush. Nest the
-    // settle/refund in its own try whose `finally` always runs flushTracing() — else
-    // the trace+generation this change exists to capture are silently dropped on the
-    // exact failure path we most want recorded.
+    // codex P1 #1: a ledger throw (settle/refund) must NOT skip the flush — the inner
+    // `finally` below always runs flushTracing(). codex RE-GATE P1 #1: a ledger throw
+    // must ALSO not MASK runAgent's result/error — `catch` the settle/refund failure
+    // (log loud, never rethrow) so the user's AI result or the original AppError
+    // survives instead of being replaced by a ledger error from this `finally`.
     try {
       // SETTLE-or-REFUND, keyed on the reservation token's usageDate (P2-C). If no
       // Anthropic attempt fired (a pre-call throw) → full REFUND; otherwise SETTLE to
@@ -355,6 +364,14 @@ export async function runAgent<T>(opts: RunAgentOpts<T>): Promise<T> {
           await settleSpend(reservation, actualAnthropicMicroUsd(attempts));
         }
       }
+    } catch (err) {
+      // Billing-integrity event (NOT a tracing one) → logger.error, alertable. Not
+      // rethrown: masking the AI result with a ledger error is worse than an unsettled
+      // reservation, which is bounded by the daily-cap window and reconcilable.
+      logger.error(
+        'ai/client: cost ledger settle/refund failed — reservation may be unsettled, reconcile',
+        { err },
+      );
     } finally {
       // Deliver buffered trace + generation events before this (serverless / eval /
       // script) context freezes or exits — the langfuse SDK otherwise loses them on

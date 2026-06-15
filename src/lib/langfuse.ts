@@ -49,9 +49,12 @@ export function getLangfuseClient(): Langfuse | null {
  * what lets the `cache-hit` check read real traces.
  */
 export async function flushTracing(): Promise<void> {
-  const client = getLangfuseClient();
-  if (!client) return;
+  // getLangfuseClient() is INSIDE the try (codex re-gate P1 #2): a client constructor
+  // throw must be caught too, not just a flushAsync() throw — otherwise a bad-config
+  // construct would propagate out of the runAgent finally and fail the AI call.
   try {
+    const client = getLangfuseClient();
+    if (!client) return;
     await client.flushAsync();
   } catch (err) {
     logger.warn('langfuse: flushAsync failed (non-fatal — tracing only)', { err });
