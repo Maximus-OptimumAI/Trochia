@@ -51,6 +51,7 @@
 import { sql } from 'drizzle-orm';
 
 import { AppError } from '@/lib/errors';
+import { logger } from '@/lib/logger';
 
 /**
  * Lazy accessor for the RLS-bypassing service client (OD-3).
@@ -131,8 +132,16 @@ export async function reserveWithinDailyCap(
       RETURNING micro_usd_spent
     `);
     newTotal = toNum(rows[0]?.micro_usd_spent);
-  } catch {
-    // fail-CLOSED — never leak the underlying store error (no query/account payload).
+  } catch (err) {
+    // fail-CLOSED — the THROWN error stays STATIC (no query/account/provider payload leaks
+    // to the caller or Sentry; the 02-06 unscrubbed lesson). But unmask the underlying store
+    // error SERVER-SIDE first (COST-METER-DIAG-01): without this, a real outage — e.g. the
+    // eval test DB missing ai_usage_daily (migration 0007) → postgres "relation does not
+    // exist" — is swallowed and surfaces only as the opaque "cost meter unavailable". The
+    // underlying error is a postgres/DB error with NO user content (no query/answer/chunk
+    // text), so logging it via the redacting logger is safe — same static-error-plus-
+    // server-log pattern as src/ai/client.ts.
+    logger.error('ai/cost/cap: reserve store write failed — cost meter unavailable', { err });
     throw new AppError('cost meter unavailable', {
       code: 'AI_COST_METER_UNAVAILABLE',
       status: 503,
@@ -196,7 +205,12 @@ async function applyDelta(accountId: string, usageDate: string, delta: number): 
         SET micro_usd_spent = GREATEST(ai_usage_daily.micro_usd_spent + ${delta}, 0),
             updated_at = now()
     `);
-  } catch {
+  } catch (err) {
+    // Same static-error-plus-server-log pattern as the reserve path (COST-METER-DIAG-01):
+    // log the underlying DB error server-side (safe — no user content) before throwing the
+    // static AI_COST_METER_UNAVAILABLE, so a swallowed outage on the settle/refund write is
+    // diagnosable rather than masked.
+    logger.error('ai/cost/cap: applyDelta store write failed — cost meter unavailable', { err });
     throw new AppError('cost meter unavailable', {
       code: 'AI_COST_METER_UNAVAILABLE',
       status: 503,

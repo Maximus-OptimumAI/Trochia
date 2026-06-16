@@ -69,13 +69,24 @@ jobs:
           # EVAL-LIVE-DB-01: this step's `eval:run` SEEDS + WRITES a corpus to the DB
           # (eval:seed runs inside eval:run). It MUST point at the THROWAWAY TEST DB,
           # NEVER prod — so DATABASE_URL aliases secrets.TEST_DATABASE_URL, the same
-          # mapping the main CI gate uses (ci.yml). DIRECT_URL is omitted: it is
-          # drizzle-kit-migration-only and the eval runs no migrations (the test DB is
-          # already migrated by the CI RLS suite); the runtime client uses the pooled
-          # DATABASE_URL. VOYAGE_API_KEY is the real key — the seed embeds the corpus.
+          # mapping the main CI gate uses (ci.yml). VOYAGE_API_KEY is the real key — the
+          # seed embeds the corpus.
+          #
+          # EVAL-SEED-DBCLIENT-01: this step is DECOUPLED from the CI RLS suite (different
+          # workflow + nightly schedule), so the test DB is NOT guaranteed to carry the
+          # migrated schema. We therefore MIGRATE it ourselves BEFORE eval:run (the
+          # `db:migrate:test` command below reuses migrateTestDb → src/db/migrations,
+          # idempotent, schema-only). Without it the seed's first metered reserve hits a
+          # missing `ai_usage_daily` (migration 0007) → postgres "relation does not exist",
+          # masked as "cost meter unavailable" (cap.ts). TEST_DATABASE_URL is exposed for
+          # migrateTestDb (which reads it); it points at the SAME pooled test DB as
+          # DATABASE_URL. No DIRECT_URL needed — migrateTestDb connects on the pooled URL.
           DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+          TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
           VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
-        run: npm run eval:run
+        run: |
+          npm run db:migrate:test
+          npm run eval:run
 
       - name: Upload eval report
         if: always()
