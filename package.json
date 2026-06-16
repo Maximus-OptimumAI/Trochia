@@ -21,6 +21,7 @@
     "db:check": "drizzle-kit check",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
+    "db:migrate:test": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/migrate-test-db.ts",
     "eval:seed": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/seed-eval-corpus.ts --allow",
     "eval:run": "npm run eval:seed && tsx --conditions=react-server --env-file-if-exists=.env.local src/ai/eval/runner.ts",
     "gen:dpa-pdf": "tsx scripts/generate-dpa-pdf.ts"
