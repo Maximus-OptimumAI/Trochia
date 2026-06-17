@@ -26,16 +26,18 @@
 import { extractFromPaste } from '@/ai/agents/extract-from-paste.agent';
 import { countPopulatedFields } from '@/ai/schemas/business-memory.zod';
 import { PASTE_FIXTURE_PATHS, loadFixtureText } from '../fixtures';
+import { EVAL_ACCOUNT_ID } from '../fixtures/eval-corpus';
 import type { EvalCheck } from '../types';
 
 /** Mean populated-field floor (Phase 2 exit gate criterion 3). */
 const FIELD_FLOOR = 8;
 
-/**
- * Fixed eval-only tenant id. Never persisted — extractFromPaste logs it at info
- * level and never sends it to the LLM. A constant keeps eval runs comparable.
- */
-const EVAL_ACCOUNT_ID = 'eval-extraction-floor';
+// The eval tenant id is the REAL seeded UUID `EVAL_ACCOUNT_ID` (fixtures/eval-corpus.ts),
+// NOT a bare string. extractFromPaste → runAgent meters the call through the cost cap,
+// which INSERTs `account_id` into `ai_usage_daily` (a `uuid` column with an FK to the
+// seeded `accounts` row). A non-UUID literal there fails Postgres `22P02` (invalid uuid),
+// masked as "cost meter unavailable" (EVAL-CHECK-ACCTID-01). The seed creates this tenant's
+// accounts row before the runner, so the FK is satisfied.
 
 export const extractionFloor: EvalCheck = {
   id: 'extraction-floor',
