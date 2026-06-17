@@ -220,7 +220,7 @@ export async function askQa(input: AskQaInput, ctx: AskQaCtx): Promise<AskQaResu
     // — mirror the synthesis catch below. Every other retrieve error stays the
     // static, redacted synthesis failure (no bound query reaches it).
     if (isCapExceeded(err)) throw err;
-    throw synthesisFailure();
+    throw synthesisFailure(err);
   }
 
   const maxVectorScore = Math.max(-1, ...candidates.map((c) => c.vectorScore ?? -1));
@@ -282,7 +282,7 @@ export async function askQa(input: AskQaInput, ctx: AskQaCtx): Promise<AskQaResu
     // it to the limit-reached state. Every other failure is the static, redacted
     // synthesis failure (no query/answer/chunk text, no cause).
     if (isCapExceeded(err)) throw err;
-    throw synthesisFailure();
+    throw synthesisFailure(err);
   }
 
   // 4. Stage-2 citation validation. Any dropped citation → grounded:false +
@@ -313,12 +313,36 @@ function isCapExceeded(err: unknown): boolean {
 }
 
 /**
- * The STATIC, redacted failure for any non-cap retrieve/synthesis error. No
- * query/answer/chunk text, no `cause` carrying them — the original error string
- * would otherwise reach Sentry UNSCRUBBED (sentry-scrub.ts is key-based on
- * structured fields, not exception .value strings — the 02-06 lesson). The
- * original error is DELIBERATELY discarded at the throw site.
+ * The STATIC, redacted failure for any non-cap retrieve/synthesis error. The
+ * THROWN error stays static + `cause`-free — the original error string would
+ * otherwise reach Sentry UNSCRUBBED (sentry-scrub.ts is key-based on structured
+ * fields, not exception .value strings — the 02-06 lesson), and the caller surface
+ * is unchanged.
+ *
+ * QA-SYNTH-DIAG-01: but log the UNDERLYING cause SERVER-SIDE first, so a real
+ * outage (provider/DB error, a structured-output miss) is diagnosable instead of an
+ * opaque QA_SYNTHESIS_FAILED — the same static-error-plus-server-log shape cap.ts
+ * uses (COST-METER-DIAG-01). Unlike cap.ts, this agent DOES handle query/answer/chunk
+ * text, so we log ONLY the error's constructor name, its `code` (if any), and its
+ * message via the redacting logger — NEVER the err object, prompts, retrieved chunks,
+ * synthesis input/output, fixture content, or any user data.
  */
-function synthesisFailure(): AppError {
+function synthesisFailure(err: unknown): AppError {
+  // The diagnostic must NEVER alter what the caller sees. Wrap the extraction + log
+  // so even a pathological throwable (a throwing `code` getter, a throwing toString)
+  // cannot replace the static QA_SYNTHESIS_FAILED with a secondary throw (codex M1).
+  try {
+    const errCode =
+      err && typeof err === 'object' && 'code' in err
+        ? String((err as Record<string, unknown>).code)
+        : undefined;
+    logger.error('ai/qa-rag: retrieve/synthesis failed — masked as QA_SYNTHESIS_FAILED', {
+      errName: err instanceof Error ? err.constructor.name : typeof err,
+      errCode,
+      errMessage: err instanceof Error ? err.message : String(err),
+    });
+  } catch {
+    // diagnostics are best-effort — never let them change the thrown error
+  }
   return new AppError('q&a synthesis failed', { code: 'QA_SYNTHESIS_FAILED' });
 }
