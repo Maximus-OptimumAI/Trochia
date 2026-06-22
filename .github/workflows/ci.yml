@@ -28,6 +28,15 @@ jobs:
   build-and-test:
     name: lint · typecheck · banned-strings · vitest · playwright · lighthouse
     runs-on: ubuntu-latest
+    # EVAL-SEED-ACCOUNTS-FK-01: JOB-LEVEL group shared with eval.yml's eval job to
+    # serialize the two jobs that touch the shared TEST_DATABASE_URL (this job's RLS
+    # cleanup TRUNCATEs the eval tenant; the eval seeds it). Same literal group string in
+    # both workflows; cancel-in-progress:false → queue, never cancel. This is INDEPENDENT
+    # of the workflow-level `ci-${{ github.ref }}` group above, which keeps CI's per-ref
+    # auto-cancel (a new push to a ref still cancels the prior in-flight CI for that ref).
+    concurrency:
+      group: trochia-shared-testdb
+      cancel-in-progress: false
     env:
       NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000' }}
       NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL || 'http://localhost:3000' }}

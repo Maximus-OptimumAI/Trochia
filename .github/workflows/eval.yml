@@ -20,6 +20,16 @@ jobs:
   eval:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # EVAL-SEED-ACCOUNTS-FK-01: serialize against ci.yml's build-and-test job on the
+    # SHARED TEST_DATABASE_URL. Both jobs map DATABASE_URL/TEST_DATABASE_URL to the same
+    # secret; ci.yml's RLS cleanup TRUNCATEs accounts/ai_usage_daily/embeddings CASCADE,
+    # which can wipe the eval tenant mid-seed if a push-CI overlaps the LIVE eval. A shared
+    # job-level concurrency group (same literal in both workflows) forces them to run one
+    # at a time. cancel-in-progress:false → QUEUE, never cancel (we must not kill an
+    # in-flight eval or CI run; the loser waits).
+    concurrency:
+      group: trochia-shared-testdb
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
