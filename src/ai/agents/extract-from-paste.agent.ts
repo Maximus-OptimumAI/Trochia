@@ -145,8 +145,18 @@ import { logger } from '@/lib/logger';
 const MIN_PASTE_CHARS = 500;
 /** Maximum paste length (chars). Caps Sonnet input + cost — 40k ≈ 6k words. */
 const MAX_PASTE_CHARS = 40_000;
-/** Token budget for the extractor output. Draft JSON ≈ 1500 tokens; 2048 covers tail. */
-const EXTRACTOR_MAX_TOKENS = 2048;
+/**
+ * Token budget for the extractor output. A rich 1,500-word paste populates ≥8 of 10
+ * top-level fields, each with a provenance entry (verbatim snippet + confidence + 3
+ * timestamps) plus nested team/traction/narrative — that EXCEEDS 2048, truncating the
+ * forced tool_use JSON mid-stream → schema parse fails → an avoidable repair retry
+ * (EVAL-ANTHROPIC-FAIL-01). 8192 covers the full draft with headroom; Sonnet 4.6's
+ * output cap (~64k) is far above this. The per-call cost-cap reserve scales with
+ * maxTokens (estAnthropicReserveMicroUsd) but stays well under the $5/day cap: 8192
+ * output tokens reserve ≈ $0.12, so even a full sequential eval run (5 fixtures) is a
+ * few cents of headroom against the cap. CAP_MICRO_USD (the global wall) is untouched.
+ */
+const EXTRACTOR_MAX_TOKENS = 8192;
 /** Untrusted-input fence label. Matches the system prompt's reference. */
 const PASTE_LABEL = 'PASTED_CONTEXT';
 

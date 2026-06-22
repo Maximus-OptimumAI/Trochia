@@ -301,14 +301,34 @@ export async function runAgent<T>(opts: RunAgentOpts<T>): Promise<T> {
     logger.warn('ai/client: structured output failed validation — attempting one repair retry', {
       taskClass: opts.taskClass,
     });
+    const repairText = `Your previous output failed schema validation: ${parsed.error.message}. Call the ${TOOL_NAME} tool again with output that conforms to the schema.`;
+    // The repair echoes the prior assistant turn (res.content). Under forced tool use
+    // that turn contains tool_use block(s), and Anthropic's contract REQUIRES the next
+    // user turn to LEAD WITH a matching tool_result block per tool_use id — a plain-text
+    // user turn 400s ("tool_use ids were found without tool_result blocks immediately
+    // after"), deterministically, for every runAgent caller (EVAL-ANTHROPIC-FAIL-01).
+    // Build one tool_result per tool_use id, carrying the validation feedback as an error
+    // result. A caller that did NOT force a tool (no tool_use in res.content) keeps the
+    // plain-text repair turn unchanged — correct for every runAgent caller.
+    const toolUseBlocks = res.content.filter(
+      (b): b is Anthropic.Messages.ToolUseBlock => b.type === 'tool_use',
+    );
+    const repairUserContent: Anthropic.Messages.MessageParam['content'] =
+      toolUseBlocks.length > 0
+        ? toolUseBlocks.map((b) => ({
+            type: 'tool_result' as const,
+            tool_use_id: b.id,
+            content: repairText,
+            is_error: true,
+          }))
+        : repairText;
     const repairMessages: Anthropic.Messages.MessageParam[] = [
       ...baseMessages,
       { role: 'assistant', content: res.content },
-      {
-        role: 'user',
-        content: `Your previous output failed schema validation: ${parsed.error.message}. Call the ${TOOL_NAME} tool again with output that conforms to the schema.`,
-      },
+      { role: 'user', content: repairUserContent },
     ];
+    // The repair call reuses the SAME forced tool_choice/tools (set inside `call`), so the
+    // repaired output stays structured.
     res = await call(repairMessages);
     if (metered) attempts.push(res.usage);
     safeTrace(() =>
