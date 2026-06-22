@@ -74,7 +74,7 @@ vi.mock('@tanstack/react-query', () => ({
 // Imported AFTER the mocks are registered.
 import { QaSidebar } from '@/components/qa/sidebar';
 
-const EXACT_CAP_COPY = 'Daily AI limit reached — resets at midnight UTC';
+const EXACT_CAP_COPY = 'Daily AI limit reached. Resets at midnight UTC';
 
 function groundedAnswer(): QaAnswer {
   return {
@@ -183,7 +183,7 @@ describe('QaSidebar', () => {
     // tRPC client surfaces `{ data: { code, httpStatus } }`.
     settleError({
       data: { code: 'TOO_MANY_REQUESTS', httpStatus: 429 },
-      message: 'Daily AI limit reached — resets at midnight UTC.',
+      message: 'Daily AI limit reached. Resets at midnight UTC.',
     });
     const limit = screen.getByTestId('qa-sidebar-limit-reached');
     expect(limit).toBeInTheDocument();

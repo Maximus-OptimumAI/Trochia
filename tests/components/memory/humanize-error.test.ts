@@ -17,7 +17,7 @@ describe('humanizeFieldError', () => {
     expect(humanizeFieldError('Customers', 'Expected number, received string')).toBe('Customers should be a number.');
     expect(humanizeFieldError('Founding date', 'Invalid datetime')).toBe('Founding date should be a date, like 2024-01-15.');
     expect(humanizeFieldError('One-liner', 'String must contain at most 280 character(s)')).toBe(
-      'One-liner is too long — shorten it a little.',
+      'One-liner is too long. Shorten it a little.',
     );
   });
 

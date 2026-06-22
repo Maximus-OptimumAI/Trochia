@@ -51,7 +51,7 @@ export function TierPicker() {
       <header className="flex max-w-2xl flex-col items-center gap-3 text-center">
         <h1 className="text-h2 text-ink">Pick the plan for your raise.</h1>
         <p className="text-body text-graphite">
-          Start with a 7-day trial. Card on file, cancel anytime — no permanent free tier.
+          Start with a 7-day trial. Card on file, cancel anytime. No permanent free tier.
         </p>
       </header>
 

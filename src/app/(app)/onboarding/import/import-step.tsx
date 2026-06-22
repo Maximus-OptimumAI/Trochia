@@ -55,8 +55,8 @@ export function ImportStep() {
       <header className="flex flex-col gap-3">
         <h1 className="text-h2 text-ink">Import your context</h1>
         <p className="text-body text-graphite">
-          Drop in your existing AI context — ChatGPT instructions, Claude project notes, a Notion
-          brief — or paste 500–5,000 words. Trochia builds your Business Memory from it.
+          Drop in your existing AI context (ChatGPT instructions, Claude project notes, a Notion
+          brief) or paste 500–5,000 words. Trochia builds your Business Memory from it.
         </p>
       </header>
 

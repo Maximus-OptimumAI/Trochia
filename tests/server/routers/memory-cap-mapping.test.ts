@@ -64,7 +64,7 @@ function caller(): AppCaller {
 // — the agent is mocked and rejects before it is read.
 const VALID_PASTE = 'A'.repeat(600);
 
-const CAP_REACHED_MESSAGE = 'Daily AI limit reached — resets at midnight UTC.';
+const CAP_REACHED_MESSAGE = 'Daily AI limit reached. Resets at midnight UTC.';
 
 describe('memoryRouter.extractFromPaste — AI_DAILY_CAP_EXCEEDED mapping (P1_extract_cap_mapping)', () => {
   beforeEach(() => {

@@ -204,14 +204,14 @@ function collectFields(draft: BusinessMemoryDraft): FieldDescriptor[] {
       if (founder?.name) {
         out.push({
           key: `team.founders.${idx}.name`,
-          label: `Founder ${idx + 1} — name`,
+          label: `Founder ${idx + 1}: name`,
           value: founder.name,
         });
       }
       if (founder?.role) {
         out.push({
           key: `team.founders.${idx}.role`,
-          label: `Founder ${idx + 1} — role`,
+          label: `Founder ${idx + 1}: role`,
           value: founder.role,
         });
       }

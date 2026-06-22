@@ -49,7 +49,7 @@ const CARDS: CtaCard[] = [
   {
     title: 'Draft outreach',
     description:
-      'Trochia drafts the outreach email for founder approval — your voice, the right detail, ready to send.',
+      'Trochia drafts the outreach email for founder approval: your voice, the right detail, ready to send.',
     href: '/app/pipeline',
     phase: 'Coming Phase 4',
     icon: Send,

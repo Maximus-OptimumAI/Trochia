@@ -93,7 +93,7 @@ const COPY = {
   pasteHelper:
     'Drop in 500–40,000 characters from ChatGPT, Claude, Notion, or a doc. Trochia drafts a Business Memory from it.',
   pastePlaceholder:
-    'Paste your existing context — ChatGPT custom instructions, Claude project notes, a Notion brief.',
+    'Paste your existing context: ChatGPT custom instructions, Claude project notes, a Notion brief.',
   characterCountSuffix: 'characters',
   submitIdle: 'Draft Business Memory',
   submitBelowMin: 'Add at least 500 characters',
@@ -102,7 +102,7 @@ const COPY = {
   draftingBody:
     'Drafting your Business Memory. This takes about 30 seconds on a typical paste.',
   injectionWarning:
-    'Trochia flagged a possible prompt injection pattern in your paste. The draft below was extracted anyway — review carefully and reject anything that looks off.',
+    'Trochia flagged a possible prompt injection pattern in your paste. The draft below was extracted anyway. Review carefully and reject anything that looks off.',
   doneTitle: 'Business Memory saved.',
   doneBody:
     'Your confirmed Business Memory is the source of truth for every later module. Continue when ready.',
@@ -111,7 +111,7 @@ const COPY = {
   errorTooShort:
     'That paste is too short. Trochia needs at least 500 characters to draft a useful Business Memory.',
   errorTooLong:
-    'That paste is too long. Trochia caps imports at 40,000 characters — try splitting into multiple pastes.',
+    'That paste is too long. Trochia caps imports at 40,000 characters. Try splitting into multiple pastes.',
   errorGeneric:
     "Trochia couldn't draft from that paste. Try again, or contact support if this persists.",
   // ── Plan 02-03 / Task 12: injection-rejected + redactions banner ──

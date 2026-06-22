@@ -23,7 +23,7 @@
  *
  *   - `AI_DAILY_CAP_EXCEEDED` (OD-8 HARD-block, propagated UNCHANGED from
  *     runAgent → askQa) → `TRPCError { code: 'TOO_MANY_REQUESTS', message:
- *     'Daily AI limit reached — resets at midnight UTC.' }`. The message is a
+ *     'Daily AI limit reached. Resets at midnight UTC.' }`. The message is a
  *     STATIC constant — never the query, never an answer. The sidebar renders
  *     this as its own distinct non-fabricated, non-error "limit reached" state.
  *   - `QA_SYNTHESIS_FAILED` (static, redacted from the agent) → INTERNAL_SERVER_ERROR
@@ -86,7 +86,7 @@ const CAP_EXCEEDED_CODE = 'AI_DAILY_CAP_EXCEEDED';
  * 2026-06-01). Mirrored verbatim in `src/components/qa/sidebar.tsx`. NO query
  * echo, NO fabricated answer — this is a non-error, non-fabricated state.
  */
-const CAP_REACHED_MESSAGE = 'Daily AI limit reached — resets at midnight UTC.';
+const CAP_REACHED_MESSAGE = 'Daily AI limit reached. Resets at midnight UTC.';
 
 // ────────────────────────────────────────────────────────────────────────────
 // Input schema
