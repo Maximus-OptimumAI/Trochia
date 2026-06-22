@@ -284,6 +284,7 @@ pair co-visible at either checked viewport.
 | R2 | Nav label/page stays "Manifesto" (not About us). Optional future: short "Who's building this" section at the manifesto foot — NOT built now. |
 | R3 | Auth restyle (Dialog split-screen, REFERENCE-dialog.md Part 2) = Phase B OPENING slice, not this PR → AUTH-RESTYLE-01. |
 | R4 | App "Coming in Phase X" labels → "Coming soon" (this cycle, text-only). Illustrated module-preview pages → COMING-SOON-PAGES-01, Phase B. |
+| R13 | Em-dash ban is CI-enforced across all rendered surfaces. BRAND v1.3's no-em-dash rule for user-facing prose is gate-enforced by scripts/check-banned-strings.mjs across marketing, auth, the authenticated (app) route group, and src/components. Exempt: code comments (parsed out, including ${...} interpolations per CDX-1) and the (app)/styleguide dev glyph reference. En-dashes are allowed in numeric ranges only. Server-side user-facing strings are not yet in the em-dash gate scope; the qa.ts cap message was purged by hand for parity (2026-06-22). |
 
 ## Followup ledger
 

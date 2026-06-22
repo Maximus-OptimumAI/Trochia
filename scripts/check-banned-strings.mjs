@@ -162,13 +162,15 @@ export const EMDASH = '—';
 // String, template, and code regions are copied verbatim, so an em-dash inside
 // a "..." / '...' / `...` literal or in JSX text survives and stays scannable.
 // A `slash slash` or `slash star` INSIDE a string/template literal is NOT
-// treated as a comment start.
+// treated as a comment start. Template `${...}` interpolations ARE parsed as
+// code (CDX-1): a comment inside an interpolation is recognized and blanked, and
+// nested strings/templates inside it recurse — so a `/* — */` in an interpolation
+// no longer false-positives, and nested templates no longer desync the scanner.
 //
-// Known limitations (neither occurs on the marketing/legal/brand scope, and
-// both are documented for the reviewer): (1) a regex literal containing U+2014
-// is treated as code and would be flagged; (2) a literal `slash slash` inside
-// JSX *text* blanks the rest of that line — a false NEGATIVE only (it can hide
-// a hit, never invent one), so it can never wrongly block a merge.
+// Known limitation (does not occur on the gated scope; documented for the
+// reviewer): a regex literal containing U+2014 is treated as code and would be
+// flagged — a false POSITIVE. There is no regex-literal carrying a U+2014 on the
+// gated surfaces; add `/.../ ` handling to stripComments if one ever appears.
 /**
  * @param {string} src
  * @returns {string} src with all comment regions blanked to spaces
@@ -177,28 +179,48 @@ export function stripComments(src) {
   let out = '';
   const n = src.length;
   let i = 0;
+  // Mode stack for template literals + their `${...}` interpolations (CDX-1).
+  // Top-level (and the inside of an interpolation expression) is CODE mode, where
+  // `//` and `/* */` ARE comments. A backtick opens a TEMPLATE frame (text copied
+  // verbatim, em-dashes preserved); a `${` inside a template opens an INTERP frame
+  // (CODE mode again, brace-depth tracked) so comments INSIDE an interpolation are
+  // recognized and blanked — and nested strings/templates inside it recurse via the
+  // same stack. The matching `}` (depth 0) pops back to the enclosing template text.
+  /** @type {({ type: 'template' } | { type: 'interp', depth: number })[]} */
+  const stack = [];
+  const top = () => (stack.length > 0 ? stack[stack.length - 1] : null);
+
   while (i < n) {
     const c = src[i];
     const d = i + 1 < n ? src[i + 1] : '';
+    const t = top();
 
-    // String / template literal: copy verbatim, honoring backslash escapes.
-    if (c === '"' || c === "'" || c === '`') {
-      const quote = c;
+    // ── TEMPLATE TEXT mode: verbatim copy until `${` (open interpolation) or the
+    // closing backtick. Honor backslash escapes so `\`` doesn't close the template.
+    if (t && t.type === 'template') {
+      if (c === '\\' && i + 1 < n) {
+        out += c + src[i + 1];
+        i += 2;
+        continue;
+      }
+      if (c === '`') {
+        out += c;
+        i++;
+        stack.pop();
+        continue;
+      }
+      if (c === '$' && d === '{') {
+        out += '${';
+        i += 2;
+        stack.push({ type: 'interp', depth: 0 });
+        continue;
+      }
       out += c;
       i++;
-      while (i < n) {
-        const ch = src[i];
-        out += ch;
-        if (ch === '\\' && i + 1 < n) {
-          out += src[i + 1];
-          i += 2;
-          continue;
-        }
-        i++;
-        if (ch === quote) break;
-      }
       continue;
     }
+
+    // ── CODE mode (top-level OR inside an interpolation expression). ──
 
     // Line comment: blank to (but not including) the newline.
     if (c === '/' && d === '/') {
@@ -222,6 +244,55 @@ export function stripComments(src) {
         i += 2;
       }
       continue;
+    }
+
+    // Single-/double-quoted string: copy verbatim, honoring backslash escapes.
+    if (c === '"' || c === "'") {
+      const quote = c;
+      out += c;
+      i++;
+      while (i < n) {
+        const ch = src[i];
+        out += ch;
+        if (ch === '\\' && i + 1 < n) {
+          out += src[i + 1];
+          i += 2;
+          continue;
+        }
+        i++;
+        if (ch === quote) break;
+      }
+      continue;
+    }
+
+    // Template literal opens here: push a TEMPLATE frame (handles nesting via the stack).
+    if (c === '`') {
+      out += c;
+      i++;
+      stack.push({ type: 'template' });
+      continue;
+    }
+
+    // Brace-depth tracking inside an interpolation, so the interpolation's CLOSING `}`
+    // (depth 0) is distinguished from an inner object-literal `{...}`. Only meaningful
+    // inside an INTERP frame; at top level braces are plain code and fall through.
+    if (t && t.type === 'interp') {
+      if (c === '{') {
+        t.depth += 1;
+        out += c;
+        i++;
+        continue;
+      }
+      if (c === '}') {
+        if (t.depth === 0) {
+          stack.pop(); // close interpolation → resume the enclosing template text
+        } else {
+          t.depth -= 1;
+        }
+        out += c;
+        i++;
+        continue;
+      }
     }
 
     out += c;
@@ -253,17 +324,27 @@ export function scanEmDash(text) {
 /**
  * Collect the files in the em-dash rule's scope.
  *   - Phase B 0b: marketing + legal + brand.
- *   - Phase B step 1 (AUTH-RESTYLE-01): + the (auth) route group. Verified free
- *     of the `${ /* … *\/ }` interpolation-comment pattern, so the CDX-1
- *     false-positive cannot trip; the broader CDX-1 hardening stays the step-2
- *     gate-widen.
+ *   - Phase B step 1 (AUTH-RESTYLE-01): + the (auth) route group.
+ *   - Phase B step 2 (Phase 2b gate-widen): + the whole authenticated app
+ *     `(app)` route group AND all of `src/components/**` (the rendered app +
+ *     component copy), now that the CDX-1 `${...}`-interpolation hardening in
+ *     `stripComments` makes the comment-aware scan safe across the app surface.
+ *     `src/components/brand` is subsumed by the `src/components` walk.
+ *
+ * The `(app)/styleguide` route is EXCLUDED: it is a dev-only glyph/type
+ * reference that intentionally renders em-dashes (38 of them). The exclusion is
+ * EM-DASH-SCOPED only — the banned-term scan (`scanFiles`) walks `src` broadly
+ * and still covers the styleguide for compliance strings.
  */
 function emDashScopedFiles() {
-  return [
+  const styleguideDir = path.join(REPO_ROOT, 'src', 'app', '(app)', 'styleguide');
+  const files = [
     ...walk(path.join(REPO_ROOT, 'src', 'app', '(marketing)'), ['.ts', '.tsx']),
     ...walk(path.join(REPO_ROOT, 'src', 'app', '(auth)'), ['.ts', '.tsx']),
-    ...walk(path.join(REPO_ROOT, 'src', 'components', 'brand'), ['.ts', '.tsx']),
+    ...walk(path.join(REPO_ROOT, 'src', 'app', '(app)'), ['.ts', '.tsx']),
+    ...walk(path.join(REPO_ROOT, 'src', 'components'), ['.ts', '.tsx']),
   ];
+  return files.filter((f) => f !== styleguideDir && !f.startsWith(styleguideDir + path.sep));
 }
 
 /**

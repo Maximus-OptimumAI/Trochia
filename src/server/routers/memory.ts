@@ -231,7 +231,7 @@ const CONFLICT_AUDIT_SNIPPET_CAP = 200;
  * in `cap.ts` stays its own static literal; this constant is purely the
  * router-facing copy for the status/state mapping.
  */
-const AI_DAILY_CAP_REACHED_MESSAGE = 'Daily AI limit reached — resets at midnight UTC.';
+const AI_DAILY_CAP_REACHED_MESSAGE = 'Daily AI limit reached. Resets at midnight UTC.';
 
 // ────────────────────────────────────────────────────────────────────────────
 // Helpers

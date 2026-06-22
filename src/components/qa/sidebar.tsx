@@ -57,7 +57,7 @@ import { cn } from '@/lib/utils';
 const COPY = {
   heading: 'Ask your knowledge',
   helper:
-    'Trochia answers from your confirmed memory, corpus, and pipeline — with citations. It does not invent.',
+    'Trochia answers from your confirmed memory, corpus, and pipeline, with citations. It does not invent.',
   inputLabel: 'Your question',
   placeholder: 'What did we report for last-quarter traction?',
   submitIdle: 'Ask',
@@ -66,7 +66,7 @@ const COPY = {
   citationsLabel: 'Cited from',
   // The EXACT OD-8 user-facing copy (mirrors src/server/routers/qa.ts
   // CAP_REACHED_MESSAGE). Rendered as a non-fabricated, non-error state.
-  limitReachedTitle: 'Daily AI limit reached — resets at midnight UTC',
+  limitReachedTitle: 'Daily AI limit reached. Resets at midnight UTC',
   limitReachedBody:
     'Your account hit the daily AI spend limit. The limit resets at midnight UTC. Your knowledge is unchanged.',
   errorGeneric:

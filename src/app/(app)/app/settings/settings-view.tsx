@@ -38,7 +38,7 @@ export function SettingsView({ email, fullName }: { email: string; fullName: str
   const exportData = useMutation(
     trpc.compliance.requestDataExport.mutationOptions({
       onSuccess: () => {
-        toast.success("Your data export is on its way — check your email.");
+        toast.success("Your data export is on its way. Check your email.");
       },
       onError: (err) => {
         logger.warn('settings: requestDataExport failed', { err });

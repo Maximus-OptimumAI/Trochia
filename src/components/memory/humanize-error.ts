@@ -38,7 +38,7 @@ export function humanizeFieldError(label: string, raw: string | undefined): stri
   if (m.includes('email')) return `${label} should be a valid email address.`;
   // Length / range — too long.
   if (m.includes('at most') || m.includes('too big') || m.includes('too long') || m.includes('maximum')) {
-    return `${label} is too long — shorten it a little.`;
+    return `${label} is too long. Shorten it a little.`;
   }
   // Length / range — too short or empty.
   if (

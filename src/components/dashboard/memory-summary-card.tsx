@@ -21,7 +21,7 @@ export function MemorySummaryCard({ companyName }: { companyName?: string | null
     <div className="mx-auto flex max-w-md flex-col items-center gap-4 py-16 text-center">
       <Logo variant="mark" href={null} height={64} />
       <h2 className="text-h3 font-geist text-ink">
-        {companyName ? `${companyName} — Business Memory` : 'Business Memory'}
+        {companyName ? `${companyName}: Business Memory` : 'Business Memory'}
       </h2>
       <p className="text-body text-graphite">
         Your Business Memory is confirmed. Every module reads from it.
