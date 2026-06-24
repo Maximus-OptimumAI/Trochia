@@ -40,6 +40,8 @@ import {
   askQa,
   validateCitations,
   citationKey,
+  splitCompoundQuery,
+  unionCandidates,
   GROUNDING_THRESHOLD,
 } from '@/ai/agents/qa-rag.agent';
 import type { QaAnswer } from '@/ai/schemas/qa-answer.zod';
@@ -363,5 +365,129 @@ describe('askQa — OD-8 cap-exceeded propagates UNCHANGED', () => {
     await expect(askQa({ accountId: ACCOUNT_ID, query: QUERY }, ctx)).rejects.toMatchObject({
       code: 'AI_DAILY_CAP_EXCEEDED',
     });
+  });
+});
+
+describe('splitCompoundQuery (pure) — conservative conjunction split (Step 3b)', () => {
+  it('single-topic query → returns [query] unchanged (no-op)', () => {
+    expect(splitCompoundQuery('What sector is the company in?')).toEqual([
+      'What sector is the company in?',
+    ]);
+  });
+
+  it('conjoined NOUNS (one question) → NOT split: "MRR and runway"', () => {
+    // The clause after "and" is a noun ("runway?"), not a question → no split.
+    // This is the existing unit-test QUERY shape; it MUST stay single-call.
+    expect(splitCompoundQuery('What is our current MRR and runway?')).toEqual([
+      'What is our current MRR and runway?',
+    ]);
+  });
+
+  it('two question clauses joined by ", and" → split into both sub-questions', () => {
+    expect(
+      splitCompoundQuery(
+        'What funding stage is Cadence Labs raising at, and what has its growth been so far?',
+      ),
+    ).toEqual([
+      'What funding stage is Cadence Labs raising at',
+      'what has its growth been so far?',
+    ]);
+  });
+
+  it('two question clauses joined by a bare " and " → split', () => {
+    expect(splitCompoundQuery('What is our MRR and how many customers do we have?')).toEqual([
+      'What is our MRR',
+      'how many customers do we have?',
+    ]);
+  });
+
+  it('out-of-scope single-clause query → no split', () => {
+    expect(splitCompoundQuery('Who are our likely competitors?')).toEqual([
+      'Who are our likely competitors?',
+    ]);
+  });
+
+  it('a right clause too short to be a question (< 3 words) → no split', () => {
+    expect(splitCompoundQuery('What is our stage and why?')).toEqual([
+      'What is our stage and why?',
+    ]);
+  });
+
+  it('blank query → returns the original single element (never throws)', () => {
+    expect(splitCompoundQuery('   ')).toEqual(['   ']);
+  });
+});
+
+describe('unionCandidates (pure) — dedup + deterministic order (Step 3b)', () => {
+  it('dedups by (sourceId, chunkIdx) keeping the higher vectorScore, sorted desc', () => {
+    const a = candidate({ sourceId: 'mem-1', chunkIdx: 0, vectorScore: 0.55 });
+    const aStronger = candidate({ sourceId: 'mem-1', chunkIdx: 0, vectorScore: 0.71 });
+    const b = candidate({ sourceId: 'mem-2', chunkIdx: 3, vectorScore: 0.6 });
+
+    const out = unionCandidates([[a, b], [aStronger]]);
+
+    expect(out).toHaveLength(2); // mem-1|0 collapsed to one
+    expect(out[0]).toMatchObject({ sourceId: 'mem-1', chunkIdx: 0, vectorScore: 0.71 });
+    expect(out[1]).toMatchObject({ sourceId: 'mem-2', chunkIdx: 3 });
+  });
+
+  it('null vectorScore ranks as -1 (below any real score)', () => {
+    const withNull = candidate({ sourceId: 'a', chunkIdx: 0, vectorScore: null });
+    const withScore = candidate({ sourceId: 'b', chunkIdx: 0, vectorScore: 0.3 });
+    const out = unionCandidates([[withNull, withScore]]);
+    expect(out[0].sourceId).toBe('b');
+  });
+});
+
+describe('askQa — compound-query splitting (Step 3b)', () => {
+  const COMPOUND =
+    'What funding stage is Cadence Labs raising at, and what has its growth been so far?';
+
+  it('compound query → hybridRetrieve called per sub-question, candidates UNIONED before grounding', async () => {
+    // sub-query 1 (stage) clears the floor; sub-query 2 (growth) is weaker — the
+    // union must still surface BOTH chunks to synthesis.
+    hybridRetrieveMock
+      .mockResolvedValueOnce([candidate({ sourceId: 'mem-1', chunkIdx: 3, vectorScore: 0.58 })])
+      .mockResolvedValueOnce([candidate({ sourceId: 'mem-1', chunkIdx: 11, vectorScore: 0.54 })]);
+    runAgentMock.mockResolvedValueOnce({
+      answer: SECRET_ANSWER,
+      citations: [
+        { sourceType: 'memory', sourceId: 'mem-1', chunkIdx: 3 },
+        { sourceType: 'memory', sourceId: 'mem-1', chunkIdx: 11 },
+      ],
+      grounded: true,
+    });
+
+    const result = await askQa({ accountId: ACCOUNT_ID, query: COMPOUND }, ctx);
+
+    expect(hybridRetrieveMock).toHaveBeenCalledTimes(2);
+    const q1 = hybridRetrieveMock.mock.calls[0][0].query;
+    const q2 = hybridRetrieveMock.mock.calls[1][0].query;
+    expect(q1).toBe('What funding stage is Cadence Labs raising at');
+    expect(q2).toBe('what has its growth been so far?');
+    expect(q1).not.toBe(COMPOUND);
+    // grounded over the UNION: both chunks cited, nothing dropped
+    expect(result.answer.grounded).toBe(true);
+    expect(result.answer.citations).toHaveLength(2);
+    expect(result.debug.droppedCitationCount).toBe(0);
+    // union floor = max across sub-queries (0.58)
+    expect(result.debug.maxVectorScore).toBeCloseTo(0.58, 5);
+    expect(result.debug.retrievedKeys).toEqual(
+      expect.arrayContaining(['mem-1|3', 'mem-1|11']),
+    );
+  });
+
+  it('single-topic query → hybridRetrieve called exactly ONCE with the original query (no-op)', async () => {
+    hybridRetrieveMock.mockResolvedValueOnce([candidate({ sourceId: 'mem-1', chunkIdx: 0 })]);
+    runAgentMock.mockResolvedValueOnce({
+      answer: SECRET_ANSWER,
+      citations: [{ sourceType: 'memory', sourceId: 'mem-1', chunkIdx: 0 }],
+      grounded: true,
+    });
+
+    await askQa({ accountId: ACCOUNT_ID, query: 'What sector is the company in?' }, ctx);
+
+    expect(hybridRetrieveMock).toHaveBeenCalledTimes(1);
+    expect(hybridRetrieveMock.mock.calls[0][0].query).toBe('What sector is the company in?');
   });
 });

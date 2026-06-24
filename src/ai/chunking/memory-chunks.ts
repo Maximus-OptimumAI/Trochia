@@ -132,6 +132,7 @@ function collectFields(row: ChunkableMemoryRow): Field[] {
     { label: 'Why us (our edge, why our team)', value: str(narrative?.why_us) ?? '' },
     { label: 'Growth (traction, growth rate, momentum)', value: str(traction?.growth) ?? '' },
     { label: 'Runway (how long our cash lasts, months of runway)', value: str(traction?.runway) ?? '' },
+    { label: 'Volume processed (total payment volume, transaction volume, GMV, amount processed, how much we have processed)', value: str(traction?.volumeProcessed) ?? '' },
     { label: 'MRR (monthly recurring revenue, monthly revenue)', value: metricValue(traction?.mrr) ?? '' },
     { label: 'ARR (annual recurring revenue, yearly revenue)', value: metricValue(traction?.arr) ?? '' },
     { label: 'Customers (how many customers we have, customer count, users)', value: metricValue(traction?.customers) ?? '' },

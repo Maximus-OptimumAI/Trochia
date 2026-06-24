@@ -89,5 +89,19 @@
     "isOutOfScope": false,
     "accountId": "e7a1c0de-0000-4000-8000-000000000001",
     "expectedRetrievableMarker": "team.founders"
+  },
+  {
+    "question": "What stage are we raising at, and what has our growth been so far?",
+    "expectedGrounded": true,
+    "isOutOfScope": false,
+    "accountId": "e7a1c0de-0000-4000-8000-000000000001",
+    "expectedRetrievableMarker": "stage+traction.growth"
+  },
+  {
+    "question": "How much have we processed in total payments to date?",
+    "expectedGrounded": true,
+    "isOutOfScope": false,
+    "accountId": "e7a1c0de-0000-4000-8000-000000000001",
+    "expectedRetrievableMarker": "traction.volumeProcessed"
   }
 ]

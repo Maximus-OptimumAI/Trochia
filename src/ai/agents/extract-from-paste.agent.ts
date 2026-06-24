@@ -266,6 +266,7 @@ const EXTRACTOR_SHAPE_CORPUS = [
   '  currency?: "USD, NGN" // free-text string — a code, list, or stablecoin ticker, NOT a fixed enum',
   '  customers?: "491 designers" // free-text STRING — a count, range, or qualitative phrase, NOT a number',
   '  growth?: "3x YoY", runway?: "~18 months",',
+  '  volumeProcessed?: "Over $40M processed to date" // free-text STRING — total payment/transaction volume, GMV, or amount processed; OPTIONAL, populate ONLY when the paste states such a figure',
   '}',
   '',
   'narrative: {',

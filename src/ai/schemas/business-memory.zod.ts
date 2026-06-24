@@ -331,6 +331,16 @@ export type Team = z.infer<typeof teamSchema>;
  *     so founders can write a count, a range, or a qualitative phrase.
  * Both live in this jsonb column, so this is a Zod-only relaxation — NO migration.
  * Growth + runway stay free-form strings ("3x YoY", "~18 months at current burn").
+ *
+ * `volumeProcessed` (ASK-UX-RETRIEVAL-01) is a FREE-TEXT string for the headline
+ * throughput metric many founders lead with — total payment / transaction volume /
+ * GMV / amount processed ("Over $40M processed across 150+ businesses"). Before this
+ * field there was NO home for it: a question like "how much have we processed?" had
+ * to land against `growth` or `oneLiner` (wrong-label dilution, cosine just under the
+ * floor). Free-text (not a number) so "$40M+", "₦2.5B", ranges, and qualitative
+ * phrases round-trip — same rationale as `customers`. OPTIONAL: pastes without a
+ * volume figure still validate (the extractor omits it), so existing fixtures are
+ * unaffected. Lives in the `traction` jsonb column — Zod-only relaxation, NO migration.
  */
 export const tractionSchema = z
   .object({
@@ -340,6 +350,7 @@ export const tractionSchema = z
     customers: z.string().optional(),
     growth: z.string().optional(),
     runway: z.string().optional(),
+    volumeProcessed: z.string().optional(),
     valuation: z.number().optional(),
     burn: z.number().optional(),
   })

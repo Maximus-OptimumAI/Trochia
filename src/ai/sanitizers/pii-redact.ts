@@ -64,6 +64,9 @@
  *     - draft.narrative.why_us
  *     - draft.traction.growth
  *     - draft.traction.runway
+ *     - draft.traction.volumeProcessed (free-text throughput metric — CSO-PII-VOL-01)
+ *     - draft.traction.customers (free-text count/phrase — CSO-PII-VOL-01 sibling gap)
+ *     - draft.traction.currency (free-text code/list/ticker — CSO-PII-VOL-01 closeout)
  *     - draft.oneLiner (top-level marketing string — LLM-emitted; T15-FIX-1 H1)
  *     - draft.team.* string leaves via bounded recursive traversal — every
  *       string in founders[*], advisors[*], and any catchall key under team —
@@ -83,8 +86,11 @@
  *     - draft.team.founders[*].email and draft.team.founders[*].phone
  *       (founder-self exemption channels — used to BUILD the exemption set,
  *       so redacting them would defeat the exemption itself)
- *     - draft.traction.{mrr, arr, currency, customers, valuation, burn}
- *       (numeric / 3-char currency code — not free-form text)
+ *     - draft.traction.{mrr, arr, valuation, burn}
+ *       (numeric metrics — not free-form text. NOTE: every FREE-TEXT traction
+ *       string — `growth`, `runway`, `volumeProcessed`, `customers`, and
+ *       `currency` (a free-text code/list/ticker, NOT a fixed 3-char enum) — is
+ *       walked above, so a third party's PII landing in any of them is redacted.)
  *
  * ## Replacement markers (CAPS on what's tracked)
  *
@@ -300,8 +306,8 @@ function accumulate(totals: Record<PIIType, number>, delta: Record<PIIType, numb
 }
 
 /**
- * Walk the four narrative fields and the two free-form traction fields,
- * redact in place on the cloned draft.
+ * Walk the four narrative fields and the five free-form traction fields
+ * (growth, runway, volumeProcessed, customers, currency), redact in place on the cloned draft.
  */
 function walkNarrativeAndTraction(
   draft: BusinessMemoryDraft,
@@ -323,7 +329,13 @@ function walkNarrativeAndTraction(
       accumulate(totals, byType);
     }
   }
-  const tractionKeys: Array<'growth' | 'runway'> = ['growth', 'runway'];
+  const tractionKeys: Array<'growth' | 'runway' | 'volumeProcessed' | 'customers' | 'currency'> = [
+    'growth',
+    'runway',
+    'volumeProcessed',
+    'customers',
+    'currency',
+  ];
   if (draft.traction) {
     for (const key of tractionKeys) {
       const v = draft.traction[key];
@@ -463,7 +475,7 @@ function walkOneLiner(
  * Redact unrelated-party PII from a Business Memory draft.
  *
  * Walks `narrative.{problem,solution,why_now,why_us}`,
- * `traction.{growth,runway}`, and every `provenance[*].source_snippet`
+ * `traction.{growth,runway,volumeProcessed,customers,currency}`, and every `provenance[*].source_snippet`
  * (single-object arm + array arm + post-resolve `rejected_alternatives`),
  * replacing every email / phone / wallet / SSN match with a typed marker —
  * EXCEPT matches whose lowercase-normalized form is in the founder-self
