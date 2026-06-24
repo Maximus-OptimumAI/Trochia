@@ -59,6 +59,9 @@ export const EVAL_MEMORY: ChunkableMemoryRow = {
     currency: 'USD',
     growth: '20% month over month for the last two quarters',
     runway: '20 months at the current burn rate',
+    // ASK-UX-RETRIEVAL-01 (Step 2): gives the 1b volume/throughput eval case a
+    // target. Synthetic — Cadence reconciles customer transaction volume.
+    volumeProcessed: 'Over $2.4B in customer transaction volume reconciled to date',
   },
   narrative: {
     problem:

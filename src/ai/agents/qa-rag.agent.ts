@@ -180,6 +180,93 @@ export function validateCitations(
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// Compound-query splitting (ASK-UX-RETRIEVAL-01 Step 3b) — exported PURE
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Clause-opening tokens that mark the start of an INDEPENDENT question clause.
+ * A coordinating "and" is treated as a split point ONLY when the clause on BOTH
+ * sides opens with one of these — i.e. it joins two QUESTIONS, not two nouns. So
+ * "What is our MRR and runway?" (one question, conjoined nouns) does NOT split,
+ * while "What stage are we at, and what has our growth been?" (two questions)
+ * does. Interrogatives + leading auxiliaries cover the natural founder phrasings.
+ */
+const CLAUSE_OPENERS: ReadonlySet<string> = new Set([
+  'what', 'which', 'who', 'whom', 'whose', 'when', 'where', 'why', 'how',
+  'is', 'are', 'was', 'were', 'do', 'does', 'did',
+  'has', 'have', 'had', 'can', 'could', 'will', 'would', 'should',
+]);
+
+/** A coordinating "and" boundary (optionally comma-led): matches ", and " / " and ". */
+const CONJUNCTION_RE = /\s*,?\s+and\s+/gi;
+
+/** The first alphabetic token of a clause, lowercased ('' when none). */
+function firstToken(clause: string): string {
+  return clause.trim().toLowerCase().match(/^[a-z]+/)?.[0] ?? '';
+}
+
+/** A clause that opens like a question AND is substantial (>= 3 words). */
+function isQuestionClause(clause: string): boolean {
+  const words = clause.trim().split(/\s+/).filter(Boolean);
+  return words.length >= 3 && CLAUSE_OPENERS.has(firstToken(clause));
+}
+
+/**
+ * Split a COMPOUND (two-question) query into its sub-questions, conservatively.
+ *
+ * Returns the ORIGINAL query as a single-element array UNLESS the text is a
+ * coordinating "and" joining two clauses that BOTH open like questions — then it
+ * returns `[leftClause, rightClause]` (split at the FIRST qualifying conjunction).
+ * Deterministic, no I/O, no LLM. The guard is intentionally strict so a single-
+ * topic query is NEVER split (the union path is then never invoked): both sides
+ * must open with an interrogative/auxiliary AND carry >= 3 words.
+ */
+export function splitCompoundQuery(query: string): string[] {
+  const q = query.trim();
+  if (!q) return [query];
+  CONJUNCTION_RE.lastIndex = 0; // shared stateful regex — reset before each scan
+  let m: RegExpExecArray | null;
+  while ((m = CONJUNCTION_RE.exec(q)) !== null) {
+    const left = q.slice(0, m.index).trim();
+    const right = q.slice(m.index + m[0].length).trim();
+    if (isQuestionClause(left) && isQuestionClause(right)) {
+      return [left, right];
+    }
+  }
+  return [query];
+}
+
+/**
+ * Union per-sub-query candidate lists into ONE deduped set, keyed by
+ * (sourceId, chunkIdx) — the same identity the citation layer uses. On a
+ * duplicate chunk keep the appearance with the higher cosine `vectorScore`, so
+ * the grounding floor sees each chunk's strongest evidence. Sorted by
+ * `vectorScore` desc (tiebreak: stable key) for a deterministic synthesis chunk
+ * order. Invoked ONLY on the compound path — single-topic retrieval is untouched.
+ */
+export function unionCandidates(lists: Candidate[][]): Candidate[] {
+  const byKey = new Map<string, Candidate>();
+  for (const list of lists) {
+    for (const c of list) {
+      const key = citationKey(c.sourceId, c.chunkIdx);
+      const existing = byKey.get(key);
+      if (!existing || (c.vectorScore ?? -1) > (existing.vectorScore ?? -1)) {
+        byKey.set(key, c);
+      }
+    }
+  }
+  return [...byKey.values()].sort((a, b) => {
+    const delta = (b.vectorScore ?? -1) - (a.vectorScore ?? -1);
+    if (delta !== 0) return delta;
+    // Locale-independent byte comparison on the stable key (not localeCompare,
+    // which is ICU/locale-sensitive) — deterministic order across environments.
+    const ak = citationKey(a.sourceId, a.chunkIdx);
+    const bk = citationKey(b.sourceId, b.chunkIdx);
+    return ak < bk ? -1 : ak > bk ? 1 : 0;
+  });
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // askQa
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -208,11 +295,31 @@ function iDontKnowAnswer(): QaAnswer {
 export async function askQa(input: AskQaInput, ctx: AskQaCtx): Promise<AskQaResult> {
   const { accountId, query } = input;
 
-  // 1. Retrieve. A retrieve throw is redacted to the static synthesis failure
-  // below (it must never propagate the bound query — handled in retrieve.ts too).
+  // 1. Retrieve. COMPOUND-QUERY SPLITTING (ASK-UX-RETRIEVAL-01 Step 3b): a
+  // two-question query ("What stage … and what has its growth been?") embeds as
+  // ONE diluted vector that can sink BOTH sub-topics below the 0.52 floor.
+  // splitCompoundQuery conservatively detects a conjunction-of-questions and
+  // returns the sub-questions; we retrieve per sub-question and UNION the
+  // candidates before grounding, so at least one sub-topic clears the floor and
+  // synthesis cites across the union. STRICT NO-OP for a single-topic query
+  // (returns [query]) → the atomic path is byte-identical: one embed, one
+  // retrieval, the same candidates, no union. No LLM call; fully deterministic.
+  // A retrieve throw is redacted to the static synthesis failure below (it must
+  // never propagate the bound query — handled in retrieve.ts too).
+  const subQueries = splitCompoundQuery(query);
   let candidates: Candidate[];
   try {
-    candidates = await hybridRetrieve({ accountId, query }, ctx);
+    if (subQueries.length <= 1) {
+      // No-op path — identical to pre-3b behavior for every single-topic query.
+      candidates = await hybridRetrieve({ accountId, query }, ctx);
+    } else {
+      // Compound path — retrieve each sub-question, then union the candidate sets
+      // (deduped by (sourceId, chunkIdx), strongest cosine kept) before grounding.
+      const perSub = await Promise.all(
+        subQueries.map((sub) => hybridRetrieve({ accountId, query: sub }, ctx)),
+      );
+      candidates = unionCandidates(perSub);
+    }
   } catch (err) {
     // R2 (codex re-gate P2): hybridRetrieve embeds the query through the METERED
     // Voyage adapter, so an over-cap tenant throws AI_DAILY_CAP_EXCEEDED here.

@@ -224,12 +224,98 @@ describe('redactUnrelatedPartyPII — no-op', () => {
 });
 
 // ────────────────────────────────────────────────────────────────────────────
+// Free-text traction fields — volumeProcessed + customers (CSO-PII-VOL-01)
+//
+// Both are free-text strings filled by the same extractor as growth/runway, so
+// a third party's PII can land in either and would be persisted + embedded +
+// retrievable if unscrubbed. They must flow through the redactor like growth/
+// runway do. Mirrors the growth/runway redaction contract.
+// ────────────────────────────────────────────────────────────────────────────
+
+describe('redactUnrelatedPartyPII — free-text traction fields (volumeProcessed + customers)', () => {
+  it('redacts unrelated-party email + phone embedded in traction.volumeProcessed AND traction.customers', () => {
+    const draft: BusinessMemoryDraft = {
+      traction: {
+        // Synthetic — a third party's contact details an extractor could carry
+        // from a paste into these free-text fields. Must be scrubbed pre-persist.
+        volumeProcessed: 'Over $40M processed; ops lead dana@acme.example, 415-555-0142',
+        customers: '120 incl. ref buyer carl@vc.example at 415-555-0188',
+        mrr: 42000,
+        currency: 'USD',
+      },
+      provenance: {},
+    } as unknown as BusinessMemoryDraft;
+
+    const result = redactUnrelatedPartyPII(draft, []);
+
+    // 2 emails + 2 phones across the two free-text fields; nothing else.
+    expect(result.byType.email).toBe(2);
+    expect(result.byType.phone).toBe(2);
+    expect(result.byType.wallet).toBe(0);
+    expect(result.byType.ssn).toBe(0);
+    expect(result.redactionsApplied).toBe(4);
+
+    const stringified = JSON.stringify(result.draft);
+    // every seeded PII literal is gone from BOTH fields
+    expect(stringified).not.toContain('dana@acme.example');
+    expect(stringified).not.toContain('415-555-0142');
+    expect(stringified).not.toContain('carl@vc.example');
+    expect(stringified).not.toContain('415-555-0188');
+    // typed markers present; non-PII context preserved
+    expect(stringified).toContain('[REDACTED-EMAIL]');
+    expect(stringified).toContain('[REDACTED-PHONE]');
+    expect(stringified).toContain('Over $40M processed');
+    expect(stringified).toContain('120 incl. ref buyer');
+    // numeric sibling untouched
+    expect((result.draft.traction as { mrr: number }).mrr).toBe(42000);
+    // immutability
+    expect(result.draft).not.toBe(draft);
+  });
+
+  it('redacts PII embedded in the free-text traction.currency field', () => {
+    const draft: BusinessMemoryDraft = {
+      traction: {
+        // currency is free-text ("a code, list, or stablecoin ticker") — PII can
+        // still land here from a paste and must be scrubbed like the other
+        // free-text traction fields (CSO-PII-VOL-01 closeout).
+        currency: 'USD; treasury contact pat@acme.example',
+      },
+      provenance: {},
+    } as unknown as BusinessMemoryDraft;
+
+    const result = redactUnrelatedPartyPII(draft, []);
+
+    expect(result.byType.email).toBe(1);
+    expect(result.redactionsApplied).toBe(1);
+    const stringified = JSON.stringify(result.draft);
+    expect(stringified).not.toContain('pat@acme.example');
+    expect(stringified).toContain('[REDACTED-EMAIL]');
+    expect(stringified).toContain('USD'); // the legitimate currency code survives
+  });
+
+  it('does NOT false-redact a normal currency value ("USD, NGN, USDC")', () => {
+    const draft: BusinessMemoryDraft = {
+      traction: { currency: 'USD, NGN, USDC' },
+      provenance: {},
+    } as unknown as BusinessMemoryDraft;
+
+    const result = redactUnrelatedPartyPII(draft, []);
+
+    // No PII pattern (email/phone/wallet/SSN) matches a currency code/list — so
+    // a legitimate currency value passes through byte-identical.
+    expect(result.redactionsApplied).toBe(0);
+    expect(result.byType).toEqual({ email: 0, phone: 0, wallet: 0, ssn: 0 });
+    expect((result.draft.traction as { currency: string }).currency).toBe('USD, NGN, USDC');
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
 // Walk-boundary — PII embedded in companyName is NOT redacted
 //
-// The redactor walks narrative.* + traction.{growth,runway} + every
-// provenance source_snippet. It explicitly does NOT walk top-level scalars
-// (companyName, oneLiner, etc.) nor team.* — those are founder-self by
-// design. This test pins the whitelist boundary.
+// The redactor walks narrative.* + traction.{growth,runway,volumeProcessed,
+// customers,currency} + every provenance source_snippet. It explicitly does NOT
+// walk top-level scalars (companyName, etc.) nor team.email/phone — those are
+// founder-self by design. This test pins the whitelist boundary.
 // ────────────────────────────────────────────────────────────────────────────
 
 describe('redactUnrelatedPartyPII — walk boundary', () => {
