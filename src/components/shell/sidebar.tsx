@@ -23,12 +23,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 /**
- * Sidebar (app shell) — `w-60 bg-paper border-r border-stone`, logo lockup top,
+ * Sidebar (app shell). `w-60 bg-paper border-r border-stone`, logo lockup top,
  * nav items middle, user menu bottom. Module order: Business Memory · Pitch Lab
  * · Pipeline · Live Raise · Data Room* · Raise Ops* (`*` = disabled, with a
- * right-aligned `text-mono-sm` phase badge — Data Room "Phase 7", Raise Ops
- * "Phase 9"). Bottom: Settings + the user avatar DropdownMenu (Settings /
- * Billing / Sign out).
+ * right-aligned `text-mono-sm` "Soon" badge). Bottom: Settings + the user avatar
+ * DropdownMenu (Settings / Billing / Sign out).
  */
 type NavItem = {
   label: string;
@@ -50,7 +49,7 @@ const NAV: NavItem[] = [
 function NavLink({ item, active }: { item: NavItem; active?: boolean }) {
   const Icon = item.icon;
   const base =
-    'flex items-center gap-3 px-3 h-10 rounded-md text-body-sm font-medium transition-colors';
+    'flex items-center gap-3 px-3 h-10 rounded-full text-body-sm font-medium transition-colors';
   if (item.disabledPhase) {
     return (
       <span
@@ -69,6 +68,7 @@ function NavLink({ item, active }: { item: NavItem; active?: boolean }) {
       href={item.href}
       className={cn(
         base,
+        'outline-none focus-visible:ring-2 focus-visible:ring-ink/40',
         active ? 'bg-stone text-ink' : 'text-graphite hover:bg-stone/50 hover:text-ink'
       )}
     >
@@ -109,7 +109,7 @@ export function Sidebar({
         <NavLink item={{ label: 'Settings', href: '/app/settings', icon: Settings }} active={activeHref === '/app/settings'} />
         <DropdownMenu>
           <DropdownMenuTrigger
-            className="flex items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-stone/50"
+            className="flex items-center gap-3 rounded-full px-3 py-2 text-left outline-none transition-colors hover:bg-stone/50 focus-visible:ring-2 focus-visible:ring-ink/40"
             aria-label="Account menu"
           >
             <Avatar className="size-7">
@@ -128,7 +128,7 @@ export function Sidebar({
             <DropdownMenuSeparator />
             <form action="/sign-out" method="post" className="w-full">
               {/* `nativeButton`: the render target IS a real <button>, so Base UI
-                  stays on its native-button path — Enter-key submit works and the
+                  stays on its native-button path, Enter-key submit works, and the
                   non-native-button a11y warning is gone (codex P2, sidebar.tsx:130). */}
               <DropdownMenuItem nativeButton render={<button type="submit" />} className="w-full">
                 Sign out
