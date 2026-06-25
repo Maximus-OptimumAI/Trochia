@@ -250,7 +250,9 @@ enhancement only). Mobile: logo + hamburger → full-screen Sheet.
 Structure unchanged from current shell (sidebar 240px + top bar). Phase B restyles
 surfaces only: sidebar `bg-paper border-r border-stone`; content cards go `bg-card
 rounded-3xl shadow-card`; active nav item `bg-stone text-ink`; pills and sharp inputs per
-this document.
+this document. Nav rows use pill radius (`rounded-full`). Interactive nav rows and the
+account trigger carry the keyboard focus ring (`focus-visible:ring-2 ring-ink/40`), reused
+from the Button primitive; the disabled "Soon" rows are not focusable and carry no ring.
 
 ### Section heading block
 
