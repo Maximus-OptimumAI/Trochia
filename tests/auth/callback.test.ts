@@ -1,6 +1,6 @@
 /**
  * Regression for /codex 01-07 re-verification 2026-05-15 [P1]:
- * first-login tenant-claim staleness — src/app/auth/callback/route.ts.
+ * first-login tenant-claim staleness in src/app/auth/callback/route.ts.
  *
  * Defect: on a first-time OAuth callback, `exchangeCodeForSession()` minted
  * the JWT BEFORE the `accounts` row existed, so the custom_access_token_hook
@@ -14,11 +14,11 @@
  * AFTER the account upsert so the next token re-runs the hook against the
  * now-existing row and stamps a populated `tenant_id`.
  *
- * This suite asserts the BEHAVIORAL contract — `refreshSession()` is called
+ * This suite asserts the BEHAVIORAL contract: `refreshSession()` is called
  * after the upsert and before the redirect. The literal-claim-population
  * assertion (decode the cookie's JWT, check `tenant_id` is non-null) requires
  * a live Supabase project + the custom_access_token_hook installed and runs
- * as an e2e against the Vercel preview — see `e2e/skeleton.spec.ts`.
+ * as an e2e against the Vercel preview; see `e2e/skeleton.spec.ts`.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -79,7 +79,14 @@ function makeRequest(code = 'pkce_code_xxx') {
   >[0];
 }
 
-describe('auth/callback — first-login session refresh (PR-6 Fix A)', () => {
+// fix/preview-auth-01: a request that arrives on a Vercel `*.vercel.app` preview
+// host. The post-exchange redirect must STAY on this host (not bounce to the
+// pinned prod APP_URL), so the session cookie set here remains visible.
+function makePreviewRequest(host = 'trochia-git-fix-preview-auth-01.vercel.app', code = 'pkce_code_xxx') {
+  return new Request(`https://${host}/auth/callback?code=${code}`) as Parameters<typeof GET>[0];
+}
+
+describe('auth/callback: first-login session refresh (PR-6 Fix A)', () => {
   beforeEach(() => {
     exchangeCodeForSessionMock.mockReset();
     refreshSessionMock.mockReset();
@@ -87,7 +94,7 @@ describe('auth/callback — first-login session refresh (PR-6 Fix A)', () => {
     executeMock.mockClear();
     findFirstMock.mockReset();
     callOrder.length = 0;
-    // Track is a stable mock — no per-test reset needed for our assertions.
+    // Track is a stable mock; no per-test reset needed for our assertions.
   });
 
   afterEach(() => {
@@ -122,6 +129,40 @@ describe('auth/callback — first-login session refresh (PR-6 Fix A)', () => {
     expect(res.headers.get('location')).toMatch(/\/onboarding$/);
   });
 
+  it('preview host: post-exchange redirect STAYS on the *.vercel.app host (fix/preview-auth-01)', async () => {
+    exchangeCodeForSessionMock.mockResolvedValue({
+      data: {
+        user: { id: '00000000-0000-0000-0000-000000000001', email: 'founder@test.local' },
+      },
+      error: null,
+    });
+    refreshSessionMock.mockResolvedValue({ data: { session: null }, error: null });
+    findFirstMock.mockResolvedValue({ id: 'acct_xxx', dpaAcceptedAt: null, subscriptionStatus: 'none' });
+
+    const res = await GET(makePreviewRequest('trochia-git-fix-preview-auth-01.vercel.app'));
+
+    // Lands back on the SAME preview host the round-trip came from (full origin,
+    // not just the path) so the host-only session cookie is visible.
+    expect(res.status).toBe(307);
+    expect(res.headers.get('location')).toBe(
+      'https://trochia-git-fix-preview-auth-01.vercel.app/onboarding',
+    );
+  });
+
+  it('preview host + exchange failure: error redirect STAYS on the preview host', async () => {
+    exchangeCodeForSessionMock.mockResolvedValue({
+      data: null,
+      error: { message: 'invalid PKCE code', status: 400 },
+    });
+
+    const res = await GET(makePreviewRequest('trochia-git-fix-preview-auth-01.vercel.app'));
+
+    expect(res.status).toBe(307);
+    expect(res.headers.get('location')).toBe(
+      'https://trochia-git-fix-preview-auth-01.vercel.app/sign-in?error=exchange_failed',
+    );
+  });
+
   it('refreshSession throws → still redirects (best-effort; proxy fallback covers)', async () => {
     exchangeCodeForSessionMock.mockResolvedValue({
       data: {
@@ -132,7 +173,7 @@ describe('auth/callback — first-login session refresh (PR-6 Fix A)', () => {
     // Simulate a Supabase Auth network hiccup on the refresh.
     refreshSessionMock.mockImplementation(async () => {
       callOrder.push('auth.refreshSession');
-      throw new Error('ECONNRESET — supabase auth unreachable');
+      throw new Error('ECONNRESET: supabase auth unreachable');
     });
     findFirstMock.mockResolvedValue({ id: 'acct_xxx', dpaAcceptedAt: null, subscriptionStatus: 'none' });
 
@@ -140,7 +181,7 @@ describe('auth/callback — first-login session refresh (PR-6 Fix A)', () => {
 
     // The refresh was attempted (best-effort).
     expect(refreshSessionMock).toHaveBeenCalledTimes(1);
-    // The redirect still landed — the founder is not blocked by a transient
+    // The redirect still landed; the founder is not blocked by a transient
     // refresh failure. The proxy.ts owner_user_id fallback covers the next
     // request's gate read until a successful refresh lands.
     expect(res.status).toBe(307);
@@ -157,7 +198,7 @@ describe('auth/callback — first-login session refresh (PR-6 Fix A)', () => {
 
     expect(res.status).toBe(307);
     expect(res.headers.get('location')).toMatch(/\/sign-in\?error=exchange_failed$/);
-    // We never reached the upsert + refresh layer — guard against accidentally
+    // We never reached the upsert + refresh layer; guard against accidentally
     // refreshing a non-session on the exchange-failure path.
     expect(insertMock).not.toHaveBeenCalled();
     expect(executeMock).not.toHaveBeenCalled();
@@ -180,7 +221,7 @@ describe('auth/callback — first-login session refresh (PR-6 Fix A)', () => {
 
     expect(res.status).toBe(307);
     expect(res.headers.get('location')).toMatch(/\/sign-in\?error=account_setup_failed$/);
-    // Critical: a failed upsert must NOT trigger a refresh — refreshing on a
+    // Critical: a failed upsert must NOT trigger a refresh; refreshing on a
     // session whose row creation failed would write a useless cookie and mask
     // the real failure mode.
     expect(refreshSessionMock).not.toHaveBeenCalled();

@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/brand/logo';
 import { createBrowserSupabaseClient } from '@/lib/supabase/client';
 import { APP_URL } from '@/lib/env';
+import { buildAuthCallbackUrl } from '@/lib/auth-redirect';
 import { logger } from '@/lib/logger';
 
 /**
@@ -24,9 +25,14 @@ export default function SignInPage() {
     setLoading(true);
     try {
       const supabase = createBrowserSupabaseClient();
+      // On a Vercel preview the round-trip must return to THIS host (the
+      // browser's own origin) so the PKCE cookie is visible to the callback;
+      // on prod this resolves to APP_URL exactly as before. See
+      // `@/lib/auth-redirect`. The origin comes only from the browser's own
+      // `window.location.origin` (never user input), and the path is fixed.
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: `${APP_URL}/auth/callback` },
+        options: { redirectTo: buildAuthCallbackUrl(window.location.origin, APP_URL) },
       });
       if (error) {
         logger.warn('sign-in: signInWithOAuth failed', { err: error });
