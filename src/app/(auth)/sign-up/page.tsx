@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/brand/logo';
 import { createBrowserSupabaseClient } from '@/lib/supabase/client';
 import { APP_URL } from '@/lib/env';
+import { buildAuthCallbackUrl } from '@/lib/auth-redirect';
 import { track } from '@/lib/analytics';
 import { logger } from '@/lib/logger';
 
@@ -20,7 +21,7 @@ import { logger } from '@/lib/logger';
  *   - H3 "Start your raise"
  *   - sub "Trochia operates alongside you through every stage."
  *   - Email Input full width, primary "Continue with email" (disabled; magic-
- *     link is V2 per D-10 — Google is the working Phase 1 path)
+ *     link is V2 per D-10; Google is the working Phase 1 path)
  *   - Divider "or"
  *   - secondary full-width "Continue with Google"  → fires `signup_started`,
  *     then `supabase.auth.signInWithOAuth({ provider: 'google',
@@ -29,7 +30,7 @@ import { logger } from '@/lib/logger';
  *   - legal line + DPA clickwrap line
  *
  * Note on DPA acceptance: per the SUMMARY note for this plan, DPA acceptance
- * is recorded on the welcome screen (after the OAuth round-trip — that's
+ * is recorded on the welcome screen (after the OAuth round-trip, that's
  * when the founder has an `accounts` row to attach the acceptance to).
  */
 export default function SignUpPage() {
@@ -41,9 +42,14 @@ export default function SignUpPage() {
     try {
       void track('signup_started').catch(() => undefined);
       const supabase = createBrowserSupabaseClient();
+      // On a Vercel preview the round-trip must return to THIS host (the
+      // browser's own origin) so the PKCE cookie is visible to the callback;
+      // on prod this resolves to APP_URL exactly as before. See
+      // `@/lib/auth-redirect`. The origin comes only from the browser's own
+      // `window.location.origin` (never user input), and the path is fixed.
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: `${APP_URL}/auth/callback` },
+        options: { redirectTo: buildAuthCallbackUrl(window.location.origin, APP_URL) },
       });
       if (error) {
         logger.warn('sign-up: signInWithOAuth failed', { err: error });
@@ -71,7 +77,7 @@ export default function SignUpPage() {
         className="flex w-full flex-col gap-3"
         onSubmit={(e) => {
           e.preventDefault();
-          // Email magic-link sign-in is V2 (D-10) — the input + button are here
+          // Email magic-link sign-in is V2 (D-10). The input + button are here
           // for visual parity with the UI-SPEC, but the action is disabled. The
           // working Phase 1 path is Google SSO.
         }}
