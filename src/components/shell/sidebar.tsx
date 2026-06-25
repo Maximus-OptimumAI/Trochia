@@ -109,7 +109,7 @@ export function Sidebar({
         <NavLink item={{ label: 'Settings', href: '/app/settings', icon: Settings }} active={activeHref === '/app/settings'} />
         <DropdownMenu>
           <DropdownMenuTrigger
-            className="flex items-center gap-3 rounded-md px-3 py-2 text-left outline-none transition-colors hover:bg-stone/50 focus-visible:ring-2 focus-visible:ring-ink/40"
+            className="flex items-center gap-3 rounded-full px-3 py-2 text-left outline-none transition-colors hover:bg-stone/50 focus-visible:ring-2 focus-visible:ring-ink/40"
             aria-label="Account menu"
           >
             <Avatar className="size-7">
@@ -128,7 +128,7 @@ export function Sidebar({
             <DropdownMenuSeparator />
             <form action="/sign-out" method="post" className="w-full">
               {/* `nativeButton`: the render target IS a real <button>, so Base UI
-                  stays on its native-button path — Enter-key submit works and the
+                  stays on its native-button path, Enter-key submit works, and the
                   non-native-button a11y warning is gone (codex P2, sidebar.tsx:130). */}
               <DropdownMenuItem nativeButton render={<button type="submit" />} className="w-full">
                 Sign out
