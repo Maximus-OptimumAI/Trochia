@@ -11,15 +11,24 @@ import { createBrowserSupabaseClient } from '@/lib/supabase/client';
 import { logger } from '@/lib/logger';
 
 /**
- * Reset-password screen (AUTH-EMAIL-PASSWORD-01).
+ * Reset-password screen (AUTH-EMAIL-PASSWORD-01, FIX 1: cross-device).
  *
- * The recovery link returns the browser here as `/reset-password?code=...`. We
- * exchange that code for a recovery session ON THIS BROWSER (the PKCE verifier
- * was set when the reset was requested) using the browser client. This page does
- * NOT touch `src/app/auth/callback/route.ts` (the hardened OAuth callback).
+ * The recovery link returns the browser here as
+ * `/reset-password?token_hash=...&type=recovery`. We verify that token_hash with
+ * `verifyOtp({ token_hash, type: 'recovery' })` on the browser client. A
+ * token_hash carries NO PKCE code_verifier, so verification works in ANY browser:
+ * the founder can request the reset on a laptop and click the link on a phone
+ * (cross-device). This replaces the prior `exchangeCodeForSession(code)` flow,
+ * which required same-browser completion and double-consumed the one-time code
+ * (the SDK's detectSessionInUrl auto-consumed it before the manual exchange).
  *
- * On a valid session the user sets a new password via `updateUser`; errors are
- * generic.
+ * Transition handling: if the link still arrives as `?code=` (the Supabase email
+ * template not yet switched to token_hash), we do NOT attempt the exchange; we
+ * show the invalid-link state with a request-a-new-link action.
+ *
+ * On a verified recovery session the founder sets a new password via
+ * `updateUser`; errors are generic. This page does NOT touch
+ * `src/app/auth/callback/route.ts` (the hardened OAuth callback).
  */
 type Phase = 'verifying' | 'ready' | 'invalid';
 
@@ -32,25 +41,41 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     let cancelled = false;
-    // A missing code becomes an empty exchange that errors out, so every state
-    // transition lands inside the async callbacks below (never synchronously in
-    // the effect body).
-    const code = new URLSearchParams(window.location.search).get('code') ?? '';
-    const supabase = createBrowserSupabaseClient();
-    supabase.auth
-      .exchangeCodeForSession(code)
-      .then(({ error: exchangeError }) => {
+    const params = new URLSearchParams(window.location.search);
+    const tokenHash = params.get('token_hash') ?? '';
+    const type = params.get('type');
+
+    // A valid recovery link carries token_hash + type=recovery. Anything else (a
+    // missing token_hash, or an old-template `?code=` PKCE link we intentionally
+    // do NOT consume) resolves straight to the invalid state with no network call.
+    // Routing the outcome through a Promise keeps every setPhase inside an async
+    // callback, so none runs synchronously in the effect body (react-hooks rule).
+    //
+    // detectSessionInUrl:false is REQUIRED: the default (true) would make the SDK
+    // auto-consume an old-template `?code=` from this URL on client init, burning
+    // the one-time code before we route it to the invalid state. verifyOtp does
+    // not depend on this flag.
+    const supabase = createBrowserSupabaseClient({ detectSessionInUrl: false });
+    const verified: Promise<boolean> =
+      tokenHash && type === 'recovery'
+        ? supabase.auth
+            .verifyOtp({ token_hash: tokenHash, type: 'recovery' })
+            .then((res) => !res.error)
+        : Promise.resolve(false);
+
+    verified
+      .then((ok) => {
         if (cancelled) return;
-        if (exchangeError) {
-          logger.warn('reset-password: code exchange failed');
-          setPhase('invalid');
-        } else {
+        if (ok) {
           setPhase('ready');
+        } else {
+          logger.warn('reset-password: recovery link invalid or expired');
+          setPhase('invalid');
         }
       })
       .catch(() => {
         if (cancelled) return;
-        logger.warn('reset-password: code exchange threw');
+        logger.warn('reset-password: recovery verification threw');
         setPhase('invalid');
       });
     return () => {
@@ -67,7 +92,9 @@ export default function ResetPasswordPage() {
     }
     setLoading(true);
     try {
-      const supabase = createBrowserSupabaseClient();
+      // Same non-consuming client as the verify effect; the recovery session is
+      // already persisted in cookies by verifyOtp, so updateUser reads it.
+      const supabase = createBrowserSupabaseClient({ detectSessionInUrl: false });
       const { error: updateError } = await supabase.auth.updateUser({ password });
       if (updateError) {
         logger.warn('reset-password: updateUser failed');

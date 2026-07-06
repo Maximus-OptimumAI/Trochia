@@ -13,7 +13,7 @@ import { resolveRedirectOrigin } from '@/lib/auth-redirect';
 import { logger } from '@/lib/logger';
 
 /**
- * Forgot-password screen (AUTH-EMAIL-PASSWORD-01).
+ * Forgot-password screen (AUTH-EMAIL-PASSWORD-01, FIX 1: cross-device).
  *
  * `resetPasswordForEmail` is sent with a host-aware `redirectTo`: on a Vercel
  * `*.vercel.app` preview it returns to THAT preview's origin, on prod it resolves
@@ -21,6 +21,13 @@ import { logger } from '@/lib/logger';
  * The origin comes only from `window.location.origin` (never user input) and the
  * path is the fixed literal `/reset-password`, so it cannot become an open
  * redirect.
+ *
+ * Cross-device: the recovery must NOT depend on a PKCE code_verifier stored in
+ * the requesting browser, so the founder can request on one device and complete
+ * on another. That relies on the Supabase "Reset password" email template
+ * sending a token_hash link (`/reset-password?token_hash=...&type=recovery`),
+ * which /reset-password verifies with `verifyOtp` (no code_verifier). See the
+ * reset-password page.
  *
  * Anti-enumeration: the confirmation is identical whether or not the email
  * exists, and even transport errors fall through to the same neutral message.

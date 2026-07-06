@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, type FormEvent } from 'react';
+import { useState, useTransition, type FormEvent } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,47 +11,38 @@ import { createBrowserSupabaseClient } from '@/lib/supabase/client';
 import { APP_URL } from '@/lib/env';
 import { buildAuthCallbackUrl } from '@/lib/auth-redirect';
 import { logger } from '@/lib/logger';
+import { signInAction } from './actions';
 
 /**
  * Sign-in screen (FND-04, AUTH-EMAIL-PASSWORD-01). Email + password is the
  * working path beside Google SSO.
  *
- * `signInWithPassword` runs on the browser client (@supabase/ssr writes the
- * session cookie), then we hard-navigate to `/app` so the proxy middleware
- * re-reads the cookie and routes (to `/onboarding` if onboarding is incomplete).
+ * Email + password runs through the `signInAction` server action, which mirrors
+ * the OAuth callback: after signInWithPassword succeeds it reads the account and
+ * routes via the shared `authDestination()` helper. An onboarding-incomplete
+ * founder RESUMES onboarding instead of being bounced to /reactivate by the proxy
+ * /app gate, so the client no longer hardcodes /app.
  *
  * Security: the error message is generic ("Invalid email or password.") so it
  * never reveals whether the email is registered, and neither the email nor the
  * password is ever logged.
  */
 export default function SignInPage() {
-  const [loading, setLoading] = useState(false);
+  const [pending, startTransition] = useTransition();
   const [googleLoading, setGoogleLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  async function onSubmit(e: FormEvent) {
+  function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    setLoading(true);
-    try {
-      const supabase = createBrowserSupabaseClient();
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-      if (signInError) {
-        // Generic on purpose: never reveal whether the email exists. No PII logged.
-        logger.warn('sign-in: password auth failed');
-        setError('Invalid email or password.');
-        setLoading(false);
-        return;
-      }
-      // Hard navigation so the proxy middleware sees the fresh session cookie.
-      window.location.assign('/app');
-    } catch {
-      logger.warn('sign-in: password auth threw');
-      setError('Invalid email or password.');
-      setLoading(false);
-    }
+    startTransition(async () => {
+      // On success the action redirects (this call does not return here); reaching
+      // this point means it returned the generic, non-enumerating error.
+      const result = await signInAction({ email, password });
+      if (result?.error) setError(result.error);
+    });
   }
 
   async function onContinueWithGoogle() {
@@ -118,8 +109,8 @@ export default function SignInPage() {
             {error}
           </p>
         )}
-        <Button type="submit" variant="primary" className="w-full" disabled={loading}>
-          {loading ? 'Signing in…' : 'Sign in'}
+        <Button type="submit" variant="primary" className="w-full" disabled={pending}>
+          {pending ? 'Signing in…' : 'Sign in'}
         </Button>
       </form>
 
