@@ -6,7 +6,9 @@
  *   2.  batch order preserved (response indices reversed → adapter re-orders)
  *   3.  empty input rejected (VOYAGE_INPUT_EMPTY before any HTTP)
  *   4.  oversize batch rejected (9 texts → VOYAGE_BATCH_OVERSIZED before HTTP)
- *   5.  non-2xx response (429 → VOYAGE_BATCH_FAILED with body truncated to 200 chars)
+ *   5.  non-2xx response (persistent 429 → retried MAX_RETRIES times → VOYAGE_BATCH_FAILED,
+ *       STATIC status-only message, body NEVER read)
+ *   5b. transient 429 then 200 → adapter retries and SUCCEEDS (Anthropic-style backoff)
  *   6.  timeout (delays > 30s → AbortController fires → VOYAGE_NETWORK_FAILED)
  *   7.  dim mismatch (768-dim response → VOYAGE_DIM_MISMATCH)
  *   8.  TRACE WHITELIST PIN — sentinel string in chunk NEVER reaches Langfuse payload
@@ -214,19 +216,25 @@ describe('voyage.adapter — Plan 02-04 / KNW-04b', () => {
     expect(httpHit).toBe(false);
   });
 
-  it('Case 5 — non-2xx response (429) on a DOCUMENT embed → VOYAGE_BATCH_FAILED, STATIC message (status only, body NEVER read) [B/codex#3/CSO-H2]', async () => {
-    // B / codex#3 / CSO-H2: the document (write) path now redacts identically to
-    // the query path — the response body (which can echo chunk text) is NEVER
-    // read. The thrown message is status-only and content-blind.
+  it('Case 5: persistent 429 on a DOCUMENT embed -> retried MAX_RETRIES times -> VOYAGE_BATCH_FAILED, STATIC message (status only, body NEVER read) [B/codex#3/CSO-H2]', async () => {
+    // B / codex#3 / CSO-H2: the document (write) path redacts identically to the
+    // query path: the response body (which can echo chunk text) is NEVER read.
+    // The thrown message is status-only and content-blind.
+    //
+    // Retry (Anthropic-style backoff): a 429 is now retried up to MAX_RETRIES (2)
+    // → 3 total attempts before the adapter gives up. Backoff is zeroed under
+    // Vitest, so this stays fast. The final throw contract is unchanged.
     const SENSITIVE_CHUNK = 'CONFIDENTIAL-DOCUMENT-CHUNK-SENTINEL-MRR';
     const longBody = `{"error":"rate limited","echo":"${SENSITIVE_CHUNK}","detail":"${'x'.repeat(300)}"}`;
+    let calls = 0;
     server.use(
-      http.post(VOYAGE_URL, () =>
-        new HttpResponse(longBody, {
+      http.post(VOYAGE_URL, () => {
+        calls += 1;
+        return new HttpResponse(longBody, {
           status: 429,
           headers: { 'Content-Type': 'application/json' },
-        }),
-      ),
+        });
+      }),
     );
 
     const { voyage } = await import('@/ai/integrations/voyage.adapter');
@@ -247,6 +255,39 @@ describe('voyage.adapter — Plan 02-04 / KNW-04b', () => {
     // Static status-only message — no body, no echoed chunk text.
     expect(caught!.message).toBe('voyage embed failed (status 429)');
     expect(caught!.message).not.toContain(SENSITIVE_CHUNK);
+    // Exhausted the retry budget: 1 initial + MAX_RETRIES (2) = 3 attempts.
+    expect(calls).toBe(3);
+  });
+
+  it('Case 5b: transient 429 then 200 -> adapter retries with backoff and SUCCEEDS', async () => {
+    // Mirrors the Anthropic client's retry: a single rate-limit blip recovers on
+    // the next attempt instead of surfacing as a hard failure. Body is never read;
+    // the retry decision keys on the 429 status only.
+    let calls = 0;
+    server.use(
+      http.post(VOYAGE_URL, () => {
+        calls += 1;
+        if (calls === 1) {
+          return new HttpResponse('{"error":"rate limited"}', {
+            status: 429,
+            headers: { 'Content-Type': 'application/json', 'Retry-After': '0' },
+          });
+        }
+        return HttpResponse.json(voyageResponse({ count: 1, totalTokens: 6 }));
+      }),
+    );
+
+    const { voyage } = await import('@/ai/integrations/voyage.adapter');
+    const result = await voyage.embed({
+      texts: ['hello world'],
+      inputType: 'document',
+      trace: { accountId: 'acc-1', sourceType: 'memory', sourceId: 'mem-1' },
+    });
+
+    expect(calls).toBe(2); // one 429, one success
+    expect(result.embeddings).toHaveLength(1);
+    expect(result.embeddings[0]).toHaveLength(1024);
+    expect(result.tokenCount).toBe(6);
   });
 
   it('Case 6 — timeout (delay > 30s) → AbortController fires → VOYAGE_NETWORK_FAILED', async () => {
