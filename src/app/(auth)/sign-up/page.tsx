@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useTransition, type FormEvent } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,53 +12,52 @@ import { APP_URL } from '@/lib/env';
 import { buildAuthCallbackUrl } from '@/lib/auth-redirect';
 import { track } from '@/lib/analytics';
 import { logger } from '@/lib/logger';
+import { signUpAction } from './actions';
 
 /**
- * Sign-up screen (FND-04 / FND-12 funnel step 1, Plan 01-07).
+ * Sign-up screen (FND-04, AUTH-EMAIL-PASSWORD-01). Email + password runs through
+ * the `signUpAction` server action (the tenant bootstrap needs the server-only
+ * service client); Google SSO stays as the OAuth path.
  *
- * Per `01-UI-SPEC.md` §"Auth + onboarding shell":
- *   - Mark 48px centered
- *   - H3 "Start your raise"
- *   - sub "Trochia operates alongside you through every stage."
- *   - Email Input full width, primary "Continue with email" (disabled; magic-
- *     link is V2 per D-10; Google is the working Phase 1 path)
- *   - Divider "or"
- *   - secondary full-width "Continue with Google"  → fires `signup_started`,
- *     then `supabase.auth.signInWithOAuth({ provider: 'google',
- *     options: { redirectTo: `${APP_URL}/auth/callback` } })`
- *   - footer link "Already have an account? Sign in →"
- *   - legal line + DPA clickwrap line
- *
- * Note on DPA acceptance: per the SUMMARY note for this plan, DPA acceptance
- * is recorded on the welcome screen (after the OAuth round-trip, that's
- * when the founder has an `accounts` row to attach the acceptance to).
+ * Confirm-email is OFF, so a successful sign-up has a live session and the action
+ * redirects to `/onboarding`. The error message is generic and non-enumerating
+ * (never reveals whether the email is already registered).
  */
 export default function SignUpPage() {
-  const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    void track('signup_started').catch(() => undefined);
+    startTransition(async () => {
+      // On success the action redirects (the awaited call does not return here);
+      // reaching this point means it returned a generic, non-enumerating error.
+      const result = await signUpAction({ email, password });
+      if (result?.error) setError(result.error);
+    });
+  }
 
   async function onContinueWithGoogle() {
-    setLoading(true);
+    setGoogleLoading(true);
     try {
       void track('signup_started').catch(() => undefined);
       const supabase = createBrowserSupabaseClient();
-      // On a Vercel preview the round-trip must return to THIS host (the
-      // browser's own origin) so the PKCE cookie is visible to the callback;
-      // on prod this resolves to APP_URL exactly as before. See
-      // `@/lib/auth-redirect`. The origin comes only from the browser's own
-      // `window.location.origin` (never user input), and the path is fixed.
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: { redirectTo: buildAuthCallbackUrl(window.location.origin, APP_URL) },
       });
-      if (error) {
-        logger.warn('sign-up: signInWithOAuth failed', { err: error });
-        setLoading(false);
+      if (oauthError) {
+        logger.warn('sign-up: signInWithOAuth failed', { err: oauthError });
+        setGoogleLoading(false);
       }
-      // success: Supabase redirects the browser; no further client work.
     } catch (err) {
       logger.warn('sign-up: signInWithOAuth threw', { err });
-      setLoading(false);
+      setGoogleLoading(false);
     }
   }
 
@@ -73,15 +72,7 @@ export default function SignUpPage() {
         </p>
       </header>
 
-      <form
-        className="flex w-full flex-col gap-3"
-        onSubmit={(e) => {
-          e.preventDefault();
-          // Email magic-link sign-in is V2 (D-10). The input + button are here
-          // for visual parity with the UI-SPEC, but the action is disabled. The
-          // working Phase 1 path is Google SSO.
-        }}
-      >
+      <form className="flex w-full flex-col gap-3" onSubmit={onSubmit}>
         <div className="flex flex-col gap-2">
           <Label htmlFor="email">Email</Label>
           <Input
@@ -92,11 +83,28 @@ export default function SignUpPage() {
             placeholder="you@yourstartup.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            disabled
+            required
           />
         </div>
-        <Button type="submit" variant="primary" className="w-full" disabled>
-          Continue with email
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="password">Password</Label>
+          <Input
+            id="password"
+            name="password"
+            type="password"
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+        </div>
+        {error && (
+          <p role="alert" className="text-body-sm text-danger">
+            {error}
+          </p>
+        )}
+        <Button type="submit" variant="primary" className="w-full" disabled={pending}>
+          {pending ? 'Creating account…' : 'Create account'}
         </Button>
       </form>
 
@@ -110,9 +118,9 @@ export default function SignUpPage() {
         variant="signal"
         className="w-full"
         onClick={onContinueWithGoogle}
-        disabled={loading}
+        disabled={googleLoading}
       >
-        {loading ? 'Connecting…' : 'Continue with Google'}
+        {googleLoading ? 'Connecting…' : 'Continue with Google'}
       </Button>
 
       <p className="text-center text-body-sm text-graphite">

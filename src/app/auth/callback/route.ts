@@ -33,6 +33,7 @@ import { accounts, users } from '@/db/schema';
 import { track } from '@/lib/analytics';
 import { APP_URL } from '@/lib/env';
 import { resolveRedirectOrigin } from '@/lib/auth-redirect';
+import { authDestination } from '@/lib/auth-destination';
 import { logger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
@@ -131,15 +132,13 @@ export async function GET(request: NextRequest) {
   const account = await service.query.accounts.findFirst({
     where: and(eq(accounts.ownerUserId, user.id), isNull(accounts.deletedAt)),
   });
-  const dpaAccepted = !!account?.dpaAcceptedAt;
-  const active =
-    account?.subscriptionStatus === 'trialing' || account?.subscriptionStatus === 'active';
 
+  // A client-supplied `next` still wins (bounded to internal paths above);
+  // otherwise the shared helper picks the destination. authDestination() carries
+  // the SAME logic this route used inline (`!dpaAccepted || !active -> /onboarding;
+  // else /app`), so the OAuth routing is behavior-preserved, byte for byte.
   if (safeNext) {
     return NextResponse.redirect(new URL(safeNext, redirectBase));
   }
-  if (!dpaAccepted || !active) {
-    return NextResponse.redirect(new URL('/onboarding', redirectBase));
-  }
-  return NextResponse.redirect(new URL('/app', redirectBase));
+  return NextResponse.redirect(new URL(authDestination(account), redirectBase));
 }
