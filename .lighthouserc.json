@@ -1,10 +1,10 @@
 {
-  "_comment": "Phase-1 perf threshold is intentionally 0.70 (NOT 0.90) on the categories:performance line below. Rationale: PR-1 CI run on commit a9c5c77 scored perf=0.75 against the same prod build that scored perf=0.98 on a dev laptop. The LHR (https://storage.googleapis.com/lighthouse-infrastructure.appspot.com/reports/1778758427114-2870.report.html) breakdown: FCP 0.5s (1.00), LCP 1.0s (0.94), CLS 0 (1.00), SpeedIndex 1.0s (0.98), TTI 1.9s (0.97) — every actual user-perceived metric scored ≥0.94. The lone drag is Total Blocking Time at 590ms (0.21), which under Lighthouse's simulate-mode throttling is the most CPU-variance-sensitive metric in the score. GHA shared runners (benchmarkIndex ~1759 on this run) consistently land TBT ~15-25 perf points lower than a dev laptop on identical bytes — widely documented. The accessibility / best-practices / SEO thresholds stay at 0.90 because those are correctness checks, not CPU-bound. TODO (Phase 2+): wire Lighthouse against a Vercel preview URL via PLAYWRIGHT_BASE_URL-style secret, which gives a stable infra-runtime perf signal and lets us restore the 0.90 perf threshold. Tracked alongside the Plan-04 ratelimit-wiring work."
+  "_comment": "PERF-LIGHTHOUSE-01: the categories:performance floor is intentionally 0.70 (NOT 0.90), and the gate asserts the MEDIAN of numberOfRuns:5 via aggregationMethod:median, so a single slow GHA cold-start sample cannot fail it. Rationale for the 0.70 floor: a PR-1 CI run on commit a9c5c77 scored perf=0.75 against the same prod build that scored perf=0.98 on a dev laptop. LHR breakdown: FCP 0.5s (1.00), LCP 1.0s (0.94), CLS 0 (1.00), SpeedIndex 1.0s (0.98), TTI 1.9s (0.97); every actual user-perceived metric scored >=0.94. The lone drag is Total Blocking Time at 590ms (0.21), which under Lighthouse simulate-mode throttling is the most CPU-variance-sensitive metric in the score. GHA shared runners (benchmarkIndex ~1759 on that run) consistently land TBT ~15 to 25 perf points lower than a dev laptop on identical bytes (widely documented), so a single cold-start run can swing the category score across the 0.70 line even though the bytes are unchanged. Asserting the median of 5 runs smooths that variance toward central tendency; it is central-tendency, NOT best-of-N (aggregationMethod is 'median', not 'optimistic'), and it changes NO threshold and NO assertion level. The accessibility, best-practices, and SEO thresholds stay at 0.90 because those are correctness checks, not CPU-bound. TODO (Phase 2+): wire Lighthouse against a Vercel preview URL via a PLAYWRIGHT_BASE_URL-style secret, which gives a stable infra-runtime perf signal and lets us restore the 0.90 perf threshold. Tracked alongside the Plan-04 ratelimit-wiring work."
   ,
   "ci": {
     "collect": {
       "url": ["http://localhost:3000/"],
-      "numberOfRuns": 1,
+      "numberOfRuns": 5,
       "startServerCommand": "npm run start",
       "startServerReadyPattern": "Ready in",
       "startServerReadyTimeout": 120000,
@@ -13,6 +13,7 @@
       }
     },
     "assert": {
+      "aggregationMethod": "median",
       "assertions": {
         "categories:performance": ["error", { "minScore": 0.7 }],
         "categories:accessibility": ["error", { "minScore": 0.9 }],
