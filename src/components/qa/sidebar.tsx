@@ -137,7 +137,7 @@ export function QaSidebar() {
   return (
     <aside
       aria-labelledby="qa-sidebar-heading"
-      className="flex w-full flex-col gap-4 rounded-xl border border-stone bg-paper p-6"
+      className="flex w-full flex-col gap-4"
       data-testid="qa-sidebar"
     >
       <div className="flex flex-col gap-1">
@@ -152,6 +152,10 @@ export function QaSidebar() {
           <span className="sr-only">{COPY.inputLabel}</span>
           <textarea
             id="qa-sidebar-input"
+            // autoFocus is intentional: this field mounts only inside the
+            // AskLauncher sheet, opened on user intent (pill or Cmd-K), so
+            // focusing the question field is expected, not a page-load focus steal.
+            autoFocus
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={COPY.placeholder}
