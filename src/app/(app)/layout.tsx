@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import { QaSidebar } from '@/components/qa/sidebar';
+import { AskLauncher } from '@/components/qa/ask-launcher';
 import { Toaster } from '@/components/ui/sonner';
 
 /**
@@ -15,17 +15,18 @@ import { Toaster } from '@/components/ui/sonner';
  * non-blocking confirmations (export started, billing portal failed, etc).
  * The styleguide layout mounts its own copy for the styleguide preview.
  *
- * Also mounts the ambient `<QaSidebar>` (Plan 02-07 / KNW-05c) once for every
- * `(app)` page — the persistent Q&A surface that answers from the founder's
- * confirmed knowledge with citations. It is its own self-contained client
- * island (calls `trpc.qa.ask` via the Plan-07 tRPC provider); pages keep
- * owning their own primary chrome.
+ * Also mounts the ambient Q&A entry point `<AskLauncher>` (ASK-UX-01) once for
+ * every `(app)` page: a floating "Ask Trochia" pill plus a Cmd-K shortcut, both
+ * opening a right-side sheet that holds the existing `<QaSidebar>` (which calls
+ * `trpc.qa.ask` via the Plan-07 tRPC provider). Pages keep owning their own
+ * primary chrome. NOTE: the launcher is mounted unconditionally, so it still
+ * appears on onboarding; gating it before memory exists is ONBOARDING-FIX-01.
  */
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <>
       {children}
-      <QaSidebar />
+      <AskLauncher />
       <Toaster />
     </>
   );
