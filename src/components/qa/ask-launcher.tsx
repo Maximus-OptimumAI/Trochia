@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { usePathname } from 'next/navigation';
 import { Sparkles } from 'lucide-react';
 
 import { QaSidebar } from '@/components/qa/sidebar';
@@ -24,12 +25,24 @@ import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
  * `autoFocus`ed so focus lands in the question field. The pill carries
  * `aria-haspopup="dialog"`; the sheet keeps a (visually hidden) title for the
  * dialog's accessible name, since QaSidebar renders its own visible heading.
+ *
+ * ONBOARDING-FIX-01: the ambient Q&A surface answers from confirmed business
+ * memory, which does not exist yet during onboarding, so the launcher is gated
+ * off every `/onboarding/*` route. On those routes this renders NOTHING (no
+ * pill, no sheet) AND the global Cmd-K / Ctrl-K listener is never registered.
+ * The launcher is unchanged on every other `(app)` route.
  */
 export function AskLauncher() {
+  const pathname = usePathname();
+  const onOnboarding = pathname?.startsWith('/onboarding') ?? false;
+
   const [open, setOpen] = React.useState(false);
 
   // Global Cmd-K / Ctrl-K opens the sheet. Listener is removed on unmount.
+  // Skipped entirely on onboarding: the effect returns before registering, so
+  // the shortcut is absent (not just hidden) wherever the pill is hidden.
   React.useEffect(() => {
+    if (onOnboarding) return;
     function onKeyDown(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
@@ -38,7 +51,11 @@ export function AskLauncher() {
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
+  }, [onOnboarding]);
+
+  // Render nothing on onboarding. All hooks above run unconditionally first, so
+  // this early return respects the rules of hooks.
+  if (onOnboarding) return null;
 
   return (
     <>
