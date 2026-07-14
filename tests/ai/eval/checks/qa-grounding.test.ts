@@ -1,10 +1,10 @@
 /**
  * qa-grounding eval-check tests (Plan 02-07 / T03).
  *
- * The qa-rag agent (@/ai/agents/qa-rag.agent) is MOCKED — NO live askQa /
+ * The qa-rag agent (@/ai/agents/qa-rag.agent) is MOCKED - NO live askQa /
  * hybridRetrieve / runAgent fires (guardrail #6; the env-gate keys on PRESENCE,
  * and tests/setup.ts loads a possibly-invalid key from .env.local, so the live
- * path must be mocked to stay hermetic — the 02-05 env-gate-keys-on-presence
+ * path must be mocked to stay hermetic - the 02-05 env-gate-keys-on-presence
  * lesson). The db client is also mocked so getRequestClientFromClaims never
  * opens a real postgres connection.
  *
@@ -23,7 +23,7 @@ vi.mock('@/ai/agents/qa-rag.agent', () => ({
 }));
 
 // Mock the db client so getRequestClientFromClaims never opens a real postgres
-// connection — the check builds an rls runner per fixture, but askQa is mocked
+// connection - the check builds an rls runner per fixture, but askQa is mocked
 // so the runner is never actually invoked.
 vi.mock('@/db/client', () => ({
   getRequestClientFromClaims: () => ({ rls: vi.fn(), db: {} }),
@@ -67,7 +67,7 @@ function iDontKnow(): AskQaResult {
 /**
  * A scope-driven mock impl: in-scope queries → grounded(0), out-of-scope → "I don't
  * know". `over(query)` may return a per-question override (else null falls through).
- * Count-independent — adding fixtures cannot exhaust a queue.
+ * Count-independent - adding fixtures cannot exhaust a queue.
  */
 function byScope(over: (q: string) => AskQaResult | null = () => null) {
   return ({ query }: { query: string }): AskQaResult =>
@@ -98,7 +98,7 @@ describe('qaGrounding.run', () => {
     expect(r.threshold).toBe(0);
   });
 
-  it('P2-D — a turn with droppedCitationCount > 0 makes the eval FAIL', async () => {
+  it('P2-D - a turn with droppedCitationCount > 0 makes the eval FAIL', async () => {
     // One in-scope Q fabricates a citation → debug.droppedCitationCount = 1.
     const fabricated = IN_SCOPE[0].question;
     askQa.mockImplementation(byScope((q) => (q === fabricated ? grounded(1) : null)));
@@ -119,7 +119,7 @@ describe('qaGrounding.run', () => {
     expect(r.metric).toBe(0);
   });
 
-  it('codex#5 — an in-scope Q that returns grounded:false (or 0 citations) makes the eval FAIL (verify grounding, not just absence of fabrication)', async () => {
+  it('codex#5 - an in-scope Q that returns grounded:false (or 0 citations) makes the eval FAIL (verify grounding, not just absence of fabrication)', async () => {
     // All in-scope Qs have droppedCitationCount===0 (no fabrication), but the
     // first in-scope Q comes back as an "I don't know" (grounded:false, 0
     // citations). Pre-codex#5 this passed vacuously; now it FAILS because the
@@ -129,7 +129,7 @@ describe('qaGrounding.run', () => {
 
     const r = await qaGrounding.run();
     expect(r.status).toBe('fail');
-    // dropped total is still 0 — the fail is from the in-scope grounding miss.
+    // dropped total is still 0 - the fail is from the in-scope grounding miss.
     expect(r.metric).toBe(0);
     expect(r.reason).toContain(`in-scope grounded+cited ${IN_SCOPE_COUNT - 1}/${IN_SCOPE_COUNT}`);
   });
@@ -142,11 +142,59 @@ describe('qaGrounding.run', () => {
     expect(askQa).toHaveBeenCalledTimes(0);
   });
 
-  it('reason carries only counts — no question/answer/chunk text', async () => {
+  it('reason carries only counts - no question/answer/chunk text', async () => {
     askQa.mockImplementation(byScope());
     const r = await qaGrounding.run();
     expect(r.reason).toContain('dropped citations');
     expect(r.reason).not.toContain('MRR');
     expect(r.reason).not.toContain('Apple');
+  });
+
+  it('1 fixture drops on first pass, re-run clean → PASS treated as variance (bounded re-run)', async () => {
+    // The flipped in-scope Q drops ONCE (grounded but 1 dropped citation), then the
+    // re-run comes back clean. Count-aware per-query mock: first call drops, second
+    // is clean.
+    const flip = IN_SCOPE[0].question;
+    const perQuery = new Map<string, number>();
+    askQa.mockImplementation(({ query }: { query: string }) => {
+      const n = (perQuery.get(query) ?? 0) + 1;
+      perQuery.set(query, n);
+      if (query === flip) return n === 1 ? grounded(1) : grounded(0);
+      return OUT_OF_SCOPE_QUESTIONS.has(query) ? iDontKnow() : grounded(0);
+    });
+    const r = await qaGrounding.run();
+    expect(r.status).toBe('pass');
+    expect(r.metric).toBe(0);
+    expect(r.reason).toContain('variance');
+  });
+
+  it('1 fixture drops and REPRODUCES on re-run → hard FAIL (systematic)', async () => {
+    // The flipped Q drops on EVERY call, so the re-run reproduces the drop.
+    const flip = IN_SCOPE[0].question;
+    askQa.mockImplementation(byScope((q) => (q === flip ? grounded(1) : null)));
+    const r = await qaGrounding.run();
+    expect(r.status).toBe('fail');
+    expect(r.reason).toMatch(/reproduced|systematic/);
+  });
+
+  it('3 in-scope fixtures drop → hard FAIL immediately with NO re-run (tightening 2)', async () => {
+    const flips = new Set([IN_SCOPE[0].question, IN_SCOPE[1].question, IN_SCOPE[2].question]);
+    askQa.mockImplementation(byScope((q) => (flips.has(q) ? grounded(1) : null)));
+    const r = await qaGrounding.run();
+    expect(r.status).toBe('fail');
+    // Systematic: no re-run fires, so askQa is called exactly once per fixture.
+    expect(askQa).toHaveBeenCalledTimes(FIXTURES.length);
+    expect(r.reason).toMatch(/systematic|no re-run/);
+  });
+
+  it('an in-scope miss with zero drops → hard FAIL with NO re-run (misses are untouched)', async () => {
+    // In-scope Q returns "I don't know" (grounded:false, 0 citations, 0 dropped).
+    const miss = IN_SCOPE[0].question;
+    askQa.mockImplementation(byScope((q) => (q === miss ? iDontKnow() : null)));
+    const r = await qaGrounding.run();
+    expect(r.status).toBe('fail');
+    expect(r.metric).toBe(0);
+    // Zero drops → the re-run branch never runs: one call per fixture.
+    expect(askQa).toHaveBeenCalledTimes(FIXTURES.length);
   });
 });

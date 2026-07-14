@@ -1,5 +1,5 @@
 /**
- * Eval harness types (EVAL-01a — Plan 02-04, Task 7).
+ * Eval harness types (EVAL-01a - Plan 02-04, Task 7).
  *
  * Three must-not-fail checks from Phase 2 exit gate (criteria 3, 4, 7):
  *   - extraction-floor: extractFromPaste auto-fills ≥8 fields from a 1,500-word paste
@@ -7,7 +7,7 @@
  *   - cache-hit:        Anthropic prompt-cache hit rate non-zero in Langfuse
  *
  * At Plan 02-04 close all three are stubs returning `'pending'` (fail-open).
- * The runner contract — `exit 0 on all-pending|all-pass`, `exit 1 on any-fail` —
+ * The runner contract - `exit 0 on all-pending|all-pass`, `exit 1 on any-fail` -
  * is codified now and exercised in Plan 02-05 when the stubs flip to real
  * implementations (fail-closed at that point).
  */
@@ -22,7 +22,7 @@
  *   - 'fail'    = the check ran and missed its threshold (fail-CLOSED → exit 1).
  *   - 'skip'    = ENV-UNAVAILABLE. The check could not reach its live dependency
  *                 (e.g. ANTHROPIC_API_KEY / Langfuse creds absent). Fail-OPEN in
- *                 NON-live contexts (PR / local CI) — never blocks. BUT when the
+ *                 NON-live contexts (PR / local CI) - never blocks. BUT when the
  *                 runner sees `EVAL_LIVE_REQUIRED === '1'` (nightly / manual live
  *                 runs), a 'skip' becomes a FAILURE (exit 1): a run that was
  *                 SUPPOSED to reach its dependency and could not is a RED gate,

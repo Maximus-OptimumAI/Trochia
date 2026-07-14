@@ -1,7 +1,7 @@
 /**
  * cache-hit eval-check tests (Plan 02-05 / T03).
  *
- * The Langfuse seam (@/lib/langfuse) is MOCKED — NO live Langfuse call fires.
+ * The Langfuse seam (@/lib/langfuse) is MOCKED - NO live Langfuse call fires.
  * (tests/setup.ts loads .env.local, so an unmocked configured path would hit the
  * network; the mock keeps this a pure unit test.) We drive the cache ratio by
  * returning controlled trace `metadata` bags and assert pass/fail/skip + the
@@ -106,7 +106,7 @@ describe('cacheHit.run', () => {
     expect(r.status).toBe('pass');
   });
 
-  it('reason carries only the ratio + trace count — no trace body leaks', async () => {
+  it('reason carries only the ratio + trace count - no trace body leaks', async () => {
     fetchTraces.mockResolvedValueOnce({
       data: [trace('agent:extract-from-paste', { cacheRead: 600, inputTokens: 2000 })],
     });
@@ -124,7 +124,7 @@ describe('cacheHit.run', () => {
     const r = await cacheHit.run();
     expect(r.status).toBe('skip');
     // Pin classification (codex P2 #5): data-unavailable (dependency reached, no data)
-    // — NOT env-unavailable. Under EVAL_LIVE_REQUIRED the runner reds this; off the live
+    // - NOT env-unavailable. Under EVAL_LIVE_REQUIRED the runner reds this; off the live
     // path it is non-blocking. The reason must read "insufficient data" on the non-live path.
     expect(r.skipKind).toBe('data-unavailable');
     expect(r.reason).toContain('insufficient data');
