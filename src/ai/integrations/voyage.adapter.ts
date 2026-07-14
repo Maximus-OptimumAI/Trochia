@@ -33,11 +33,62 @@ import { voyageMicroUsd, voyageReserveMicroUsd } from '@/ai/cost/rates';
 import { env } from '@/lib/env';
 import { AppError } from '@/lib/errors';
 import { getLangfuseClient } from '@/lib/langfuse';
+import { logger } from '@/lib/logger';
 
 const VOYAGE_ENDPOINT = 'https://api.voyageai.com/v1/embeddings';
 const VOYAGE_MODEL = 'voyage-3-large' as const;
 const VOYAGE_DIM = 1024 as const;
 const REQUEST_TIMEOUT_MS = 30_000;
+
+// ── Retry policy (mirrors the Anthropic SDK client's retry pattern) ──────────
+// The Anthropic client in src/ai/client.ts leans on the SDK's built-in retry
+// (default maxRetries: 2 → up to 3 attempts) with exponential backoff + jitter,
+// honoring Retry-After. Voyage is called through raw `fetch`, so it has no such
+// built-in; this reproduces the same shape for the capacity-signal statuses.
+//
+// We retry ONLY on rate-limit / overload statuses (429 + the overload 5xx: 502
+// Bad Gateway, 503 Unavailable, 529 Overloaded). A 4xx other than 429 is a
+// caller/input error and is NOT retried; a network throw is NOT retried (it
+// keeps the existing single-attempt VOYAGE_NETWORK_FAILED contract).
+//
+// PRIVACY (CSO-H2): the retry decision reads ONLY the numeric status and the
+// Retry-After HEADER, never `response.text()`, whose body can echo the query or
+// a document chunk. Same content-blind guarantee the throw paths already hold.
+const MAX_RETRIES = 2; // → up to 3 total attempts, matching the Anthropic default
+const RETRY_BASE_MS = 500;
+const RETRY_MAX_MS = 8_000;
+const RETRYABLE_STATUSES = new Set([429, 502, 503, 529]);
+
+/**
+ * Backoff for attempt N (0-indexed): exponential (`base·2^N`, capped) with full
+ * jitter, floored to `Retry-After` when the server sent one. Content-blind: it
+ * only ever sees the numeric attempt count and the Retry-After header value.
+ *
+ * Zeroed under Vitest (`process.env.VITEST`) so the unit suite exercises the
+ * retry CONTROL FLOW with no real waits; the eval runner (tsx) and production
+ * both leave VITEST unset and get the real backoff.
+ */
+function retryDelayMs(attempt: number, retryAfterHeader: string | null): number {
+  if (process.env.VITEST) return 0;
+  const expo = Math.min(RETRY_BASE_MS * 2 ** attempt, RETRY_MAX_MS);
+  const jittered = expo * (0.5 + Math.random() * 0.5); // jitter in [0.5, 1.0]×
+  const retryAfterMs = parseRetryAfterMs(retryAfterHeader);
+  return Math.min(Math.max(jittered, retryAfterMs), RETRY_MAX_MS);
+}
+
+/** Parse a `Retry-After` header (delta-seconds or HTTP-date) to ms; 0 if absent/invalid. */
+function parseRetryAfterMs(header: string | null): number {
+  if (!header) return 0;
+  const seconds = Number(header);
+  if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
+  const dateMs = Date.parse(header);
+  if (Number.isFinite(dateMs)) return Math.max(0, dateMs - Date.now());
+  return 0;
+}
+
+function sleep(ms: number): Promise<void> {
+  return ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
+}
 
 export type VoyageInputType = 'document' | 'query';
 
@@ -168,40 +219,71 @@ export const voyage = {
     onTokens: (totalTokens: number) => void,
   ): Promise<VoyageEmbedResult> {
     const t0 = Date.now();
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
+    // Retry loop (mirrors the Anthropic SDK client's pattern; see RETRY_* above):
+    // up to MAX_RETRIES backoff retries on a capacity status (429 + overload 5xx).
+    // A fresh AbortController + 30s timeout is minted PER attempt (an aborted
+    // controller cannot be reused, and each attempt gets its own request budget).
     let response: Response;
-    try {
-      response = await fetch(VOYAGE_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${env.VOYAGE_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: VOYAGE_MODEL,
-          input: input.texts,
-          input_type: input.inputType,
-          truncation: false,
-        }),
-        signal: controller.signal,
-      });
-    } catch {
-      // B / codex#3 / CSO-H2: redact for BOTH inputType. The 02-06 fix covered
-      // query only; document embeds (write path) carry chunk text in input.texts,
-      // and err.message/cause can echo it into Sentry unscrubbed. Static message,
-      // NO message, NO cause — for both query + document.
-      throw new AppError('voyage embed failed (network)', { code: 'VOYAGE_NETWORK_FAILED' });
-    } finally {
-      clearTimeout(timeout);
-    }
+    let attempt = 0;
+    for (;;) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+      let attemptResponse: Response;
+      try {
+        attemptResponse = await fetch(VOYAGE_ENDPOINT, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${env.VOYAGE_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: VOYAGE_MODEL,
+            input: input.texts,
+            input_type: input.inputType,
+            truncation: false,
+          }),
+          signal: controller.signal,
+        });
+      } catch {
+        // B / codex#3 / CSO-H2: redact for BOTH inputType. The 02-06 fix covered
+        // query only; document embeds (write path) carry chunk text in input.texts,
+        // and err.message/cause can echo it into Sentry unscrubbed. Static message,
+        // NO message, NO cause, for both query + document. Network throws are NOT
+        // retried (the 429/5xx backoff is the scoped change; the single-attempt
+        // network contract is unchanged (Case 6 / Case 12).
+        throw new AppError('voyage embed failed (network)', { code: 'VOYAGE_NETWORK_FAILED' });
+      } finally {
+        clearTimeout(timeout);
+      }
 
-    if (!response.ok) {
+      if (attemptResponse.ok) {
+        response = attemptResponse;
+        break;
+      }
+
+      // Non-2xx. Retry (backoff) on a capacity status while retries remain;
+      // otherwise throw. CSO-H2: status + Retry-After HEADER only, body NEVER read.
+      if (RETRYABLE_STATUSES.has(attemptResponse.status) && attempt < MAX_RETRIES) {
+        const delayMs = retryDelayMs(attempt, attemptResponse.headers.get('retry-after'));
+        // Content-blind log: numeric status + attempt + delay only (no body, no input).
+        logger.warn('voyage.embed: retryable status, backing off', {
+          status: attemptResponse.status,
+          attempt: attempt + 1,
+          maxRetries: MAX_RETRIES,
+          delayMs,
+        });
+        attempt += 1;
+        await sleep(delayMs);
+        continue;
+      }
+
       // B / codex#3 / CSO-H2: do NOT read response.text() for EITHER inputType —
       // a provider 400/429 can echo the query OR the document chunk text in the
       // body. Status only, no body, for both query + document.
-      throw new AppError(`voyage embed failed (status ${response.status})`, { code: 'VOYAGE_BATCH_FAILED' });
+      throw new AppError(`voyage embed failed (status ${attemptResponse.status})`, {
+        code: 'VOYAGE_BATCH_FAILED',
+      });
     }
 
     const json = (await response.json()) as {
