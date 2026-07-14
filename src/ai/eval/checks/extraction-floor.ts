@@ -3,12 +3,12 @@
  *
  * Scores the REAL `extractFromPaste` agent against the 5 committed paste
  * fixtures (`tests/ai/fixtures/paste-*.txt`, reached via the fixtures re-export
- * seam — NOT duplicated) and asserts a mean populated-field floor of ≥ 8.
+ * seam - NOT duplicated) and asserts a mean populated-field floor of ≥ 8.
  *
  * Field count reuses the EXISTING `countPopulatedFields` helper from
  * `@/ai/schemas/business-memory.zod` (C1-M2 + plan-checker Finding 2). NOTE its
  * semantics are SHALLOW: each structured group (team / traction / narrative)
- * counts when `Object.keys(group).length > 0` — it does NOT verify leaves are
+ * counts when `Object.keys(group).length > 0` - it does NOT verify leaves are
  * non-empty. The metric is this shallow count averaged over the 5 fixtures.
  * Deeper leaf-emptiness checking is OUT OF SCOPE here.
  *
@@ -25,12 +25,63 @@
  */
 import { extractFromPaste } from '@/ai/agents/extract-from-paste.agent';
 import { countPopulatedFields } from '@/ai/schemas/business-memory.zod';
+import { isAppError } from '@/lib/errors';
+import { logger } from '@/lib/logger';
 import { PASTE_FIXTURE_PATHS, loadFixtureText } from '../fixtures';
 import { EVAL_ACCOUNT_ID } from '../fixtures/eval-corpus';
 import type { EvalCheck } from '../types';
 
-/** Mean populated-field floor (Phase 2 exit gate criterion 3). */
+/** Mean populated-field floor (Phase 2 exit gate criterion 3). LOCKED, not moved. */
 const FIELD_FLOOR = 8;
+
+/**
+ * Bounded FRESH re-attempts per fixture (EVAL-TOLERANCE-01, tightening 1). Each
+ * attempt is a brand NEW extractFromPaste call: a fresh conversation with its own
+ * internal attempt-plus-repair AND its own reserve/settle cycle, NOT a
+ * continuation of the poisoned turn that runAgent already re-prompts once (the
+ * "one repair retry"). This absorbs the STOCHASTIC structured-output miss
+ * (EVAL-ANTHROPIC-FAIL-01) without softening the gate: after this many fresh
+ * attempts the fixture STILL hard-fails (the last error rethrows), so a genuinely
+ * broken extractor still reds the nightly.
+ */
+const MAX_FRESH_ATTEMPTS = 3;
+
+/**
+ * The ONLY error code that triggers a fresh re-attempt. Everything else
+ * (AI_DAILY_CAP_EXCEEDED, AI_COST_METER_UNAVAILABLE, DB, network, anything)
+ * propagates IMMEDIATELY with no retry. Cap-exceeded in particular must NEVER be
+ * retried: retrying it would only reserve more budget against a hard wall.
+ */
+const RETRYABLE_ERROR_CODE = 'AI_STRUCTURED_OUTPUT_INVALID';
+
+/**
+ * Run extractFromPaste for one fixture with up to MAX_FRESH_ATTEMPTS fresh calls,
+ * retrying ONLY on AI_STRUCTURED_OUTPUT_INVALID. Any other error propagates at
+ * once (no retry). If every fresh attempt raises the structured-output error, the
+ * LAST error is rethrown so the fixture HARD-FAILS the check (it is never skipped,
+ * never excluded from the mean). Content-blind: logs only the attempt index,
+ * never paste or draft content.
+ */
+async function extractWithFreshRetries(
+  paste: string,
+): Promise<Awaited<ReturnType<typeof extractFromPaste>>> {
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= MAX_FRESH_ATTEMPTS; attempt++) {
+    try {
+      return await extractFromPaste({ accountId: EVAL_ACCOUNT_ID, paste, founderEmail: '' });
+    } catch (err) {
+      // Retry ONLY the stochastic structured-output miss; propagate everything else.
+      if (!(isAppError(err) && err.code === RETRYABLE_ERROR_CODE)) throw err;
+      lastErr = err;
+      logger.warn('ai/eval/extraction-floor: structured-output miss, fresh re-attempt', {
+        attempt,
+        maxAttempts: MAX_FRESH_ATTEMPTS,
+      });
+    }
+  }
+  // Exhausted every fresh attempt on the retryable error: hard-fail (tightening 1).
+  throw lastErr;
+}
 
 // The eval tenant id is the REAL seeded UUID `EVAL_ACCOUNT_ID` (fixtures/eval-corpus.ts),
 // NOT a bare string. extractFromPaste → runAgent meters the call through the cost cap,
@@ -53,26 +104,26 @@ export const extractionFloor: EvalCheck = {
         description: this.description,
         status: 'skip' as const,
         reason:
-          'ANTHROPIC_API_KEY not set — live extraction skipped (env-unavailable, non-blocking)',
+          'ANTHROPIC_API_KEY not set - live extraction skipped (env-unavailable, non-blocking)',
       };
     }
 
     // Score the real agent against each fixture; count populated field groups.
+    // Each call gets bounded FRESH re-attempts on the stochastic structured-output
+    // miss (tightening 1). The mean is still computed over ALL 5 fixtures; only the
+    // number of attempts per fixture changes. A fixture that exhausts its attempts
+    // throws out of this loop (hard-fail), exactly as a single call did before.
     const counts: number[] = [];
     for (const path of PASTE_FIXTURE_PATHS) {
       const paste = loadFixtureText(path);
-      const result = await extractFromPaste({
-        accountId: EVAL_ACCOUNT_ID,
-        paste,
-        founderEmail: '',
-      });
+      const result = await extractWithFreshRetries(paste);
       counts.push(countPopulatedFields(result.draft));
     }
 
     const mean = counts.reduce((sum, n) => sum + n, 0) / counts.length;
     const status = mean >= FIELD_FLOOR ? ('pass' as const) : ('fail' as const);
 
-    // reason carries ONLY counts — no draft / paste / snippet content.
+    // reason carries ONLY counts - no draft / paste / snippet content.
     return {
       id: this.id,
       description: this.description,

@@ -2,20 +2,20 @@
  * Eval fixture re-export seam (Plan 02-05 / T02).
  *
  * This module is the single place the eval checks reach for fixture INPUTS. It
- * holds NO fixture bodies — the canonical paste fixtures live at
+ * holds NO fixture bodies - the canonical paste fixtures live at
  * `tests/ai/fixtures/paste-*.txt` (shipped with the extractFromPaste plan) and
  * are reused, never duplicated, per the README "import or re-export, do NOT
  * duplicate" contract.
  *
  * Resolution: paths are anchored at `process.cwd()` (the repo root) + the
  * canonical `tests/ai/fixtures/` directory. Both entry points run from the repo
- * root — `npm run eval:run` ("tsx src/ai/eval/runner.ts") and `vitest` (config
- * rooted at the repo) — so `process.cwd()` is the repo root under both. This
+ * root - `npm run eval:run` ("tsx src/ai/eval/runner.ts") and `vitest` (config
+ * rooted at the repo) - so `process.cwd()` is the repo root under both. This
  * avoids the `@/*` alias (which maps to `./src`, NOT `tests/`) and the
  * `import.meta.url` walk-up (brittle across the tsx-vs-vitest module graph).
  *
  * The sanitizer eval (injection + PII fixtures) is DEFERRED to
- * FOLLOWUP-SANITIZER-EVAL-01 (founder ruling 2026-05-31, C1-H4/OD-1) — those
+ * FOLLOWUP-SANITIZER-EVAL-01 (founder ruling 2026-05-31, C1-H4/OD-1) - those
  * fixtures are evaluated by a DIRECT eval over promptInjectionSanitizer +
  * redactUnrelatedPartyPII, NOT via this paste seam, so no INJECTION_FIXTURE_PATH
  * / PII_FIXTURE_PATH export lives here.
@@ -26,7 +26,7 @@ import { join } from 'node:path';
 /** Repo-root-anchored directory holding the canonical paste fixtures. */
 const FIXTURE_DIR = join(process.cwd(), 'tests', 'ai', 'fixtures');
 
-/** The 5 canonical paste fixture filenames (Gate 6 count pin — exactly 5). */
+/** The 5 canonical paste fixture filenames (Gate 6 count pin - exactly 5). */
 const PASTE_FIXTURE_FILES = [
   'paste-acme-fintech.txt',
   'paste-helix-saas.txt',
@@ -67,7 +67,7 @@ const QA_GROUNDING_FIXTURE_DIR = join(
   'qa-grounding',
 );
 
-/** The qa-grounding fixture filenames (starter set — expand per FOLLOWUP). */
+/** The qa-grounding fixture filenames (starter set - expand per FOLLOWUP). */
 const QA_GROUNDING_FIXTURE_FILES = ['in-scope.json', 'out-of-scope.json'] as const;
 
 /**
@@ -77,7 +77,7 @@ const QA_GROUNDING_FIXTURE_FILES = ['in-scope.json', 'out-of-scope.json'] as con
  * return grounded:false (criterion 6).
  *
  * The 50-Q / 10-out-of-scope full set grows against design-partner data
- * (FOLLOWUP-QA-GROUNDING-FIXTURE-EXPAND) — the SHAPE + a representative subset
+ * (FOLLOWUP-QA-GROUNDING-FIXTURE-EXPAND) - the SHAPE + a representative subset
  * are pinned here so the gate is real now.
  */
 export const QA_GROUNDING_FIXTURE_PATHS: readonly string[] =
@@ -89,7 +89,7 @@ export type QaGroundingFixture = {
   question: string;
   /** Whether a grounded, cited answer is expected (in-scope) or "I don't know". */
   expectedGrounded: boolean;
-  /** Deliberately out-of-scope Q — must return grounded:false (criterion 6). */
+  /** Deliberately out-of-scope Q - must return grounded:false (criterion 6). */
   isOutOfScope: boolean;
   /** The eval tenant id the question runs under. */
   accountId: string;

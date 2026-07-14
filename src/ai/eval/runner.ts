@@ -1,5 +1,5 @@
 /**
- * Eval harness runner (EVAL-01a — Plan 02-04, Task 7).
+ * Eval harness runner (EVAL-01a - Plan 02-04, Task 7).
  *
  * Iterates the 3 must-not-fail checks (extraction-floor, qa-grounding, cache-hit),
  * collects results, emits a CI-friendly JSON report to stdout AND a markdown
@@ -21,6 +21,8 @@
 import { extractionFloor } from './checks/extraction-floor';
 import { qaGrounding } from './checks/qa-grounding';
 import { cacheHit } from './checks/cache-hit';
+import { readEvalSpendMicroUsd, formatSpendUsd } from './spend';
+import { CAP_MICRO_USD } from '@/ai/cost/cap';
 import type { EvalCheck, EvalCheckResult, EvalStatus, EvalSuiteResult } from './types';
 import { writeFileSync, appendFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -31,7 +33,7 @@ const CHECKS: EvalCheck[] = [extractionFloor, qaGrounding, cacheHit];
 // Runtime allowlist of check ids permitted to return 'pending'
 // (FOLLOWUP-EVAL-PENDING-RUNTIME-GATE-01, C1-M1). Plan 02-07 / T03 flipped
 // qa-grounding to a REAL check (the last 'pending' stub), so the allowlist is
-// now EMPTY — the eval gate is fully active: ANY 'pending' fails the run.
+// now EMPTY - the eval gate is fully active: ANY 'pending' fails the run.
 // A `Set<string>` (not a literal-tuple) so `.has(r.id)` typechecks against
 // `r.id: string` without a const-assertion narrowing.
 const PENDING_ALLOWED = new Set<string>([]);
@@ -41,7 +43,7 @@ export async function runEvalSuite(): Promise<EvalSuiteResult> {
   // rather than rejecting Promise.all (which would skip the report write and
   // leave the PR-comment step reading a stale/absent eval-report.json). The
   // error message is truncated and carries no stack/secret/PII (/codex P2 +
-  // /cso). A thrown check is fail-CLOSED — it can never pass silently.
+  // /cso). A thrown check is fail-CLOSED - it can never pass silently.
   const results = await Promise.all(
     CHECKS.map(async (c): Promise<EvalCheckResult> => {
       try {
@@ -59,11 +61,11 @@ export async function runEvalSuite(): Promise<EvalSuiteResult> {
   );
 
   // When EVAL_LIVE_REQUIRED==='1' (nightly / manual live runs), ANY surviving 'skip'
-  // is promoted to a FAILURE — a run that was supposed to reach its dependency and did
+  // is promoted to a FAILURE - a run that was supposed to reach its dependency and did
   // not is a RED gate, not a silent pass (C1-H1). This INCLUDES a data-unavailable skip
   // (codex P1 #3, LANGFUSE-TRACING-01): the flush fix in this change makes the live eval
   // produce AND deliver its own agent:* traces, so zero traces after the cache-hit
-  // check's bounded ingestion-lag retry means DELIVERY is broken — exactly what the
+  // check's bounded ingestion-lag retry means DELIVERY is broken - exactly what the
   // gate must catch. `skipKind` is now a DIAGNOSTIC ONLY (it shapes the failure reason:
   // "flush/ingestion suspect" vs "creds missing"), never a tolerance switch.
   const liveRequired = process.env.EVAL_LIVE_REQUIRED === '1';
@@ -75,12 +77,22 @@ export async function runEvalSuite(): Promise<EvalSuiteResult> {
   const liveSkipFail = liveRequired && results.some((r) => r.status === 'skip');
   const exitCode: 0 | 1 = anyFail || disallowedPending || liveSkipFail ? 1 : 0;
 
+  // Tightening 3 (EVAL-TOLERANCE-01): report the MEASURED aggregate spend for the
+  // run against the $5/user/day cap, so the bounded retries above cost a known
+  // number rather than an estimate. READ-ONLY: this reads the settled ledger total
+  // and does NOT change reserve/settle or cap.ts. Best-effort (null -> "n/a" off a
+  // live run or on any read failure); it NEVER affects exitCode.
+  const spendMicroUsd = await readEvalSpendMicroUsd();
+  const spendLine = `**Aggregate metered spend (eval tenant, today UTC):** ${formatSpendUsd(spendMicroUsd)} of ${formatSpendUsd(CAP_MICRO_USD)}/user/day cap`;
+
   const summary = [
     '## Trochia eval harness',
     '',
     '| Check | Status | Reason |',
     '|---|---|---|',
     ...results.map((r) => `| \`${r.id}\` | ${badge(r.status)} | ${r.reason} |`),
+    '',
+    spendLine,
     '',
     `**Exit code:** ${exitCode}`,
   ].join('\n');

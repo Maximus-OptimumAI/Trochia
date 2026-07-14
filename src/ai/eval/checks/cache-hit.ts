@@ -4,7 +4,7 @@
  * Reads the Anthropic prompt-cache hit ratio from Langfuse TRACE metadata over a
  * bounded recent window and asserts the ratio is non-zero. The ai/client.ts
  * chokepoint names each trace `agent:${taskClass}` and writes cache metrics via
- * `trace.update({ metadata: { cacheRead, inputTokens, ... } })` — it creates NO
+ * `trace.update({ metadata: { cacheRead, inputTokens, ... } })` - it creates NO
  * GENERATION observations, so the read path is `fetchTraces` over trace metadata
  * (NOT `fetchObservations`, C1-H2 / OD-3).
  *
@@ -18,11 +18,11 @@
  *   - ratio > 0 → 'pass'; else 'fail'. metric = ratio, threshold = 0.
  *
  * Privacy (G-LANGFUSE-WHITELIST): `fields: 'core,io'` ALSO returns each trace's
- * `.input`/`.output` bodies — this check reads ONLY `metadata.cacheRead` /
+ * `.input`/`.output` bodies - this check reads ONLY `metadata.cacheRead` /
  * `metadata.inputTokens` token counts and NEVER touches `.input`/`.output`,
  * chunk_text, paste content, PII, founder query content, or credentials. `reason`
  * carries only the ratio + trace count. Langfuse credentials are constructed ONLY
- * in src/lib/langfuse.ts — this file never builds a client or a raw-fetch creds.
+ * in src/lib/langfuse.ts - this file never builds a client or a raw-fetch creds.
  */
 import { getLangfuseClient, isLangfuseConfigured } from '@/lib/langfuse';
 import type { EvalCheck } from '../types';
@@ -61,7 +61,7 @@ export const cacheHit: EvalCheck = {
         status: 'skip' as const,
         skipKind: 'env-unavailable' as const,
         reason:
-          'Langfuse not configured — cache-hit read skipped (env-unavailable, non-blocking)',
+          'Langfuse not configured - cache-hit read skipped (env-unavailable, non-blocking)',
       };
     }
 
@@ -74,7 +74,7 @@ export const cacheHit: EvalCheck = {
         status: 'skip' as const,
         skipKind: 'env-unavailable' as const,
         reason:
-          'Langfuse client unavailable — cache-hit read skipped (env-unavailable, non-blocking)',
+          'Langfuse client unavailable - cache-hit read skipped (env-unavailable, non-blocking)',
       };
     }
 
@@ -86,11 +86,11 @@ export const cacheHit: EvalCheck = {
     // Ingestion-lag retry (LANGFUSE-TRACING-01): a live run may read moments after a
     // trace was produced+flushed, before Langfuse has ingested it. When
     // EVAL_LIVE_REQUIRED, retry the fetch with a generous backoff before concluding
-    // no-data — Langfuse indexing latency is the only benign reason for an empty
+    // no-data - Langfuse indexing latency is the only benign reason for an empty
     // window on a live run, so give it real room (6 tries × 5s ≈ 25s of grace) to
     // avoid a flaky RED gate. If the window is STILL empty after that, delivery is
     // broken (codex P1 #3) and the runner reds the gate. In every other context
-    // (PR / local / unit) this is a SINGLE fetch with no sleeps — the fetchTraces
+    // (PR / local / unit) this is a SINGLE fetch with no sleeps - the fetchTraces
     // call count / query signature is unchanged off the live path.
     const liveRequired = process.env.EVAL_LIVE_REQUIRED === '1';
     const maxTries = liveRequired ? 6 : 1;
@@ -107,7 +107,7 @@ export const cacheHit: EvalCheck = {
       });
       // Defensive: the SDK can resolve a response whose `data` is absent / non-array
       // on some error paths (e.g. a creds 401 the SDK swallows). Treat a missing
-      // `data` as zero traces — which falls through to the counted===0 → 'skip'
+      // `data` as zero traces - which falls through to the counted===0 → 'skip'
       // branch below (data-unavailable), never a throw.
       const traces = Array.isArray(res.data) ? res.data : [];
       cacheRead = 0;
@@ -127,17 +127,17 @@ export const cacheHit: EvalCheck = {
     }
 
     // Zero agent:* traces in the window → 'skip' with skipKind 'data-unavailable'.
-    // skipKind is a DIAGNOSTIC: it distinguishes this (dependency reached, no data —
+    // skipKind is a DIAGNOSTIC: it distinguishes this (dependency reached, no data -
     // ingestion lag, a swallowed 401, or broken delivery) from 'env-unavailable'
     // (creds missing). On PR/local (EVAL_LIVE_REQUIRED unset) this is non-blocking.
     // Under EVAL_LIVE_REQUIRED the runner reds ANY surviving skip (codex P1 #3): the
     // bounded retry above already absorbed benign ingestion lag, so an empty window
-    // here means flush/ingestion is broken — the gate must catch it. Also keeps the
+    // here means flush/ingestion is broken - the gate must catch it. Also keeps the
     // ratio division below safe (no inputTokens → no divide).
     if (counted === 0) {
       const detail = liveRequired
-        ? 'no agent:* traces after retry — flush/ingestion suspect'
-        : 'no agent:* traces in the window — insufficient data';
+        ? 'no agent:* traces after retry - flush/ingestion suspect'
+        : 'no agent:* traces in the window - insufficient data';
       return {
         id: this.id,
         description: this.description,
@@ -150,7 +150,7 @@ export const cacheHit: EvalCheck = {
     const ratio = cacheRead / Math.max(inputTokens, 1);
     const status = ratio > RATIO_FLOOR ? ('pass' as const) : ('fail' as const);
 
-    // reason carries ONLY the ratio + trace count — no trace input/output bodies.
+    // reason carries ONLY the ratio + trace count - no trace input/output bodies.
     return {
       id: this.id,
       description: this.description,

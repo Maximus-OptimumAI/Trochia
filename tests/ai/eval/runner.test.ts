@@ -1,8 +1,8 @@
 /**
- * Eval harness runner tests (EVAL-01a — Plan 02-04, Task 7; hardened in 02-05 T01).
+ * Eval harness runner tests (EVAL-01a - Plan 02-04, Task 7; hardened in 02-05 T01).
  *
  * Codifies the runner contract, now a RUNTIME gate (Plan 02-05 T01; hardened in
- * 02-07 T03 — PENDING_ALLOWED is now EMPTY, so ANY 'pending' fails the run):
+ * 02-07 T03 - PENDING_ALLOWED is now EMPTY, so ANY 'pending' fails the run):
  *
  *   exit 0 on all-pass, or 'skip' (env-unavailable) when EVAL_LIVE_REQUIRED unset.
  *   exit 1 on any-fail, ANY 'pending' (the allowlist is empty), OR any 'skip'
@@ -13,8 +13,8 @@
  *      → exit 0 (the real PR/local CI baseline; qa-grounding is now a live check)
  *   2. any-fail → exit 1 (stub extractionFloor.run → { status: 'fail' })
  *   3. all-pass → exit 0 (stub all three → { status: 'pass' })
- *   4. every check id in result — assert sorted ids deepEqual the canonical 3
- *   5. Markdown summary shape — header + all 3 check ids present
+ *   4. every check id in result - assert sorted ids deepEqual the canonical 3
+ *   5. Markdown summary shape - header + all 3 check ids present
  *   6. non-qa-grounding 'pending' → exit 1 (pins the PENDING_ALLOWED runtime gate)
  *   7. 'skip' + EVAL_LIVE_REQUIRED unset → exit 0 (skip is non-failing on PR/local)
  *   8. 'skip' + EVAL_LIVE_REQUIRED='1' → exit 1 (C1-H1 live-required gate)
@@ -24,6 +24,16 @@ import { runEvalSuite } from '@/ai/eval/runner';
 import { extractionFloor } from '@/ai/eval/checks/extraction-floor';
 import { qaGrounding } from '@/ai/eval/checks/qa-grounding';
 import { cacheHit } from '@/ai/eval/checks/cache-hit';
+
+// Tightening 3: the runner reads the settled eval-tenant spend via getServiceClient
+// (deferred import) ONLY on a live run (EVAL_LIVE_REQUIRED==='1'). Mock the db
+// client so that read is deterministic + hermetic (a fixed ledger total, no real
+// connection). The checks are all spied at .run() level, so nothing else touches it.
+vi.mock('@/db/client', () => ({
+  getServiceClient: () => ({
+    execute: async () => [{ micro_usd_spent: 1_234_567 }],
+  }),
+}));
 
 describe('runEvalSuite', () => {
   const originalLiveRequired = process.env.EVAL_LIVE_REQUIRED;
@@ -52,7 +62,7 @@ describe('runEvalSuite', () => {
     }
   });
 
-  it('Case 1 — exit 0 when all three live checks skip (EVAL_LIVE_REQUIRED unset)', async () => {
+  it('Case 1 - exit 0 when all three live checks skip (EVAL_LIVE_REQUIRED unset)', async () => {
     // 02-07 T03 flipped qa-grounding to a LIVE check + emptied PENDING_ALLOWED.
     // The real PR/local baseline is now all three checks returning 'skip'
     // (env-absent, no creds in CI). EVAL_LIVE_REQUIRED unset → skip is non-failing.
@@ -83,7 +93,7 @@ describe('runEvalSuite', () => {
     expect(result.checks.find((c) => c.id === 'qa-grounding')?.status).toBe('skip');
   });
 
-  it('Case 1b — qa-grounding pending now FAILS the run (allowlist empty, 02-07 T03)', async () => {
+  it('Case 1b - qa-grounding pending now FAILS the run (allowlist empty, 02-07 T03)', async () => {
     // The previously-allowlisted 'pending' for qa-grounding is no longer allowed:
     // PENDING_ALLOWED is empty, so ANY 'pending' forces exit 1. Mock the live
     // checks to 'skip' so the exit 1 is attributable solely to the qa-grounding
@@ -112,7 +122,7 @@ describe('runEvalSuite', () => {
     expect(result.checks.find((c) => c.id === 'qa-grounding')?.status).toBe('pending');
   });
 
-  it('Case 2 — exit 1 on any-fail (extractionFloor returns fail)', async () => {
+  it('Case 2 - exit 1 on any-fail (extractionFloor returns fail)', async () => {
     vi.spyOn(extractionFloor, 'run').mockResolvedValueOnce({
       id: 'extraction-floor',
       description: extractionFloor.description,
@@ -120,7 +130,7 @@ describe('runEvalSuite', () => {
       reason: 'test-stub: forced failure',
     });
     // cacheHit is now a LIVE check (Plan 02-05 T03); stub it so this runner unit
-    // test stays hermetic — without this it fires a real fetchTraces against any
+    // test stays hermetic - without this it fires a real fetchTraces against any
     // .env.local Langfuse creds. 'skip' is non-failing, so the asserted exit 1 is
     // attributable solely to extractionFloor's 'fail'.
     vi.spyOn(cacheHit, 'run').mockResolvedValueOnce({
@@ -134,7 +144,7 @@ describe('runEvalSuite', () => {
     expect(result.checks.find((c) => c.id === 'extraction-floor')?.status).toBe('fail');
   });
 
-  it('Case 3 — exit 0 on all-pass', async () => {
+  it('Case 3 - exit 0 on all-pass', async () => {
     vi.spyOn(extractionFloor, 'run').mockResolvedValueOnce({
       id: 'extraction-floor',
       description: extractionFloor.description,
@@ -161,11 +171,11 @@ describe('runEvalSuite', () => {
   // Cases 4 + 5 call runEvalSuite() to assert structural shape (ids + summary).
   // They do NOT exercise any check's body. Since Plan 02-05 T02 flipped
   // extraction-floor to a LIVE check (it fires the real extractFromPaste agent
-  // whenever ANTHROPIC_API_KEY is present — and tests/setup.ts loads a key from
+  // whenever ANTHROPIC_API_KEY is present - and tests/setup.ts loads a key from
   // .env.local), these cases now MUST stub the live checks to keep them from
   // making real network calls. Stubbing to 'skip' mirrors the env-absent baseline
   // and leaves the assertions (id membership / summary shape) unchanged.
-  it('Case 4 — every canonical check id is present in the result', async () => {
+  it('Case 4 - every canonical check id is present in the result', async () => {
     vi.spyOn(extractionFloor, 'run').mockResolvedValueOnce({
       id: 'extraction-floor',
       description: extractionFloor.description,
@@ -183,7 +193,7 @@ describe('runEvalSuite', () => {
     expect(ids).toEqual(['cache-hit', 'extraction-floor', 'qa-grounding']);
   });
 
-  it('Case 5 — Markdown summary shape', async () => {
+  it('Case 5 - Markdown summary shape', async () => {
     vi.spyOn(extractionFloor, 'run').mockResolvedValueOnce({
       id: 'extraction-floor',
       description: extractionFloor.description,
@@ -203,7 +213,7 @@ describe('runEvalSuite', () => {
     expect(result.summary).toContain('cache-hit');
   });
 
-  it('Case 6 — exit 1 on a non-allowlisted pending (extractionFloor pending)', async () => {
+  it('Case 6 - exit 1 on a non-allowlisted pending (extractionFloor pending)', async () => {
     // PENDING_ALLOWED contains exactly 'qa-grounding'; a 'pending' from any other
     // check id forces exitCode 1 (FOLLOWUP-EVAL-PENDING-RUNTIME-GATE-01).
     delete process.env.EVAL_LIVE_REQUIRED;
@@ -226,7 +236,7 @@ describe('runEvalSuite', () => {
     expect(result.checks.find((c) => c.id === 'extraction-floor')?.status).toBe('pending');
   });
 
-  it('Case 7 — exit 0 on skip when EVAL_LIVE_REQUIRED is unset', async () => {
+  it('Case 7 - exit 0 on skip when EVAL_LIVE_REQUIRED is unset', async () => {
     delete process.env.EVAL_LIVE_REQUIRED;
     vi.spyOn(extractionFloor, 'run').mockResolvedValueOnce({
       id: 'extraction-floor',
@@ -247,7 +257,7 @@ describe('runEvalSuite', () => {
     expect(result.checks.find((c) => c.id === 'extraction-floor')?.status).toBe('skip');
   });
 
-  it('Case 8 — exit 1 on skip when EVAL_LIVE_REQUIRED=1 (C1-H1 live-required gate)', async () => {
+  it('Case 8 - exit 1 on skip when EVAL_LIVE_REQUIRED=1 (C1-H1 live-required gate)', async () => {
     process.env.EVAL_LIVE_REQUIRED = '1';
     vi.spyOn(extractionFloor, 'run').mockResolvedValueOnce({
       id: 'extraction-floor',
@@ -269,11 +279,11 @@ describe('runEvalSuite', () => {
     expect(result.checks.find((c) => c.id === 'extraction-floor')?.status).toBe('skip');
   });
 
-  it('Case 8b — exit 1 on a DATA-unavailable skip under EVAL_LIVE_REQUIRED=1 (delivery broken after retry reds the gate, codex P1 #3 / LANGFUSE-TRACING-01)', async () => {
+  it('Case 8b - exit 1 on a DATA-unavailable skip under EVAL_LIVE_REQUIRED=1 (delivery broken after retry reds the gate, codex P1 #3 / LANGFUSE-TRACING-01)', async () => {
     process.env.EVAL_LIVE_REQUIRED = '1';
     // codex P1 #3: under EVAL_LIVE_REQUIRED the cache-hit retry already absorbed benign
     // Langfuse ingestion lag, so a data-unavailable skip that SURVIVES means the eval's
-    // own traces were not delivered (broken flush/ingestion) — a RED gate, NOT a
+    // own traces were not delivered (broken flush/ingestion) - a RED gate, NOT a
     // tolerated pass. skipKind is now diagnostic only; ANY surviving skip reds the gate.
     // The other two checks pass so the exit 1 is attributable to the cache-hit skip alone.
     vi.spyOn(extractionFloor, 'run').mockResolvedValueOnce({
@@ -293,14 +303,14 @@ describe('runEvalSuite', () => {
       description: cacheHit.description,
       status: 'skip',
       skipKind: 'data-unavailable',
-      reason: 'test-stub: no agent:* traces after retry — flush/ingestion suspect',
+      reason: 'test-stub: no agent:* traces after retry - flush/ingestion suspect',
     });
     const result = await runEvalSuite();
     expect(result.exitCode).toBe(1);
     expect(result.checks.find((c) => c.id === 'cache-hit')?.skipKind).toBe('data-unavailable');
   });
 
-  it('Case 8c — exit 1 on an ENV-unavailable skip under EVAL_LIVE_REQUIRED=1 (missing creds still RED the gate)', async () => {
+  it('Case 8c - exit 1 on an ENV-unavailable skip under EVAL_LIVE_REQUIRED=1 (missing creds still RED the gate)', async () => {
     process.env.EVAL_LIVE_REQUIRED = '1';
     vi.spyOn(extractionFloor, 'run').mockResolvedValueOnce({
       id: 'extraction-floor',
@@ -325,7 +335,36 @@ describe('runEvalSuite', () => {
     expect(result.exitCode).toBe(1);
   });
 
-  it('Case 9 — a thrown check becomes a sanitized fail (not a rejection), report still produced', async () => {
+  it('Tightening 3 - the summary reports measured aggregate spend against the cap on a live run', async () => {
+    process.env.EVAL_LIVE_REQUIRED = '1';
+    vi.spyOn(extractionFloor, 'run').mockResolvedValueOnce({
+      id: 'extraction-floor',
+      description: extractionFloor.description,
+      status: 'pass',
+      reason: 'test-stub: pass',
+    });
+    vi.spyOn(qaGrounding, 'run').mockResolvedValueOnce({
+      id: 'qa-grounding',
+      description: qaGrounding.description,
+      status: 'pass',
+      reason: 'test-stub: pass',
+    });
+    vi.spyOn(cacheHit, 'run').mockResolvedValueOnce({
+      id: 'cache-hit',
+      description: cacheHit.description,
+      status: 'pass',
+      reason: 'test-stub: pass',
+    });
+    const result = await runEvalSuite();
+    // 1_234_567 micro-USD → $1.2346, cap 5_000_000 → $5.0000. Additive to the
+    // summary; never affects exitCode.
+    expect(result.summary).toContain('Aggregate metered spend');
+    expect(result.summary).toContain('$1.2346');
+    expect(result.summary).toContain('$5.0000/user/day');
+    expect(result.exitCode).toBe(0);
+  });
+
+  it('Case 9 - a thrown check becomes a sanitized fail (not a rejection), report still produced', async () => {
     // Per-check try/catch isolation (/codex P2 + /cso L3): a check that throws
     // must NOT reject Promise.all (which would skip the report write). It is
     // converted to a fail-CLOSED 'fail' result; the other checks + the summary
