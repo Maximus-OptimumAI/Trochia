@@ -35,7 +35,7 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files — keep everything except the documented example
+# env files - keep everything except the documented example
 .env
 .env.*
 !.env.example
@@ -48,7 +48,7 @@ yarn-error.log*
 next-env.d.ts
 .env.test
 
-# Local tool state — machine-specific
+# Local tool state - machine-specific
 .claude/
 .gstack/
 
@@ -60,5 +60,9 @@ src/db/migrations/schema.ts
 
 # Eval harness runtime artifact (EVAL-01a / Plan 02-04 T07).
 # `npm run eval:run` writes this to the repo root; CI uploads it as an artifact.
-# Never committed — the JSON shape lives in src/ai/eval/runner.ts.
+# Never committed - the JSON shape lives in src/ai/eval/runner.ts.
 eval-report.json
+
+# Ephemeral per-session agent scratch (handoff notes between sessions).
+# Not a versioned deliverable; kept local so it never collides on checkout.
+docs/handoff.md
